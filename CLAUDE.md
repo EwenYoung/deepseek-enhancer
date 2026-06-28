@@ -16,6 +16,22 @@ Built artifacts go to `dist/chrome-mv3/`. Deploy target: `D:\deepseek-enhancer\`
 
 To test in Chrome: `chrome://extensions` → "Load unpacked" → point to the deploy directory.
 
+## 测试
+
+每次代码改动后按以下分工验证：
+
+**Claude 测试**（确定性/可自动化）：
+- 纯函数逻辑（SSE 解析、导出、技能合并、类型定义）
+- CSS 选择器正确性
+- 数据转换/格式化
+- 方法：内联 `assert` 或 `npm run test`（vitest）
+
+**用户手动测试**（需在 chat.deepseek.com 浏览器中验证）：
+- 各主题下视觉颜色、按钮、高亮
+- Agent 模式端到端工具调用
+- React 条件渲染后的 UI 状态
+- SPA 导航后的状态保持
+
 ## Architecture
 
 ### Three-Layer Runtime

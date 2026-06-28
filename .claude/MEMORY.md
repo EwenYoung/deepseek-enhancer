@@ -1,0 +1,3 @@
+- [宽屏模式右侧贴框调试总结](wide-mode-right-overflow.md) — 根因是 chatPanel 超窗口，教训是调试从父链追溯
+- [graphify 优先搜索](graphify-first-search.md) — 优先用 graphify query/path/explain 搜索代码，修改后及时 update
+- [主题色模式下发送按钮消失调试总结](theme-send-button-hidden-debug.md) — emotion CSS-in-JS 被扩展 `*` + `!important` 覆盖，最终用 `:not([class*="ds-button"])` 全规则排除修复

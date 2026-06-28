@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WXT cache
+.wxt/
+
+# Graphify output
+graphify-out/
+
+# DeepSeek DOM reference (saved HTML snapshots)
+.ds-reference/*.html
+.ds-reference/*_files/
+
+# Windows deploy mount
+/mnt/d/
+
+# Logs
+*.log
+npm-debug.log*

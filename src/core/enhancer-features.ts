@@ -231,17 +231,17 @@ export async function applyTheme(idx: number) {
     }
     #root [data-ds-chatpanel],
     #root [data-ds-chatpanel] *:not([class*="ds-button"]) {
-      background-color: ${theme.chatBg} !important;
+      background: ${theme.chatBg} !important;
     }
     /* no-bg 区域：同特异性(0-1-3-0最高)后定义 → 透明 */
     #root [data-ds-chatpanel] [data-ds-no-bg],
     #root [data-ds-chatpanel] [data-ds-no-bg] *:not([class*="ds-button"]) {
-      background-color: transparent !important;
+      background: transparent !important;
     }
     /* 外部 no-bg 包裹器（右侧间隙）：同样排除按钮 */
     #root [data-ds-no-bg],
     #root [data-ds-no-bg] *:not([class*="ds-button"]) {
-      background-color: transparent !important;
+      background: transparent !important;
     }
     /* 放在最后：选中会话条目高亮 + 清除所有 Emotion 蓝色残留 */
     #root [data-ds-sidebar] a[data-ds-sidebar-selected],
@@ -255,6 +255,12 @@ export async function applyTheme(idx: number) {
     #root [data-ds-sidebar] a[data-ds-sidebar-selected] .ds-focus-ring {
       outline: none !important;
       box-shadow: none !important;
+    }
+    /* 已思考折叠区域：融入主题色 */
+    #root [data-ds-chatpanel] .ds-message:has(.ds-think-content) > :first-child {
+      background-color: ${theme.chatBg} !important;
+      border-radius: 6px !important;
+      margin-bottom: 0 !important;
     }
   `);
 
@@ -454,6 +460,13 @@ export async function toggleScrollbar(hidden: boolean) {
       #root [class*="ds-scroll-area"] {
         scrollbar-width: none !important;
       }
+      /* DeepSeek 自定义滚动条 div 元素 */
+      #root [class*="ds-scroll-area__vertical-bar"],
+      #root [class*="ds-scroll-area__horizontal-bar"],
+      #root [class*="ds-scroll-area__vertical-gutter"],
+      #root [class*="ds-scroll-area__horizontal-gutter"] {
+        display: none !important;
+      }
     `);
   } else {
     removeCSS('scrollbar');
@@ -464,14 +477,73 @@ export async function toggleScrollbar(hidden: boolean) {
 // 5.4 输入框自动隐藏
 // ============================================================
 let inputHideActive = false;
-let inputHideTimer: ReturnType<typeof setTimeout> | null = null;
+let inputHideEl: HTMLElement | null = null;  // 要平移的元素（_77cefa5）
+let inputClipEl: HTMLElement | null = null;  // 裁剪溢出的元素（aaff8b8f）
+let inputFocused = false;  // textarea 是否有焦点
+let inputCurrentlyHidden = true;
 
 function onMouseMove(e: MouseEvent) {
-  if (!inputHideActive) return;
-  const nearBottom = window.innerHeight - e.clientY < 120;
-  document.querySelectorAll('.ds-input-autohide').forEach(el => {
-    (el as HTMLElement).classList.toggle('ds-input-visible', nearBottom);
+  if (!inputHideActive || !inputHideEl) return;
+  const dist = window.innerHeight - e.clientY;
+  if (inputFocused) {
+    inputCurrentlyHidden = false;
+    inputHideEl.style.transform = 'translateY(0)';
+  } else {
+    // 迟滞：显示阈值 80px，隐藏阈值 150px
+    if (inputCurrentlyHidden) {
+      if (dist < 80) {
+        inputCurrentlyHidden = false;
+        inputHideEl.style.transform = 'translateY(0)';
+      }
+    } else {
+      if (dist > 150) {
+        inputCurrentlyHidden = true;
+        inputHideEl.style.transform = 'translateY(120px)';
+      }
+    }
+  }
+}
+
+function onTextareaFocus() {
+  inputFocused = true;
+  inputCurrentlyHidden = false;
+  inputHideEl?.style.setProperty('transform', 'translateY(0)');
+}
+
+function onTextareaBlur() {
+  inputFocused = false;
+}
+
+let textareaObserver: MutationObserver | null = null;
+
+function setupTextareaObserver() {
+  textareaObserver?.disconnect();
+  textareaObserver = new MutationObserver(() => {
+    const ta = document.querySelector('textarea');
+    if (ta && (!inputHideEl || !document.body.contains(inputHideEl))) {
+      // textarea 被 React 重建了，重新初始化
+      const tryInit = () => {
+        inputHideEl = ta.parentElement?.parentElement?.parentElement as HTMLElement | null;
+        inputClipEl = inputHideEl?.parentElement as HTMLElement | null;
+        if (!inputHideEl || !inputClipEl || !document.body.contains(inputHideEl)) return false;
+        inputClipEl.style.overflow = 'hidden';
+        inputHideEl.style.transition = 'transform 0.35s ease';
+        inputFocused = document.activeElement === ta;
+        inputCurrentlyHidden = !inputFocused;
+        inputHideEl.style.transform = inputFocused ? 'translateY(0)' : 'translateY(120px)';
+        ta.addEventListener('focus', onTextareaFocus);
+        ta.addEventListener('blur', onTextareaBlur);
+        return true;
+      };
+      if (!tryInit()) {
+        let retries = 4;
+        const iv = setInterval(() => {
+          if (tryInit() || --retries <= 0) clearInterval(iv);
+        }, 500);
+      }
+    }
   });
+  textareaObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 export async function toggleAutoHideInput(enabled: boolean) {
@@ -481,33 +553,50 @@ export async function toggleAutoHideInput(enabled: boolean) {
   inputHideActive = enabled;
 
   if (enabled) {
-    applyCSS('inputHide', `
-      .ds-input-autohide {
-        transform: translateY(65%) !important;
-        transition: transform 0.35s ease !important;
-      }
-      .ds-input-autohide.ds-input-visible {
-        transform: translateY(0) !important;
-      }
-    `);
-    // 标记输入包装层
-    const ta = document.querySelector('textarea');
-    if (ta) {
-      let el = ta.parentElement;
-      for (let i = 0; i < 5 && el; i++) {
-        if (el.tagName === 'DIV' && getComputedStyle(el).position !== 'static') {
-          el.classList.add('ds-input-autohide');
-          break;
-        }
-        el = el.parentElement;
-      }
+    // 提取初始化逻辑，支持重试（页面加载时 textarea 可能还没渲染）
+    const tryInit = () => {
+      const ta = document.querySelector('textarea');
+      if (!ta) return false;
+      inputHideEl = ta.parentElement?.parentElement?.parentElement as HTMLElement | null;
+      inputClipEl = inputHideEl?.parentElement as HTMLElement | null;
+      if (!inputHideEl || !inputClipEl) return false;
+      inputClipEl.style.overflow = 'hidden';
+      inputHideEl.style.transition = 'transform 0.35s ease';
+      inputFocused = document.activeElement === ta;
+      inputCurrentlyHidden = !inputFocused;
+      inputHideEl.style.transform = inputFocused ? 'translateY(0)' : 'translateY(120px)';
+      ta.addEventListener('focus', onTextareaFocus);
+      ta.addEventListener('blur', onTextareaBlur);
+      return true;
+    };
+    // 尝试重试（页面加载时 textarea 可能还没渲染）
+    if (!tryInit()) {
+      let retries = 6;
+      const iv = setInterval(() => {
+        if (tryInit() || --retries <= 0) clearInterval(iv);
+      }, 500);
     }
+    // 监听 textarea 替换（SPA 切换会话时 React 重建）
+    setupTextareaObserver();
     document.addEventListener('mousemove', onMouseMove);
   } else {
-    removeCSS('inputHide');
-    document.querySelectorAll('.ds-input-autohide, .ds-input-visible').forEach(el => {
-      el.classList.remove('ds-input-autohide', 'ds-input-visible');
-    });
+    if (inputHideEl) {
+      inputHideEl.style.transform = '';
+      inputHideEl.style.transition = '';
+    }
+    if (inputClipEl) inputClipEl.style.overflow = '';
+    // 清理事件
+    const ta = document.querySelector('textarea');
+    if (ta) {
+      ta.removeEventListener('focus', onTextareaFocus);
+      ta.removeEventListener('blur', onTextareaBlur);
+    }
+    inputHideEl = null;
+    inputClipEl = null;
+    inputFocused = false;
+    inputCurrentlyHidden = true;
+    textareaObserver?.disconnect();
+    textareaObserver = null;
     document.removeEventListener('mousemove', onMouseMove);
   }
 }
@@ -518,6 +607,20 @@ export async function toggleAutoHideInput(enabled: boolean) {
 let recognition: SpeechRecognition | null = null;
 let isRecording = false;
 
+function onVoiceKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+    e.preventDefault();
+    // 先确保输入框显示
+    if (inputHideActive && inputHideEl && inputCurrentlyHidden) {
+      inputCurrentlyHidden = false;
+      inputHideEl.style.transform = 'translateY(0)';
+    }
+    // 再切换录音
+    const btn = document.getElementById('ds-voice-btn') as HTMLElement | null;
+    if (btn) toggleRecording(btn);
+  }
+}
+
 export async function toggleVoiceInput(enabled: boolean) {
   const cfg = await getConfig();
   cfg.voiceInput = enabled;
@@ -525,8 +628,13 @@ export async function toggleVoiceInput(enabled: boolean) {
 
   if (enabled) {
     createVoiceButton();
+    setupVoiceObserver();
+    document.addEventListener('keydown', onVoiceKeydown);
   } else {
     document.getElementById('ds-voice-btn')?.remove();
+    document.removeEventListener('keydown', onVoiceKeydown);
+    voiceObserver?.disconnect();
+    voiceObserver = null;
     if (recognition) {
       try { recognition.stop(); } catch {}
       recognition = null;
@@ -566,6 +674,32 @@ function createVoiceButton() {
     (container as HTMLElement).style.position = 'relative';
   }
   container?.appendChild(btn);
+}
+
+// 语音按钮的 textarea 重建监听
+let voiceObserver: MutationObserver | null = null;
+
+function setupVoiceObserver() {
+  voiceObserver?.disconnect();
+  voiceObserver = new MutationObserver(() => {
+    const existing = document.getElementById('ds-voice-btn');
+    const ta = document.querySelector('textarea');
+    if (ta && !existing) {
+      // textarea 被重建了，重新创建语音按钮
+      let retries = 4;
+      const tryCreate = () => {
+        if (document.getElementById('ds-voice-btn')) return true;
+        createVoiceButton();
+        return !!document.getElementById('ds-voice-btn');
+      };
+      if (!tryCreate()) {
+        const iv = setInterval(() => {
+          if (tryCreate() || --retries <= 0) clearInterval(iv);
+        }, 500);
+      }
+    }
+  });
+  voiceObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function toggleRecording(btn: HTMLElement) {
@@ -632,5 +766,5 @@ export async function loadEnhancerFeatures() {
   if (cfg.themeIdx > 0) await applyTheme(cfg.themeIdx);
   if (cfg.hideScrollbar) await toggleScrollbar(true);
   if (cfg.autoHideInput) await toggleAutoHideInput(true);
-  if (cfg.voiceInput) { setTimeout(createVoiceButton, 1000); }
+  if (cfg.voiceInput) { setTimeout(() => { createVoiceButton(); setupVoiceObserver(); document.addEventListener('keydown', onVoiceKeydown); }, 1000); }
 }

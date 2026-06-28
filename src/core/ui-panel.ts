@@ -169,6 +169,72 @@ function createPanel(state: AppState) {
   panelEl.innerHTML = buildPanelHTML();
   document.body.appendChild(panelEl);
 
+  // 面板深色模式样式（跟随 DeepSeek）
+  const panelDarkStyle = document.createElement('style');
+  panelDarkStyle.id = 'ds-panel-dark-style';
+  panelDarkStyle.textContent = `
+    /* 通杀：覆盖面板内所有内联样式的背景和文字色（排除开关元素避免遮挡） */
+    #ds-mini-panel.ds-panel-dark,
+    #ds-mini-panel.ds-panel-dark [style]:not(#ds-mini-agent-slider):not(#ds-mini-agent-knob):not([style*="-webkit-text-fill-color"]) {
+      background: #1e1e2e !important;
+      color: #cdd6f4 !important;
+    }
+    /* 边框 */
+    #ds-mini-panel.ds-panel-dark,
+    #ds-mini-panel.ds-panel-dark [style*="border"] {
+      border-color: #313244 !important;
+    }
+    /* 设置区横条分割线 */
+    #ds-mini-panel.ds-panel-dark .ds-enh-row {
+      border-bottom-color: #313244 !important;
+    }
+    /* 按钮 - 覆盖通杀恢复可见样式 */
+    #ds-mini-panel.ds-panel-dark button:not(#ds-mini-panel-close) {
+      background: #45475a !important;
+      border: 1px solid #585b70 !important;
+      color: #cdd6f4 !important;
+    }
+    #ds-mini-panel.ds-panel-dark #ds-mini-add-skill {
+      background: #6c63ff !important;
+      border: none !important;
+      color: #fff !important;
+    }
+    #ds-mini-panel.ds-panel-dark #ds-mini-export-html {
+      background: #2a6e3b !important;
+      border: none !important;
+    }
+    #ds-mini-panel.ds-panel-dark #ds-mini-export-md {
+      background: #45475a !important;
+      color: #cdd6f4 !important;
+    }
+    /* 输入框 */
+    #ds-mini-panel.ds-panel-dark input {
+      background: #313244 !important;
+      border-color: #45475a !important;
+      color: #cdd6f4 !important;
+    }
+    /* tab */
+    #ds-mini-panel-tab.ds-panel-dark {
+      background: #6c63ff !important;
+    }
+  `;
+  document.head.appendChild(panelDarkStyle);
+
+  // 初始检测深色模式
+  const initialDark = document.body.classList.contains('dark');
+  if (initialDark) {
+    panelEl.classList.add('ds-panel-dark');
+    tab.classList.add('ds-panel-dark');
+  }
+
+  // 监听深色模式切换
+  const darkObserver = new MutationObserver(() => {
+    const isDark = document.body.classList.contains('dark');
+    panelEl?.classList.toggle('ds-panel-dark', isDark);
+    tab.classList.toggle('ds-panel-dark', isDark);
+  });
+  darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
   // 事件绑定
   bindPanelEvents(state);
 }

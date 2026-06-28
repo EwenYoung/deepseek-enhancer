@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+*.zip
 
 # TypeScript
 *.tsbuildinfo
@@ -16,6 +17,12 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # WXT cache
 .wxt/
@@ -33,3 +40,6 @@ graphify-out/
 # Logs
 *.log
 npm-debug.log*
+
+# Claude Code
+.claude/.graphify_*

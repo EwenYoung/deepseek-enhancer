@@ -64,9 +64,32 @@
     { name: 'github_trending', label: 'GitHub热门', params: { language: { desc: '语言' }, since: { desc: '周期' } } },
     { name: 'doc_generate',  label: '生成文档',   params: { title: { desc: '文件名' }, format: { desc: '格式: md/html' }, content: { desc: '文档内容（Markdown）' } } },
   ];
+  var disabledTools = {}; // 用户禁用的工具列表
+
+  // 监听来自 isolated world 的工具状态
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    if (e.data && e.data.source === 'DS_MINI_ISOLATED' && e.data.type === 'SET_TOOLS_STATE') {
+      disabledTools = {};
+      for (var k in e.data.tools) {
+        if (!e.data.tools[k]) disabledTools[k] = true;
+      }
+      TOOL_DEFS_CACHE = {}; // 清空缓存
+      // 清空旧注入记录，避免导出时混入旧工具定义
+      var el = document.getElementById('ds-mini-injected');
+      if (el) el.textContent = '';
+    }
+  });
 
   function buildToolDefs(mode) {
-    var avail = TOOL_DEFS.slice();
+    try {
+      var ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
+      for (var k in ls) { if (!ls[k]) disabledTools[k] = true; }
+    } catch(e) {}
+    var avail = [];
+    for (var i = 0; i < TOOL_DEFS.length; i++) {
+      if (!disabledTools[TOOL_DEFS[i].name]) avail.push(TOOL_DEFS[i]);
+    }
     if (mode === 'fast') avail = avail.filter(function (t) { return t.name === 'web_fetch' || t.name === 'doc_generate'; });
     if (avail.length === 0) return '';
 
@@ -110,8 +133,7 @@
   var TOOL_DEFS_CACHE = {};
 
   function getToolDefs(mode) {
-    if (!TOOL_DEFS_CACHE[mode]) TOOL_DEFS_CACHE[mode] = buildToolDefs(mode);
-    return TOOL_DEFS_CACHE[mode];
+    return buildToolDefs(mode); // 实时构建，不缓存（Tools 开关动态变化）
   }
 
   // ==========================================================

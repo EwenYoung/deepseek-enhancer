@@ -7,6 +7,7 @@ import { initPanel } from '../core/ui-panel';
 import { initToolBlocks, handleMainWorldToolCalls, setSilentMode } from '../core/ui-tool-blocks';
 import { initArtifacts } from '../core/artifact';
 import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
+import { setDisabledTools } from '../core/inject-context';
 import type { AppState } from '../core/types';
 
 export const state: AppState = {
@@ -44,6 +45,12 @@ export default defineContentScript({
       if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_AGENT_MODE') {
         setSilentMode(event.data.enabled);
       }
+      if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_TOOLS_STATE') {
+        setDisabledTools(event.data.tools || {});
+      }
+      if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_TOKEN_SPEED_TOGGLE') {
+        if (!event.data.enabled) { if (speedEl) { speedEl.remove(); speedEl = null; } }
+      }
     });
 
     initAutocomplete(state);
@@ -55,9 +62,12 @@ export default defineContentScript({
     loadEnhancerFeatures();
     initThemeAutoSwitch();
 
-    // 同步静默循环标志
+    // 同步静默循环标志 + 工具状态初始加载
     chrome.storage.local.get('ds_mini_agent_mode').then(r => {
       if (r.ds_mini_agent_mode) setSilentMode(true);
+    });
+    chrome.storage.local.get('ds_mini_tools_state').then(r => {
+      if (r.ds_mini_tools_state) setDisabledTools(r.ds_mini_tools_state);
     });
 
     // token 速度监听
@@ -82,30 +92,35 @@ let speedEl: HTMLElement | null = null;
 let speedTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateTokenSpeed(tokPerSec: number, finished: boolean) {
-  if (!speedEl) {
-    speedEl = document.createElement('div');
-    speedEl.id = 'ds-mini-tok-speed';
-    speedEl.style.cssText = `
-      position: fixed; right: 16px; bottom: 120px; z-index: 999999;
-      font-family: -apple-system, sans-serif; font-size: 11px;
-      color: #9ca3af; pointer-events: none; user-select: none;
-      opacity: 0; transition: opacity 0.3s;
-      background: rgba(0,0,0,0.05); padding: 2px 8px;
-      border-radius: 4px;
-    `;
-    document.body.appendChild(speedEl);
-  }
-
-  speedEl.textContent = `~${tokPerSec.toFixed(0)} tok/s`;
-  speedEl.style.opacity = '1';
-
-  if (finished) {
-    // 最终速度显示 2s 后渐隐
-    if (speedTimer) clearTimeout(speedTimer);
-    speedTimer = setTimeout(() => {
-      speedEl!.style.opacity = '0';
-    }, 2000);
-  }
+  const ENHANCER_KEY = 'ds_mini_enhancer';
+  chrome.storage.local.get(ENHANCER_KEY).then(r => {
+    const cfg = r[ENHANCER_KEY] || {};
+    if (!cfg.tokenSpeed) {
+      if (speedEl) { speedEl.remove(); speedEl = null; }
+      return;
+    }
+    if (!speedEl) {
+      speedEl = document.createElement('div');
+      speedEl.id = 'ds-mini-tok-speed';
+      speedEl.style.cssText = `
+        position: fixed; right: 16px; bottom: 120px; z-index: 99999;
+        font-family: -apple-system, sans-serif; font-size: 11px;
+        color: #9ca3af; pointer-events: none; user-select: none;
+        opacity: 0; transition: opacity 0.3s;
+        background: rgba(0,0,0,0.05); padding: 2px 8px;
+        border-radius: 4px;
+      `;
+      document.body.appendChild(speedEl);
+    }
+    speedEl.textContent = `~${tokPerSec.toFixed(0)} tok/s`;
+    speedEl.style.opacity = '1';
+    if (finished) {
+      if (speedTimer) clearTimeout(speedTimer);
+      speedTimer = setTimeout(() => {
+        speedEl!.style.opacity = '0';
+      }, 2000);
+    }
+  });
 }
 
 // 注入语音脉冲 CSS

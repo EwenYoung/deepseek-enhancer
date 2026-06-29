@@ -4,7 +4,7 @@
 // 从页面右侧滑出的管理面板
 import type { AppState, Skill } from './types';
 import { loadSkills, saveSkill, deleteSkill, toggleSkill } from './skill-registry';
-import { importFromGitHub, importFromGitHubPath, importFromLocal, importAndSave } from './skill-importer';
+import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
 import {
   toggleWideScreen, applyTheme, toggleScrollbar,
@@ -36,202 +36,136 @@ export async function initPanel(state: AppState) {
 // ============================================================
 // 创建面板
 // ============================================================
-let tabTop = 0;
-let tabLeft = 0;
-
-// 从 storage 恢复位置
-chrome.storage.local.get('ds_mini_tab_pos').then(r => {
-  if (r.ds_mini_tab_pos) {
-    tabTop = r.ds_mini_tab_pos.top;
-    tabLeft = r.ds_mini_tab_pos.left;
-    const tab = document.getElementById('ds-mini-panel-tab');
-    if (tab) {
-      tab.style.top = tabTop + 'px';
-      tab.style.left = tabLeft + 'px';
-      tab.style.right = 'auto';
-    }
-  }
-});
-
 function createPanel(state: AppState) {
-  // Tab 触发器（可拖拽）
-  const tab = document.createElement('div');
-  tab.id = 'ds-mini-panel-tab';
-  tab.innerHTML = '⚡';
-  tab.title = 'Deepseek Enhancer ✦ 工具面板（可拖拽）';
-  tab.style.cssText = `
-    position: fixed;
-    right: 0;
-    top: 50%;
-    z-index: 999998;
-    width: 24px;
-    height: 80px;
-    background: #4f46e5;
-    color: #fff;
-    border-radius: 8px 0 0 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    font-size: 16px;
-    writing-mode: vertical-lr;
-    letter-spacing: 4px;
-    opacity: 0.7;
-    user-select: none;
-    transition: opacity 0.3s;
-  `;
-  tab.addEventListener('mouseenter', () => { tab.style.opacity = '1'; });
-  tab.addEventListener('mouseleave', () => { if (!isDragging) tab.style.opacity = '0.7'; });
-
-  // 拖拽逻辑
-  let dragStartX = 0;
-  let dragStartY = 0;
-  let dragStartLeft = 0;
-  let dragStartTop = 0;
-  let isDragging = false;
-  let hasMoved = false;
-
-  tab.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return; // 只响应左键
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    const rect = tab.getBoundingClientRect();
-    dragStartLeft = rect.left;
-    dragStartTop = rect.top;
-    isDragging = true;
-    hasMoved = false;
-    tab.style.cursor = 'grabbing';
-    tab.style.transition = 'none';
-    tab.style.right = 'auto';
-    tab.style.left = dragStartLeft + 'px';
-    tab.style.top = dragStartTop + 'px';
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartX;
-    const dy = e.clientY - dragStartY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved = true;
-    tab.style.left = Math.max(0, Math.min(dragStartLeft + dx, window.innerWidth - 24)) + 'px';
-    tab.style.top = Math.max(0, Math.min(dragStartTop + dy, window.innerHeight - 80)) + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    isDragging = false;
-    tab.style.cursor = 'grab';
-    tab.style.opacity = '0.7';
-
-    // 保存位置
-    tabTop = parseInt(tab.style.top, 10) || 0;
-    tabLeft = parseInt(tab.style.left, 10) || 0;
-    chrome.storage.local.set({ ds_mini_tab_pos: { top: tabTop, left: tabLeft } });
-
-    // 恢复位置
-    if (tabTop) tab.style.top = tabTop + 'px';
-    if (tabLeft) tab.style.left = tabLeft + 'px';
-  });
-
-  // 点击（没拖拽才算点击）
-  tab.addEventListener('click', (e) => {
-    if (hasMoved) {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
+  // 注入 CSS 变量（浅色/深色主题）
+  const panelVars = document.createElement('style');
+  panelVars.id = 'ds-panel-vars';
+  panelVars.textContent = `
+    :root {
+      --panel-bg: rgba(255,255,255,0.92);
+      --panel-blur: blur(20px);
+      --panel-text: #1f2937;
+      --panel-text-secondary: #6b7280;
+      --panel-border: rgba(0,0,0,0.08);
+      --accent: #007AFF;
+      --accent-secondary: #5E5CE6;
+      --danger: #FF3B30;
+      --card-bg: rgba(255,255,255,0.5);
+      --card-border: rgba(0,0,0,0.06);
+      --toggle-on: #007AFF;
+      --toggle-off: rgba(0,0,0,0.2);
+      --toggle-knob: #fff;
+      --input-bg: rgba(255,255,255,0.7);
+      --input-border: rgba(0,0,0,0.12);
+      --overlay-bg: rgba(0,0,0,0.3);
     }
-    togglePanel(state);
-  });
+    html.ds-dark {
+      --panel-bg: rgba(0,0,0,0.88);
+      --panel-text: #e0e0e0;
+      --panel-text-secondary: #a0a0b0;
+      --panel-border: rgba(255,255,255,0.08);
+      --accent: #5E5CE6;
+      --accent-secondary: #007AFF;
+      --danger: #FF453A;
+      --card-bg: rgba(255,255,255,0.08);
+      --card-border: rgba(255,255,255,0.06);
+      --toggle-on: #5E5CE6;
+      --toggle-off: rgba(255,255,255,0.15);
+      --toggle-knob: #fff;
+      --input-bg: rgba(255,255,255,0.1);
+      --input-border: rgba(255,255,255,0.12);
+      --overlay-bg: rgba(0,0,0,0.5);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0s !important; }
+    }
+  `;
+  document.head.appendChild(panelVars);
 
-  document.body.appendChild(tab);
-
-  // 面板主体
+  // 面板主体（玻璃风格）
   panelEl = document.createElement('div');
   panelEl.id = 'ds-mini-panel';
   panelEl.style.cssText = `
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 360px;
-    height: 100vh;
+    position: fixed; right: 12px; top: 12px;
+    width: 340px; height: calc(100vh - 24px);
     z-index: 999999;
-    background: #fff;
-    box-shadow: -4px 0 24px rgba(0,0,0,0.12);
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    font-family: -apple-system, sans-serif;
+    background: var(--panel-bg);
+    backdrop-filter: var(--panel-blur);
+    -webkit-backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    transform: translateX(calc(100% + 20px));
+    transition: transform 0.25s ease-out;
+    display: flex; flex-direction: column;
+    font-family: 'DM Sans', -apple-system, sans-serif;
     font-size: 14px;
-    color: #1f2937;
+    color: var(--panel-text);
+    overflow: hidden;
   `;
-
   panelEl.innerHTML = buildPanelHTML();
   document.body.appendChild(panelEl);
 
-  // 面板深色模式样式（跟随 DeepSeek）
-  const panelDarkStyle = document.createElement('style');
-  panelDarkStyle.id = 'ds-panel-dark-style';
-  panelDarkStyle.textContent = `
-    /* 通杀：覆盖面板内所有内联样式的背景和文字色（排除开关元素避免遮挡） */
-    #ds-mini-panel.ds-panel-dark,
-    #ds-mini-panel.ds-panel-dark [style]:not(#ds-mini-agent-slider):not(#ds-mini-agent-knob):not([style*="-webkit-text-fill-color"]) {
-      background: #1e1e2e !important;
-      color: #cdd6f4 !important;
-    }
-    /* 边框 */
-    #ds-mini-panel.ds-panel-dark,
-    #ds-mini-panel.ds-panel-dark [style*="border"] {
-      border-color: #313244 !important;
-    }
-    /* 设置区横条分割线 */
-    #ds-mini-panel.ds-panel-dark .ds-enh-row {
-      border-bottom-color: #313244 !important;
-    }
-    /* 按钮 - 覆盖通杀恢复可见样式 */
-    #ds-mini-panel.ds-panel-dark button:not(#ds-mini-panel-close) {
-      background: #45475a !important;
-      border: 1px solid #585b70 !important;
-      color: #cdd6f4 !important;
-    }
-    #ds-mini-panel.ds-panel-dark #ds-mini-add-skill {
-      background: #6c63ff !important;
-      border: none !important;
-      color: #fff !important;
-    }
-    #ds-mini-panel.ds-panel-dark #ds-mini-export-html {
-      background: #2a6e3b !important;
-      border: none !important;
-    }
-    #ds-mini-panel.ds-panel-dark #ds-mini-export-md {
-      background: #45475a !important;
-      color: #cdd6f4 !important;
-    }
-    /* 输入框 */
-    #ds-mini-panel.ds-panel-dark input {
-      background: #313244 !important;
-      border-color: #45475a !important;
-      color: #cdd6f4 !important;
-    }
-    /* tab */
-    #ds-mini-panel-tab.ds-panel-dark {
-      background: #6c63ff !important;
-    }
+  // 右下角发光触发器
+  const trigger = document.createElement('div');
+  trigger.id = 'ds-mini-trigger';
+  trigger.innerHTML = `
+    <span id="ds-mini-trigger-icon" style="font-size:14px;">✦</span>
+    <span id="ds-mini-trigger-label" style="
+      font-size:12px;font-weight:500;white-space:nowrap;
+      max-width:0;overflow:hidden;transition:max-width 0.2s, margin 0.2s;
+    ">DeepSeek Enhancer</span>
   `;
-  document.head.appendChild(panelDarkStyle);
+  trigger.style.cssText = `
+    position: fixed; bottom: 16px; right: 16px;
+    z-index: 999998;
+    display: flex; align-items: center; gap: 6px;
+    background: var(--accent, #007AFF);
+    color: #fff;
+    border: none; border-radius: 20px;
+    padding: 8px 10px;
+    cursor: pointer;
+    box-shadow: 0 0 12px var(--accent, #007AFF);
+    transition: box-shadow 0.15s, padding 0.2s;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+  `;
+  trigger.addEventListener('mouseenter', () => {
+    const label = document.getElementById('ds-mini-trigger-label');
+    if (label) { label.style.maxWidth = '200px'; label.style.marginLeft = '4px'; }
+    trigger.style.padding = '8px 14px';
+  });
+  trigger.addEventListener('mouseleave', () => {
+    const label = document.getElementById('ds-mini-trigger-label');
+    if (label) { label.style.maxWidth = '0'; label.style.marginLeft = '0'; }
+    trigger.style.padding = '8px 10px';
+  });
+  trigger.addEventListener('click', () => togglePanel(state));
+  document.body.appendChild(trigger);
 
   // 初始检测深色模式
   const initialDark = document.body.classList.contains('dark');
   if (initialDark) {
-    panelEl.classList.add('ds-panel-dark');
-    tab.classList.add('ds-panel-dark');
+    panelEl.classList.add('dark');
+    document.documentElement.classList.add('ds-dark');
+    trigger.style.setProperty('--accent', '#5E5CE6');
   }
 
   // 监听深色模式切换
   const darkObserver = new MutationObserver(() => {
     const isDark = document.body.classList.contains('dark');
-    panelEl?.classList.toggle('ds-panel-dark', isDark);
-    tab.classList.toggle('ds-panel-dark', isDark);
+    panelEl?.classList.toggle('dark', isDark);
+    document.documentElement.classList.toggle('ds-dark', isDark);
+    const accent = isDark ? '#5E5CE6' : '#007AFF';
+    trigger.style.setProperty('--accent', accent);
+    // 切换透明度值
+    chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {
+      const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
+      const slider = document.getElementById('ds-enh-opacity') as HTMLInputElement | null;
+      const label = document.getElementById('ds-enh-opacity-val');
+      if (slider) slider.value = val ? String(val) : '100';
+      if (label) label.textContent = val ? val + '%' : '100%';
+      applyOpacity(val || 100);
+    });
   });
   darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -240,115 +174,163 @@ function createPanel(state: AppState) {
 }
 
 // ============================================================
-// 面板 HTML
+// 面板 HTML（玻璃风格）
 // ============================================================
 function buildPanelHTML(): string {
   return `
     <!-- 标题栏 -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e5e7eb;">
-      <span style="font-weight:800;font-size:16px;background:linear-gradient(135deg,#4f46e5,#a855f7,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:0.5px;">✦ Deepseek Enhancer</span>
-      <button id="ds-mini-panel-close" style="background:none;border:none;cursor:pointer;font-size:20px;color:#9ca3af;padding:4px 8px;">×</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--panel-border);flex-shrink:0;">
+      <span style="font-weight:700;font-size:15px;color:var(--accent);letter-spacing:0.3px;">✦ DeepSeek Enhancer</span>
+      <button id="ds-mini-panel-close" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--panel-text-secondary);padding:2px 6px;border-radius:6px;transition:background 0.15s;">✕</button>
     </div>
 
-    <!-- 1. Agent 模式（最重要，置顶） -->
-    <div style="padding:12px 14px;border-bottom:1px solid #e5e7eb;background:#f0f5ff;">
+    <!-- Agent 模式 -->
+    <div style="padding:12px 16px;border-bottom:1px solid var(--panel-border);flex-shrink:0;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div><span style="font-size:13px;font-weight:600;color:#1e40af;">🤖 Agent 模式</span>
-        <div style="font-size:11px;color:#6b7280;margin-top:1px;">注入工具定义 + 自动循环</div></div>
-        <label id="ds-mini-agent-toggle" style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            <span style="font-size:13px;font-weight:600;color:var(--panel-text);">Agent 模式</span>
+          </div>
+          <div style="font-size:11px;color:var(--panel-text-secondary);margin-top:2px;">注入工具定义 + 自动循环</div>
+        </div>
+        <label id="ds-mini-agent-toggle" style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0;">
           <input type="checkbox" id="ds-mini-agent-checkbox" style="opacity:0;width:0;height:0;">
-          <span id="ds-mini-agent-slider" style="position:absolute;inset:0;background:#d1d5db;border-radius:24px;transition:background 0.3s;"></span>
-          <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);" id="ds-mini-agent-knob"></span>
+          <span id="ds-mini-agent-slider" style="position:absolute;inset:0;background:var(--toggle-off);border-radius:24px;transition:background 0.2s;"></span>
+          <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--toggle-knob);border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);" id="ds-mini-agent-knob"></span>
         </label>
       </div>
     </div>
 
-    <!-- 2. 工具卡片 -->
-    <div style="padding:10px 14px;border-bottom:1px solid #e5e7eb;">
-      <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px;">🧰 Tools</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-        <div style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"><div style="font-size:13px;font-weight:600;">🔍 搜索</div><div style="font-size:10px;color:#9ca3af;">web_search</div></div>
-        <div style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"><div style="font-size:13px;font-weight:600;">📄 抓取</div><div style="font-size:10px;color:#9ca3af;">web_fetch</div></div>
-        <div style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"><div style="font-size:13px;font-weight:600;">📰 新闻</div><div style="font-size:10px;color:#9ca3af;">news_hub</div></div>
-        <div style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"><div style="font-size:13px;font-weight:600;">🔥 GitHub</div><div style="font-size:10px;color:#9ca3af;">github_trending</div></div>
-        <div style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"><div style="font-size:13px;font-weight:600;">📝 生成文档</div><div style="font-size:10px;color:#9ca3af;">doc_generate</div></div>
+    <!-- Tools 列表（1 列，带开关） -->
+    <div style="padding:10px 16px;border-bottom:1px solid var(--panel-border);flex-shrink:0;">
+      <div style="font-size:12px;font-weight:600;color:var(--panel-text-secondary);margin-bottom:6px;">Tools</div>
+      <div id="ds-tools-list" style="display:flex;flex-direction:column;gap:4px;">
+        <div class="ds-tool-row" data-tool="web_search" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--card-bg);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">搜索</span>
+          <span class="ds-tool-toggle" data-tool="web_search" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+        </div>
+        <div class="ds-tool-row" data-tool="web_fetch" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--card-bg);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">抓取</span>
+          <span class="ds-tool-toggle" data-tool="web_fetch" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+        </div>
+        <div class="ds-tool-row" data-tool="news_hub" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--card-bg);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+          <span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">新闻</span>
+          <span class="ds-tool-toggle" data-tool="news_hub" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+        </div>
+        <div class="ds-tool-row" data-tool="github_trending" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--card-bg);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          <span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">GitHub 趋势</span>
+          <span class="ds-tool-toggle" data-tool="github_trending" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+        </div>
+        <div class="ds-tool-row" data-tool="doc_generate" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--card-bg);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">生成文档</span>
+          <span class="ds-tool-toggle" data-tool="doc_generate" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+        </div>
       </div>
     </div>
 
-    <!-- 3. 导出 -->
-    <div style="padding:10px 14px;border-bottom:1px solid #e5e7eb;">
-      <div style="font-size:12px;font-weight:600;color:#166534;margin-bottom:6px;">📤 导出会话</div>
+    <!-- 导出 -->
+    <div style="padding:10px 16px;border-bottom:1px solid var(--panel-border);flex-shrink:0;">
+      <div style="font-size:11px;font-weight:600;color:var(--panel-text-secondary);margin-bottom:4px;">导出会话</div>
       <div style="display:flex;gap:6px;">
-        <button id="ds-mini-export-md" style="flex:1;padding:5px 10px;border:1px solid #16a34a;border-radius:6px;background:#fff;color:#166534;cursor:pointer;font-size:11px;font-weight:500;">📄 Markdown</button>
-        <button id="ds-mini-export-html" style="flex:1;padding:5px 10px;border:none;border-radius:6px;background:#16a34a;color:#fff;cursor:pointer;font-size:11px;font-weight:500;">🌐 HTML</button>
+        <button id="ds-mini-export-md" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:background 0.15s;">Markdown</button>
+        <button id="ds-mini-export-html" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:background 0.15s;">HTML</button>
       </div>
     </div>
 
-    <!-- 4. 技能列表 -->
-    <div style="flex:1;overflow-y:auto;padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-size:12px;font-weight:600;">📋 Skills</span>
-        <div style="display:flex;gap:4px;">
-          <button id="ds-mini-import-gh" title="GitHub导入" style="padding:3px 8px;font-size:10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;">📦</button>
-          <button id="ds-mini-import-local" title="本地导入" style="padding:3px 8px;font-size:10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;">📁</button>
-          <button id="ds-mini-add-skill" title="新建技能" style="padding:3px 8px;font-size:10px;border:none;border-radius:4px;background:#4f46e5;color:#fff;cursor:pointer;">+</button>
+    <!-- Skills 表头（独立于滚动区） -->
+    <div style="flex-shrink:0;padding:6px 16px 0;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;font-weight:600;color:var(--panel-text-secondary);">Skills</span>
+      <div style="display:flex;gap:4px;">
+        <button id="ds-mini-import-local" title="本地导入" style="padding:4px 8px;font-size:10px;border:1px solid var(--panel-border);border-radius:6px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;display:flex;align-items:center;gap:3px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导入
+        </button>
+        <button id="ds-mini-add-skill" title="新建技能" style="padding:4px 8px;font-size:10px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;gap:3px;">+ 新建</button>
+      </div>
+    </div>
+    <!-- Skills 列表区 -->
+    <div id="ds-mini-skill-list" style="flex:1;overflow-y:auto;padding:6px 16px 8px;"></div>
+
+    <!-- 设置区（底部固定，可折叠） -->
+    <div id="ds-settings-section" style="flex-shrink:0;border-top:1px solid var(--panel-border);">
+      <!-- 折叠头 -->
+      <div id="ds-settings-toggle" style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;cursor:pointer;user-select:none;">
+        <span style="font-size:11px;font-weight:500;color:var(--panel-text-secondary);">设置</span>
+        <span id="ds-settings-arrow" style="font-size:11px;color:var(--panel-text-secondary);">⚙</span>
+      </div>
+      <!-- 设置体（可折叠） -->
+      <div id="ds-settings-body" style="display:none;">
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--panel-border);">
+          <div id="ds-settings-tab-enh" style="flex:1;padding:5px 7px;text-align:center;font-size:11px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;">增强功能</div>
+          <div id="ds-settings-tab-panel" style="flex:1;padding:5px 7px;text-align:center;font-size:11px;font-weight:500;color:var(--panel-text-secondary);cursor:pointer;">面板设置</div>
+          <div id="ds-settings-tab-api" style="flex:1;padding:5px 7px;text-align:center;font-size:11px;font-weight:500;color:var(--panel-text-secondary);cursor:pointer;">API 设置</div>
         </div>
-      </div>
-      <div id="ds-mini-skill-list"></div>
-    </div>
-
-    <!-- 5. 设置（折叠） -->
-    <div style="border-top:1px solid #e5e7eb;">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;user-select:none;color:#6b7280;font-size:12px;" onclick="
-        var c=document.getElementById('ds-mini-settings-body'),i=this.querySelector('.ds-set-icon');
-        if(c){c.style.display=c.style.display==='none'?'block':'none'}
-        if(i){i.textContent=c.style.display==='none'?'▶':'▼'}
-      ">
-        <span>⚙️ 设置</span>
-        <span class="ds-set-icon" style="color:#d1d5db;font-size:10px;">▶</span>
-      </div>
-      <div id="ds-mini-settings-body" style="display:none;padding:0 14px 12px;">
-        <div style="margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:11px;color:#92400e;">🔑 Tavily API Key</span>
-            <span id="ds-mini-apikey-status" style="font-size:10px;"></span>
+        <div style="padding:6px 12px 10px;max-height:150px;overflow-y:auto;">
+          <!-- 增强功能页 -->
+          <div id="ds-settings-enh" style="display:block;">
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>宽屏模式</span>
+              <span class="ds-enh-toggle" data-id="ds-enh-wide" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+            </div>
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>背景主题</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <button id="ds-enh-theme-prev" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;">‹</button>
+                <span id="ds-enh-theme-name" style="font-size:10px;color:var(--panel-text);min-width:36px;text-align:center;">默认</span>
+                <button id="ds-enh-theme-next" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;">›</button>
+              </div>
+            </div>
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>隐藏滚动条</span>
+              <span class="ds-enh-toggle" data-id="ds-enh-scrollbar" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+            </div>
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>隐藏输入框</span>
+              <span class="ds-enh-toggle" data-id="ds-enh-autohide" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+            </div>
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>语音输入</span>
+              <span class="ds-enh-toggle" data-id="ds-enh-voice" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+            </div>
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>Token 速度</span>
+              <span class="ds-enh-toggle" data-id="ds-enh-tokenspeed" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span>
+            </div>
           </div>
-          <div style="display:flex;gap:4px;">
-            <input id="ds-mini-apikey" type="password" placeholder="tvly-xxxxxxxx" style="flex:1;padding:5px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;">
-            <button id="ds-mini-apikey-save" style="padding:5px 8px;border:none;border-radius:4px;background:#4f46e5;color:#fff;cursor:pointer;font-size:10px;white-space:nowrap;">保存</button>
-            <button id="ds-mini-apikey-test" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;font-size:10px;">🔍</button>
+          <!-- 面板设置页 -->
+          <div id="ds-settings-panel" style="display:none;">
+            <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
+              <span>面板透明度</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input id="ds-enh-opacity" type="range" min="10" max="100" value="100" step="5" style="width:80px;height:4px;cursor:pointer;accent-color:var(--accent);">
+                <span id="ds-enh-opacity-val" style="font-size:10px;min-width:28px;text-align:right;color:var(--panel-text-secondary);">100%</span>
+              </div>
+            </div>
           </div>
-        </div>
-        <!-- 增强功能 -->
-        <div style="font-size:11px;font-weight:600;color:#374151;margin-bottom:4px;">🎨 增强功能</div>
-        <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;border-bottom:1px solid #f3f4f6;">
-          <span>🖥️ 宽屏模式</span>
-          <button id="ds-enh-wide" style="padding:2px 8px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:10px;">关闭</button>
-        </div>
-        <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;border-bottom:1px solid #f3f4f6;">
-          <span>🎨 背景主题</span>
-          <button id="ds-enh-theme" style="padding:2px 8px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:10px;">默认</button>
-        </div>
-        <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;border-bottom:1px solid #f3f4f6;">
-          <span>📜 滚动条</span>
-          <button id="ds-enh-scrollbar" style="padding:2px 8px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:10px;">显示</button>
-        </div>
-        <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;border-bottom:1px solid #f3f4f6;">
-          <span>⬇️ 输入框自动隐藏</span>
-          <button id="ds-enh-autohide" style="padding:2px 8px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:10px;">关闭</button>
-        </div>
-        <div class="ds-enh-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;">
-          <span>🎤 语音输入</span>
-          <button id="ds-enh-voice" style="padding:2px 8px;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer;font-size:10px;">关闭</button>
+          <!-- API 设置页 -->
+          <div id="ds-settings-api" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="font-size:10px;font-weight:500;color:var(--panel-text-secondary);">Tavily API Key</span>
+              <span id="ds-mini-apikey-status" style="font-size:9px;"></span>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <input id="ds-mini-apikey" type="password" placeholder="tvly-xxxxxxxx" style="flex:1;padding:4px 6px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--panel-text);font-size:10px;">
+              <button id="ds-mini-apikey-save" style="padding:4px 7px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:9px;white-space:nowrap;">保存</button>
+              <button id="ds-mini-apikey-test" style="padding:4px 7px;border:1px solid var(--panel-border);border-radius:6px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:9px;">测试</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 编辑/新建表单（默认隐藏） -->
-    <div id="ds-mini-editor" style="display:none;flex:1;overflow-y:auto;padding:12px;flex-direction:column;"></div>
-
-    <!-- GitHub 导入弹层 -->
-    <div id="ds-mini-gh-dialog" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.3);align-items:center;justify-content:center;"></div>
+    <!-- 编辑/新建弹窗容器（初始隐藏） -->
+    <div id="ds-mini-modal" style="display:none;position:fixed;inset:0;z-index:999998;"></div>
   `;
 }
 
@@ -359,13 +341,23 @@ function bindPanelEvents(state: AppState) {
   if (!panelEl) return;
 
   panelEl.querySelector('#ds-mini-panel-close')?.addEventListener('click', () => closePanel());
-  panelEl.querySelector('#ds-mini-add-skill')?.addEventListener('click', () => showEditor(state));
-  panelEl.querySelector('#ds-mini-import-gh')?.addEventListener('click', () => showGHDialog());
+  panelEl.querySelector('#ds-mini-add-skill')?.addEventListener('click', () => showModalEditor(state));
   panelEl.querySelector('#ds-mini-import-local')?.addEventListener('click', () => handleLocalImport(state));
 
   // 导出
   panelEl.querySelector('#ds-mini-export-md')?.addEventListener('click', () => exportChat('markdown'));
   panelEl.querySelector('#ds-mini-export-html')?.addEventListener('click', () => exportChat('html'));
+  // 导出按钮 hover（边框高亮 + 背景微变）
+  panelEl.querySelectorAll('#ds-mini-export-md, #ds-mini-export-html').forEach(btn => {
+    btn.addEventListener('mouseenter', () => {
+      (btn as HTMLElement).style.borderColor = 'var(--accent)';
+      (btn as HTMLElement).style.color = 'var(--accent)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      (btn as HTMLElement).style.borderColor = 'var(--panel-border)';
+      (btn as HTMLElement).style.color = 'var(--panel-text)';
+    });
+  });
 
   // API Key
   loadAPIKey();
@@ -378,11 +370,165 @@ function bindPanelEvents(state: AppState) {
 
   // 增强器功能
   loadEnhancerPanel();
-  panelEl.querySelector('#ds-enh-wide')?.addEventListener('click', handleEnhancerToggle);
-  panelEl.querySelector('#ds-enh-theme')?.addEventListener('click', handleEnhancerToggle);
-  panelEl.querySelector('#ds-enh-scrollbar')?.addEventListener('click', handleEnhancerToggle);
-  panelEl.querySelector('#ds-enh-autohide')?.addEventListener('click', handleEnhancerToggle);
-  panelEl.querySelector('#ds-enh-voice')?.addEventListener('click', handleEnhancerToggle);
+
+  // 设置区折叠
+  const settingsToggle = panelEl.querySelector('#ds-settings-toggle');
+  const settingsBody = panelEl.querySelector('#ds-settings-body') as HTMLElement;
+  if (settingsToggle && settingsBody) {
+    let settingsOpen = false;
+    settingsToggle.addEventListener('click', () => {
+      settingsOpen = !settingsOpen;
+      settingsBody.style.display = settingsOpen ? '' : 'none';
+    });
+  }
+
+  // 设置区分页切换（3 个 tab）
+  const tabEnh = panelEl.querySelector('#ds-settings-tab-enh');
+  const tabPanel = panelEl.querySelector('#ds-settings-tab-panel');
+  const tabApi = panelEl.querySelector('#ds-settings-tab-api');
+  const bodyEnh = panelEl.querySelector('#ds-settings-enh') as HTMLElement;
+  const bodyPanel = panelEl.querySelector('#ds-settings-panel') as HTMLElement;
+  const bodyApi = panelEl.querySelector('#ds-settings-api') as HTMLElement;
+
+  const inactiveTabStyle = 'flex:1;padding:5px 7px;text-align:center;font-size:11px;font-weight:500;color:var(--panel-text-secondary);cursor:pointer;';
+  const activeTabStyle = 'flex:1;padding:5px 7px;text-align:center;font-size:11px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;';
+
+  function switchSettingsTab(active: string) {
+    [tabEnh, tabPanel, tabApi].forEach(t => { if (t) (t as HTMLElement).style.cssText = inactiveTabStyle; });
+    const activeEl = active === 'enh' ? tabEnh : active === 'panel' ? tabPanel : tabApi;
+    if (activeEl) (activeEl as HTMLElement).style.cssText = activeTabStyle;
+    if (bodyEnh) bodyEnh.style.display = active === 'enh' ? 'block' : 'none';
+    if (bodyPanel) bodyPanel.style.display = active === 'panel' ? 'block' : 'none';
+    if (bodyApi) bodyApi.style.display = active === 'api' ? 'block' : 'none';
+  }
+
+  tabEnh?.addEventListener('click', () => switchSettingsTab('enh'));
+  tabPanel?.addEventListener('click', () => switchSettingsTab('panel'));
+  tabApi?.addEventListener('click', () => switchSettingsTab('api'));
+
+  // 增强功能 toggle
+  panelEl.querySelectorAll('.ds-enh-toggle').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-id');
+      const funcMap: Record<string, () => void> = {
+        'ds-enh-wide': async () => {
+          enhState.wideScreen = !enhState.wideScreen;
+          await toggleWideScreen(enhState.wideScreen);
+          updateEnhButton('ds-enh-wide', enhState.wideScreen);
+          showToast(enhState.wideScreen ? '宽屏已开启' : '宽屏已关闭');
+        },
+        'ds-enh-scrollbar': async () => {
+          enhState.hideScrollbar = !enhState.hideScrollbar;
+          await toggleScrollbar(enhState.hideScrollbar);
+          updateEnhButton('ds-enh-scrollbar', enhState.hideScrollbar);
+          showToast(enhState.hideScrollbar ? '滚动条已隐藏' : '滚动条已显示');
+        },
+        'ds-enh-autohide': async () => {
+          enhState.autoHideInput = !enhState.autoHideInput;
+          await toggleAutoHideInput(enhState.autoHideInput);
+          updateEnhButton('ds-enh-autohide', enhState.autoHideInput);
+          showToast(enhState.autoHideInput ? '输入框自动隐藏已开启' : '输入框自动隐藏已关闭');
+        },
+        'ds-enh-voice': async () => {
+          enhState.voiceInput = !enhState.voiceInput;
+          await toggleVoiceInput(enhState.voiceInput);
+          updateEnhButton('ds-enh-voice', enhState.voiceInput);
+          showToast(enhState.voiceInput ? '语音输入已开启（Ctrl+M）' : '语音输入已关闭');
+        },
+        'ds-enh-tokenspeed': async () => {
+          enhState.tokenSpeed = !enhState.tokenSpeed;
+          const cfg = await getConfig();
+          cfg.tokenSpeed = enhState.tokenSpeed;
+          await chrome.storage.local.set({ 'ds_mini_enhancer': cfg });
+          updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
+          window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_TOKEN_SPEED_TOGGLE', enabled: enhState.tokenSpeed }, '*');
+          showToast(enhState.tokenSpeed ? 'Token 速度已开启' : 'Token 速度已关闭');
+        },
+      };
+      funcMap[id]?.();
+    });
+  });
+
+  // 透明度滑杆
+  const opacitySlider = panelEl.querySelector('#ds-enh-opacity') as HTMLInputElement | null;
+  const opacityVal = panelEl.querySelector('#ds-enh-opacity-val');
+  if (opacitySlider) {
+    opacitySlider.addEventListener('input', () => {
+      const val = parseInt(opacitySlider.value);
+      if (opacityVal) opacityVal.textContent = val + '%';
+      applyOpacity(val);
+      // 保存
+      const isDark = document.body.classList.contains('dark');
+      chrome.storage.local.set({ [isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']: val });
+    });
+  }
+
+  // Tools 开关
+  const TOOLS_KEY = 'ds_mini_tools_state';
+  function updateToolToggle(el: Element, on: boolean) {
+    el.classList.toggle('ds-tool-on', on);
+    (el as HTMLElement).style.background = on ? 'var(--toggle-on)' : 'var(--toggle-off)';
+    const knob = el.querySelector('span') as HTMLElement | null;
+    if (knob) knob.style.right = on ? '2px' : '14px';
+    const row = el.closest('.ds-tool-row') as HTMLElement | null;
+    if (row) row.style.opacity = on ? '1' : '0.4';
+  }
+  function postToolsState() {
+    chrome.storage.local.get(TOOLS_KEY).then(r => {
+      const tools = r[TOOLS_KEY] || {};
+      // ponytail: 直接写 window 变量 + localStorage，给 inject-context / MAIN world 读取
+      (window as any).__DS_TOOLS_STATE__ = tools;
+      try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(tools)); } catch {}
+      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'SET_TOOLS_STATE', tools }, '*');
+      setTimeout(() => {
+        window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'SET_TOOLS_STATE', tools }, '*');
+      }, 500);
+    });
+  }
+  // 加载初始状态
+  chrome.storage.local.get(TOOLS_KEY).then(r => {
+    const tools = r[TOOLS_KEY] || {};
+    (window as any).__DS_TOOLS_STATE__ = tools;
+    try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(tools)); } catch {}
+    panelEl?.querySelectorAll('.ds-tool-toggle').forEach(el => {
+      const tool = el.getAttribute('data-tool') || '';
+      updateToolToggle(el, tools[tool] !== false);
+    });
+  });
+  // 绑定点击
+  panelEl?.querySelectorAll('.ds-tool-toggle').forEach(el => {
+    el.addEventListener('click', () => {
+      const tool = el.getAttribute('data-tool') || '';
+      const isOn = el.classList.contains('ds-tool-on');
+      const newOn = !isOn;
+      updateToolToggle(el, newOn);
+      // 立即更新 window 变量，不等 storage 回调
+      const storedTools = (window as any).__DS_TOOLS_STATE__ || {};
+      storedTools[tool] = newOn;
+      (window as any).__DS_TOOLS_STATE__ = storedTools;
+      // 同步写入 localStorage（MAIN 世界可直接读取）
+      try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(storedTools)); } catch {}
+      // 异步保存 + postMessage
+      chrome.storage.local.get(TOOLS_KEY).then(r => {
+        const tools = r[TOOLS_KEY] || {};
+        tools[tool] = newOn;
+        chrome.storage.local.set({ [TOOLS_KEY]: tools });
+        postToolsState();
+      });
+    });
+  });
+
+  // 主题切换
+  panelEl.querySelector('#ds-enh-theme-prev')?.addEventListener('click', () => {
+    enhState.themeIdx = (enhState.themeIdx - 1 + getThemeCount()) % getThemeCount();
+    applyTheme(enhState.themeIdx);
+    updateThemeName();
+  });
+  panelEl.querySelector('#ds-enh-theme-next')?.addEventListener('click', () => {
+    enhState.themeIdx = (enhState.themeIdx + 1) % getThemeCount();
+    applyTheme(enhState.themeIdx);
+    updateThemeName();
+  });
 
   refreshSkillList(state);
 }
@@ -415,7 +561,8 @@ async function loadAPIKey() {
 function updateAPIKeyStatus(hasKey: boolean) {
   const statusEl = panelEl?.querySelector('#ds-mini-apikey-status');
   if (!statusEl) return;
-  statusEl.textContent = hasKey ? '✅ 已配置' : '❌ 未配置';
+  statusEl.textContent = hasKey ? '已配置' : '未配置';
+  (statusEl as HTMLElement).style.color = hasKey ? 'var(--accent)' : 'var(--panel-text-secondary)';
 }
 
 function saveAPIKey() {
@@ -426,9 +573,9 @@ function saveAPIKey() {
   chrome.storage.local.set({ ds_mini_tavily_key: key }).then(() => {
     chrome.runtime.sendMessage({ type: 'SET_API_KEY', key });
     updateAPIKeyStatus(!!key);
-    showToast(key ? 'API Key 已保存 ✅' : 'API Key 已清除');
+    showToast(key ? 'API Key 已保存' : 'API Key 已清除');
   }).catch(() => {
-    showToast('保存失败 ❌');
+    showToast('保存失败');
   });
 }
 
@@ -437,22 +584,22 @@ async function testTavilyConnection() {
   if (!testBtn) return;
 
   testBtn.disabled = true;
-  testBtn.textContent = '⏳ 测试中...';
+  testBtn.textContent = '测试中...';
 
   try {
     chrome.runtime.sendMessage({ type: 'TEST_TAVILY' }, (resp) => {
       testBtn.disabled = false;
-      testBtn.textContent = '🔍 测试';
+      testBtn.textContent = '测试';
       if (resp?.ok) {
-        showToast('Tavily 连接正常 ✅');
+        showToast('Tavily 连接正常');
       } else {
-        showToast(`Tavily 测试失败: ${resp?.message || '未知错误'} ❌`);
+        showToast(`Tavily 测试失败: ${resp?.message || '未知错误'}`);
       }
     });
   } catch (err) {
     testBtn.disabled = false;
-    testBtn.textContent = '🔍 测试';
-    showToast(`测试请求失败: ${err} ❌`);
+    testBtn.textContent = '测试';
+    showToast(`测试请求失败: ${err}`);
   }
 }
 
@@ -464,7 +611,7 @@ const AGENT_MODE_KEY = 'ds_mini_agent_mode';
 function updateAgentSlider(enabled: boolean) {
   const slider = panelEl?.querySelector('#ds-mini-agent-slider') as HTMLElement | null;
   const knob = panelEl?.querySelector('#ds-mini-agent-knob') as HTMLElement | null;
-  if (slider) slider.style.background = enabled ? '#4f46e5' : '#d1d5db';
+  if (slider) slider.style.background = enabled ? 'var(--toggle-on)' : 'var(--toggle-off)';
   if (knob) knob.style.transform = enabled ? 'translateX(20px)' : '';
 }
 
@@ -490,7 +637,7 @@ function toggleAgentMode() {
   updateAgentSlider(enabled);
   chrome.storage.local.set({ [AGENT_MODE_KEY]: enabled });
   postAgentMode(enabled);
-  showToast(enabled ? 'Agent 模式已开启 ✅' : 'Agent 模式已关闭');
+  showToast(enabled ? 'Agent 模式已开启' : 'Agent 模式已关闭');
 }
 
 function postAgentMode(enabled: boolean) {
@@ -505,69 +652,56 @@ function postAgentMode(enabled: boolean) {
 // ============================================================
 // 增强器功能
 // ============================================================
-let enhState: any = { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false };
+let enhState: any = { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false };
 
 async function loadEnhancerPanel() {
   enhState = await getConfig();
-  updateEnhButtons();
+  updateEnhButton('ds-enh-wide', enhState.wideScreen);
+  updateEnhButton('ds-enh-scrollbar', enhState.hideScrollbar);
+  updateEnhButton('ds-enh-autohide', enhState.autoHideInput);
+  updateEnhButton('ds-enh-voice', enhState.voiceInput);
+  updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
+  updateThemeName();
+  // 加载透明度
+  const isDark = document.body.classList.contains('dark');
+  chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {
+    const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
+    if (val) {
+      const slider = panelEl?.querySelector('#ds-enh-opacity') as HTMLInputElement | null;
+      const label = panelEl?.querySelector('#ds-enh-opacity-val');
+      if (slider) { slider.value = String(val); }
+      if (label) label.textContent = val + '%';
+      applyOpacity(val);
+    }
+  });
 }
 
-async function handleEnhancerToggle(e: Event) {
-  const btn = e.currentTarget as HTMLElement;
-  const id = btn.id;
-
-  switch (id) {
-    case 'ds-enh-wide':
-      enhState.wideScreen = !enhState.wideScreen;
-      await toggleWideScreen(enhState.wideScreen);
-      break;
-    case 'ds-enh-theme':
-      enhState.themeIdx = (enhState.themeIdx + 1) % getThemeCount();
-      await applyTheme(enhState.themeIdx);
-      break;
-    case 'ds-enh-scrollbar':
-      enhState.hideScrollbar = !enhState.hideScrollbar;
-      await toggleScrollbar(enhState.hideScrollbar);
-      break;
-    case 'ds-enh-autohide':
-      enhState.autoHideInput = !enhState.autoHideInput;
-      await toggleAutoHideInput(enhState.autoHideInput);
-      break;
-    case 'ds-enh-voice':
-      enhState.voiceInput = !enhState.voiceInput;
-      await toggleVoiceInput(enhState.voiceInput);
-      break;
+function applyOpacity(pct: number) {
+  const lightBase = '255,255,255';
+  const darkBase = '0,0,0';
+  const isDark = document.body.classList.contains('dark');
+  const rgb = isDark ? darkBase : lightBase;
+  const alpha = (pct / 100).toFixed(2);
+  document.documentElement.style.setProperty('--panel-bg', `rgba(${rgb},${alpha})`);
+  // 也更新弹窗遮罩透明度
+  const modalBg = panelEl?.querySelector('#ds-mini-modal-overlay');
+  if (modalBg) {
+    (modalBg as HTMLElement).style.setProperty('--overlay-bg', `rgba(0,0,0,${(pct / 200 + 0.25).toFixed(2)})`);
   }
-  updateEnhButtons();
 }
 
-function updateEnhButtons() {
-  const labels: Record<string, string> = {
-    wideScreen: '宽屏模式',
-    themeIdx: '背景主题',
-    hideScrollbar: '滚动条',
-    autoHideInput: '输入框自动隐藏',
-    voiceInput: '语音输入',
-  };
-  const btn = (id: string) => panelEl?.querySelector(id) as HTMLElement | null;
+function updateEnhButton(id: string, on: boolean) {
+  const toggle = panelEl?.querySelector(`[data-id="${id}"]`) as HTMLElement | null;
+  if (!toggle) return;
+  toggle.style.background = on ? 'var(--toggle-on)' : 'var(--toggle-off)';
+  const knob = toggle.querySelector('.ds-enh-knob') as HTMLElement | null;
+  if (knob) knob.style.left = on ? '18px' : '2px';
+}
 
-  const bW = btn('#ds-enh-wide');
-  if (bW) bW.textContent = enhState.wideScreen ? '开启' : '关闭';
-
-  const bT = btn('#ds-enh-theme');
-  if (bT) {
-    const names = ['默认', 'Claude', 'Cat', 'Dracula', 'OneHalf'];
-    bT.textContent = names[enhState.themeIdx % names.length];
-  }
-
-  const bS = btn('#ds-enh-scrollbar');
-  if (bS) bS.textContent = enhState.hideScrollbar ? '隐藏' : '显示';
-
-  const bA = btn('#ds-enh-autohide');
-  if (bA) bA.textContent = enhState.autoHideInput ? '开启' : '关闭';
-
-  const bV = btn('#ds-enh-voice');
-  if (bV) bV.textContent = enhState.voiceInput ? '开启' : '关闭';
+function updateThemeName() {
+  const names = ['默认', 'Claude', 'Catppuccin', 'Dracula', 'OneHalf'];
+  const el = panelEl?.querySelector('#ds-enh-theme-name');
+  if (el) el.textContent = names[enhState.themeIdx % names.length];
 }
 
 function showToast(msg: string) {
@@ -575,8 +709,12 @@ function showToast(msg: string) {
   toast.textContent = msg;
   toast.style.cssText = `
     position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-    z-index:9999999;background:#1f2937;color:#fff;padding:8px 20px;
-    border-radius:6px;font-size:14px;font-family:-apple-system,sans-serif;
+    z-index:9999999;background:var(--panel-bg, #1f2937);color:var(--panel-text, #fff);border:1px solid var(--panel-border);
+    padding:8px 20px;
+    border-radius:8px;font-size:13px;font-family:'DM Sans',-apple-system,sans-serif;
+    backdrop-filter:var(--panel-blur);
+    -webkit-backdrop-filter:var(--panel-blur);
+    box-shadow:0 4px 16px rgba(0,0,0,0.15);
     transition:opacity 0.3s;
   `;
   document.body.appendChild(toast);
@@ -605,8 +743,9 @@ function openPanel(state: AppState) {
 
 function closePanel() {
   if (!panelEl) return;
-  panelEl.style.transform = 'translateX(100%)';
-  hideEditor();
+  panelEl.style.transform = 'translateX(calc(100% + 20px))';
+  // 关闭时移除任何弹窗
+  document.getElementById('ds-mini-modal-overlay')?.remove();
 }
 
 // ============================================================
@@ -631,13 +770,11 @@ async function refreshSkillList(state: AppState) {
     });
     card.querySelector('.ds-mini-edit')?.addEventListener('click', () => {
       const skill = state.skills.find(s => s.id === id);
-      if (skill) showEditor(state, skill);
+      if (skill) showModalEditor(state, skill);
     });
     card.querySelector('.ds-mini-delete')?.addEventListener('click', async () => {
-      if (confirm(`确定删除 "${state.skills.find(s => s.id === id)?.name}"？`)) {
-        await deleteSkill(id);
-        await refreshSkillList(state);
-      }
+      const skill = state.skills.find(s => s.id === id);
+      if (skill) showDeleteConfirm(state, id, skill.name);
     });
   });
 }
@@ -661,79 +798,157 @@ function skillCardHTML(skill: Skill): string {
 
   return `
     <div data-skill-id="${esc(skill.id)}" style="
-      border:1px solid #e5e7eb;border-radius:6px;padding:10px;margin-bottom:8px;
-      background:${skill.enabled ? '#fff' : '#f9fafb'};
+      border:1px solid var(--card-border);border-radius:10px;padding:10px;margin-bottom:6px;
+      background:var(--card-bg);
     ">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <span style="font-weight:600;">/${esc(skill.name)}</span>
-          <span style="font-size:11px;color:#9ca3af;margin-left:6px;">${esc(sourceLabel)}</span>
+          <span style="font-weight:600;font-size:13px;">/${esc(skill.name)}</span>
+          <span style="font-size:11px;color:var(--panel-text-secondary);margin-left:6px;">${esc(sourceLabel)}</span>
         </div>
-        <div style="display:flex;gap:4px;">
-          <button class="ds-mini-toggle" style="
-            background:none;border:none;cursor:pointer;font-size:16px;
-          ">${skill.enabled ? '✅' : '⭕'}</button>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;">
+            <input type="checkbox" style="opacity:0;width:0;height:0;" ${skill.enabled ? 'checked' : ''}>
+            <span class="ds-mini-toggle" style="position:absolute;inset:0;background:${skill.enabled ? 'var(--toggle-on)' : 'var(--toggle-off)'};border-radius:20px;transition:background 0.2s;cursor:pointer;">
+              <span style="position:absolute;top:2px;left:${skill.enabled ? '18px' : '2px'};width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span>
+            </span>
+          </label>
           ${skill.source !== 'builtin' ? `
-            <button class="ds-mini-edit" style="
-              background:none;border:none;cursor:pointer;font-size:14px;
-            ">✏️</button>
-            <button class="ds-mini-delete" style="
-              background:none;border:none;cursor:pointer;font-size:14px;
-            ">🗑️</button>
+            <button class="ds-mini-edit" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+            <button class="ds-mini-delete" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           ` : ''}
         </div>
       </div>
-      <div style="font-size:12px;color:#6b7280;margin-top:4px;">${esc(skill.description)}</div>
+      <div style="font-size:12px;color:var(--panel-text-secondary);margin-top:4px;">${esc(skill.description)}</div>
     </div>
   `;
 }
 
 // ============================================================
-// 编辑器（新建 / 编辑）
+// Modal 弹窗系统
 // ============================================================
-function showEditor(state: AppState, skill?: Skill) {
-  const editorEl = panelEl?.querySelector('#ds-mini-editor');
-  const listEl = panelEl?.querySelector('#ds-mini-skill-list');
-  if (!editorEl || !listEl) return;
+function showModalEditor(state: AppState, skill?: Skill) {
+  const existing = document.getElementById('ds-mini-modal-overlay');
+  if (existing) existing.remove();
+  if (document.getElementById('ds-mini-modal-editor')) return;
 
   const isEdit = !!skill;
-  editorEl.style.display = 'flex';
-  (listEl as HTMLElement).style.display = 'none';
 
-  editorEl.innerHTML = `
-    <div style="font-weight:600;margin-bottom:12px;">
-      ${isEdit ? `✏️ 编辑 /${esc(skill!.name)}` : '➕ 新建技能'}
+  // 遮罩层
+  const overlay = document.createElement('div');
+  overlay.id = 'ds-mini-modal-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:999997;
+    background:var(--overlay-bg, rgba(0,0,0,0.3));
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity 0.2s;
+  `;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  // 弹窗
+  const modal = document.createElement('div');
+  modal.id = 'ds-mini-modal-editor';
+  modal.style.cssText = `
+    width:680px; max-width:90vw; max-height:85vh;
+    background:var(--panel-bg, #fff);
+    backdrop-filter:var(--panel-blur, blur(20px));
+    -webkit-backdrop-filter:var(--panel-blur, blur(20px));
+    border:1px solid var(--panel-border, rgba(0,0,0,0.08));
+    border-radius:16px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.2);
+    display:flex; flex-direction:column;
+    color:var(--panel-text, #1f2937);
+    font-family:'DM Sans', -apple-system, sans-serif;
+    overflow:hidden;
+  `;
+
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--panel-border);flex-shrink:0;">
+      <span style="font-weight:600;font-size:15px;">${isEdit ? `编辑 /${esc(skill!.name)}` : '新建 Skill'}</span>
+      <button id="ds-modal-close" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--panel-text-secondary);padding:2px 6px;border-radius:6px;">✕</button>
     </div>
+    <div style="padding:16px 20px;flex:1;overflow-y:auto;">
+      <label style="font-size:12px;font-weight:500;color:var(--panel-text-secondary);display:block;margin-bottom:4px;">名称（如 my-skill）</label>
+      <input id="ds-modal-name" value="${esc(skill?.name || '')}" placeholder="my-skill"
+        style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;margin-bottom:12px;box-sizing:border-box;"
+        ${isEdit ? 'disabled' : ''}>
 
-    <label style="font-size:12px;color:#6b7280;margin-bottom:4px;">名称 (kebab-case)</label>
-    <input id="ds-mini-editor-name" value="${esc(skill?.name || '')}" placeholder="my-skill"
-      style="padding:8px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:8px;"
-      ${isEdit ? 'disabled' : ''}>
+      <label style="font-size:12px;font-weight:500;color:var(--panel-text-secondary);display:block;margin-bottom:4px;">描述</label>
+      <input id="ds-modal-desc" value="${esc(skill?.description || '')}" placeholder="一句话描述"
+        style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;margin-bottom:12px;box-sizing:border-box;">
 
-    <label style="font-size:12px;color:#6b7280;margin-bottom:4px;">描述</label>
-    <input id="ds-mini-editor-desc" value="${esc(skill?.description || '')}" placeholder="一句话描述"
-      style="padding:8px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:8px;">
-
-    <label style="font-size:12px;color:#6b7280;margin-bottom:4px;">指令内容 (Markdown)</label>
-    <textarea id="ds-mini-editor-instructions" placeholder="系统指令..."
-      style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:4px;resize:none;min-height:200px;font-family:monospace;font-size:13px;"
-    >${skill?.instructions || ''}</textarea>
-
-    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-      <button id="ds-mini-editor-cancel" style="
-        padding:6px 16px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;
-      ">取消</button>
-      <button id="ds-mini-editor-save" style="
-        padding:6px 16px;border:none;border-radius:4px;background:#4f46e5;color:#fff;cursor:pointer;
-      ">保存</button>
+      <label style="font-size:12px;font-weight:500;color:var(--panel-text-secondary);display:block;margin-bottom:4px;">指令内容 (Markdown)</label>
+      <textarea id="ds-modal-instructions" placeholder="系统指令..."
+        style="width:100%;min-height:280px;padding:10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;font-family:monospace;resize:none;box-sizing:border-box;"
+      >${skill?.instructions || ''}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--panel-border);flex-shrink:0;">
+      <button id="ds-modal-cancel" style="padding:7px 18px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
+      <button id="ds-modal-save" style="padding:7px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">保存</button>
     </div>
   `;
 
-  editorEl.querySelector('#ds-mini-editor-cancel')?.addEventListener('click', () => hideEditor());
-  editorEl.querySelector('#ds-mini-editor-save')?.addEventListener('click', async () => {
-    const name = (editorEl.querySelector('#ds-mini-editor-name') as HTMLInputElement).value.trim();
-    const desc = (editorEl.querySelector('#ds-mini-editor-desc') as HTMLInputElement).value.trim();
-    const instructions = (editorEl.querySelector('#ds-mini-editor-instructions') as HTMLTextAreaElement).value.trim();
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // 拖拽移动（标题栏）
+  let isDragging = false, dragOffX = 0, dragOffY = 0;
+  const titleBar = modal.firstElementChild as HTMLElement | null;
+  if (titleBar) {
+    titleBar.style.cursor = 'grab';
+    titleBar.addEventListener('mousedown', (e) => {
+      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+      isDragging = true;
+      const rect = modal.getBoundingClientRect();
+      dragOffX = e.clientX - rect.left;
+      dragOffY = e.clientY - rect.top;
+      modal.style.position = 'fixed';
+      modal.style.left = rect.left + 'px';
+      modal.style.top = rect.top + 'px';
+      modal.style.margin = '0';
+      modal.style.transform = 'none';
+      e.preventDefault();
+    });
+  }
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    modal.style.left = Math.max(0, Math.min(e.clientX - dragOffX, window.innerWidth - 480)) + 'px';
+    modal.style.top = Math.max(0, Math.min(e.clientY - dragOffY, window.innerHeight - 360)) + 'px';
+  });
+  document.addEventListener('mouseup', () => { isDragging = false; });
+
+  // 拉伸（右下角）
+  const resizeHandle = document.createElement('div');
+  resizeHandle.style.cssText = `position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;z-index:10;background:linear-gradient(135deg,transparent 50%,var(--panel-text-secondary) 50%);border-radius:0 0 16px;`;
+  modal.style.position = 'relative';
+  modal.appendChild(resizeHandle);
+  let isResizing = false;
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    const startW = modal.offsetWidth, startH = modal.offsetHeight;
+    const startX = e.clientX, startY = e.clientY;
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizing) return;
+      modal.style.width = Math.max(480, Math.min(startW + ev.clientX - startX, window.innerWidth * 0.9)) + 'px';
+      modal.style.height = Math.max(360, Math.min(startH + ev.clientY - startY, window.innerHeight * 0.9)) + 'px';
+    };
+    const onUp = () => { isResizing = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // 事件绑定（原 code 继续）
+  modal.querySelector('#ds-modal-close')?.addEventListener('click', () => overlay.remove());
+  modal.querySelector('#ds-modal-cancel')?.addEventListener('click', () => overlay.remove());
+
+  const saveBtn = modal.querySelector('#ds-modal-save') as HTMLElement;
+  saveBtn?.addEventListener('click', async () => {
+    const name = (modal.querySelector('#ds-modal-name') as HTMLInputElement).value.trim();
+    const desc = (modal.querySelector('#ds-modal-desc') as HTMLInputElement).value.trim();
+    const instructions = (modal.querySelector('#ds-modal-instructions') as HTMLTextAreaElement).value.trim();
 
     if (!name || !instructions) {
       alert('名称和指令内容不能为空');
@@ -751,113 +966,63 @@ function showEditor(state: AppState, skill?: Skill) {
     };
 
     await saveSkill(newSkill);
-    hideEditor();
+    overlay.remove();
     await refreshSkillList(state);
   });
+
+  // Ctrl+Enter 保存
+  modal.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveBtn?.click();
+  });
+
+  // 聚焦到名称或内容
+  setTimeout(() => {
+    const nameInput = modal.querySelector('#ds-modal-name') as HTMLInputElement;
+    if (nameInput && !skill) nameInput.focus();
+    else (modal.querySelector('#ds-modal-instructions') as HTMLTextAreaElement)?.focus();
+  }, 100);
 }
 
-function hideEditor() {
-  const editorEl = panelEl?.querySelector('#ds-mini-editor');
-  const listEl = panelEl?.querySelector('#ds-mini-skill-list');
-  if (editorEl) (editorEl as HTMLElement).style.display = 'none';
-  if (listEl) (listEl as HTMLElement).style.display = '';
-}
+function showDeleteConfirm(state: AppState, skillId: string, skillName: string) {
+  const existing = document.getElementById('ds-mini-modal-overlay');
+  if (existing) existing.remove();
 
-// ============================================================
-// GitHub 导入弹层
-// ============================================================
-function showGHDialog() {
-  const dialog = panelEl?.querySelector('#ds-mini-gh-dialog');
-  if (!dialog) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'ds-mini-modal-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:999997;
+    background:var(--overlay-bg, rgba(0,0,0,0.3));
+    backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;
+  `;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-  (dialog as HTMLElement).style.display = 'flex';
-  dialog.innerHTML = `
-    <div style="
-      background:#fff;border-radius:8px;padding:20px;width:300px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.15);
-    ">
-      <div style="font-weight:600;margin-bottom:12px;">📦 从 GitHub 导入</div>
-      <input id="ds-mini-gh-url" placeholder="https://github.com/user/repo"
-        style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:4px;margin-bottom:12px;box-sizing:border-box;">
-      <div id="ds-mini-gh-content"></div>
-      <div id="ds-mini-gh-error" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button id="ds-mini-gh-cancel" style="
-          padding:6px 16px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;
-        ">取消</button>
-        <button id="ds-mini-gh-import" style="
-          padding:6px 16px;border:none;border-radius:4px;background:#4f46e5;color:#fff;cursor:pointer;
-        ">导入</button>
-      </div>
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    width:360px; padding:20px;
+    background:var(--panel-bg); backdrop-filter:var(--panel-blur);
+    border:1px solid var(--panel-border); border-radius:14px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.15);
+    color:var(--panel-text);
+    font-family:'DM Sans', -apple-system, sans-serif;
+  `;
+  modal.innerHTML = `
+    <div style="font-weight:600;font-size:14px;margin-bottom:8px;">确认删除</div>
+    <div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">确定删除 "${esc(skillName)}"？此操作不可撤销。</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="ds-del-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
+      <button id="ds-del-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--danger);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">删除</button>
     </div>
   `;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 
-  dialog.querySelector('#ds-mini-gh-cancel')?.addEventListener('click', () => {
-    (dialog as HTMLElement).style.display = 'none';
+  modal.querySelector('#ds-del-cancel')?.addEventListener('click', () => overlay.remove());
+  modal.querySelector('#ds-del-confirm')?.addEventListener('click', async () => {
+    await deleteSkill(skillId);
+    overlay.remove();
+    await refreshSkillList(state);
   });
-
-  dialog.querySelector('#ds-mini-gh-import')?.addEventListener('click', async () => {
-    const url = (dialog.querySelector('#ds-mini-gh-url') as HTMLInputElement).value.trim();
-    const errorEl = dialog.querySelector('#ds-mini-gh-error') as HTMLElement;
-    const contentEl = dialog.querySelector('#ds-mini-gh-content') as HTMLElement;
-    if (!url) { errorEl.textContent = '请输入 GitHub URL'; errorEl.style.display = ''; return; }
-
-    errorEl.style.display = 'none';
-
-    try {
-      const result = await importFromGitHub(url);
-
-      // 发现多个技能 → 展示列表让用户选择
-      if (result.discovered) {
-        const { entries, files, user, repo, branch } = result.discovered;
-        const listHtml = entries.map((e, i) =>
-          `<div data-idx="${i}" data-path="${e}" style="padding:8px 12px;cursor:pointer;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:8px;background:#fff;" onmouseenter="this.style.background='#f3f4f6'" onmouseleave="this.style.background='#fff'">
-            <span>📂</span>
-            <span style="font-weight:500;">${esc(e)}</span>
-          </div>`
-        ).join('');
-
-        contentEl.innerHTML = `
-          <div style="font-weight:600;margin-bottom:8px;">从仓库中发现以下技能：</div>
-          <div style="max-height:240px;overflow-y:auto;">${listHtml}</div>
-          <div style="margin-top:8px;font-size:11px;color:#9ca3af;">点击技能名称直接导入</div>`;
-
-        // 绑定点击事件
-        contentEl.querySelectorAll('[data-path]').forEach(el => {
-          el.addEventListener('click', async () => {
-            const path = el.getAttribute('data-path')!;
-            try {
-              const subResult = await importFromGitHubPath(user, repo, branch, path);
-              if (subResult.skill) {
-                await importAndSave(subResult.skill);
-                (dialog as HTMLElement).style.display = 'none';
-                refreshSkillList({ skills: await loadSkills(), activeSkill: null });
-              }
-            } catch (err2) {
-              errorEl.textContent = err2 instanceof Error ? err2.message : '导入失败';
-              errorEl.style.display = '';
-            }
-          });
-        });
-        return;
-      }
-
-      // 单个技能 → 直接导入
-      if (result.skill) {
-        await importAndSave(result.skill);
-        (dialog as HTMLElement).style.display = 'none';
-        refreshSkillList({ skills: await loadSkills(), activeSkill: null });
-      }
-    } catch (err) {
-      errorEl.textContent = err instanceof Error ? err.message : '导入失败';
-      errorEl.style.display = '';
-    }
-  });
-
-  // 自动聚焦
-  setTimeout(() => {
-    (dialog.querySelector('#ds-mini-gh-url') as HTMLInputElement)?.focus();
-  }, 100);
 }
 
 // ============================================================

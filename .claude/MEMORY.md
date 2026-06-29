@@ -3,3 +3,4 @@
 - [主题色模式下发送按钮消失调试总结](theme-send-button-hidden-debug.md) — emotion CSS-in-JS 被扩展 `*` + `!important` 覆盖，最终用 `:not([class*="ds-button"])` 全规则排除修复
 - [测试策略](testing-strategy.md) — 确定性代码我写 assert 测试，非确定性的交互交用户手动测试
 - [面板深色适配与输入框隐藏调试](panel-dark-mode-and-input-hide-debug.md) — 迟滞效应、MutationObserver SPA 重建、background 简写覆盖、自定义滚动条
+- [UI 重设计玻璃面板](glassmorphism-panel-redesign.md) — 玻璃面板、Tools 开关跨世界通信、Modal 弹窗系统、设置3 tab、Token 速度

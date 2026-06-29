@@ -11,6 +11,7 @@ interface EnhancerConfig {
   hideScrollbar: boolean;
   autoHideInput: boolean;
   voiceInput: boolean;
+  tokenSpeed: boolean;    // token 速度显示
 }
 
 // ============================================================
@@ -19,8 +20,8 @@ interface EnhancerConfig {
 export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
-    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false };
-  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false }; }
+    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false };
+  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false }; }
 }
 
 async function saveConfig(cfg: EnhancerConfig) {
@@ -167,7 +168,7 @@ export async function toggleWideScreen(enabled: boolean) {
 const LIGHT_THEMES = [
   { name: '默认',  bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '' },
   { name: 'Claude浅', bg: '#f5ece2', chatBg: '#fbf3e8',  sidebarBg: '#ede0d4', sidebarHighlight: '#ded0be' },
-  { name: 'Cat浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6' },
+  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6' },
   { name: 'Dracula浅', bg: '#f5ecec', chatBg: '#fbf4f2',  sidebarBg: '#ebe0de', sidebarHighlight: '#ddd0ce' },
   { name: 'OneHalf浅', bg: '#edf0e8', chatBg: '#f4f7f0',  sidebarBg: '#e0e5d8', sidebarHighlight: '#ced4c8' },
 ];
@@ -175,7 +176,7 @@ const LIGHT_THEMES = [
 const DARK_THEMES = [
   { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '' },
   { name: 'Claude深', bg: '#1a1625', chatBg: '#1e1a2a',  sidebarBg: '#15121f', sidebarHighlight: '#261f35' },
-  { name: 'Cat深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a' },
+  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a' },
   { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e' },
   { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d' },
 ];
@@ -484,6 +485,14 @@ let inputCurrentlyHidden = true;
 
 function onMouseMove(e: MouseEvent) {
   if (!inputHideActive || !inputHideEl) return;
+  if (!document.querySelector('[class*="ds-message"]')) return;
+  // 输入框有文字时不下滑隐藏
+  const ta = document.querySelector('textarea');
+  if (ta && ta.value.trim().length > 0) {
+    inputCurrentlyHidden = false;
+    inputHideEl.style.transform = 'translateY(0)';
+    return;
+  }
   const dist = window.innerHeight - e.clientY;
   if (inputFocused) {
     inputCurrentlyHidden = false;
@@ -512,6 +521,11 @@ function onTextareaFocus() {
 
 function onTextareaBlur() {
   inputFocused = false;
+  // 输入框有文字时不下滑隐藏
+  const ta = document.querySelector('textarea');
+  if (ta && ta.value.trim().length > 0 && inputHideEl) {
+    inputHideEl.style.transform = 'translateY(0)';
+  }
 }
 
 let textareaObserver: MutationObserver | null = null;
@@ -529,8 +543,9 @@ function setupTextareaObserver() {
         inputClipEl.style.overflow = 'hidden';
         inputHideEl.style.transition = 'transform 0.35s ease';
         inputFocused = document.activeElement === ta;
-        inputCurrentlyHidden = !inputFocused;
-        inputHideEl.style.transform = inputFocused ? 'translateY(0)' : 'translateY(120px)';
+        const hasMessages = !!document.querySelector('[class*="ds-message"]');
+        inputCurrentlyHidden = !inputFocused && hasMessages && ta.value.trim().length === 0;
+        inputHideEl.style.transform = inputCurrentlyHidden ? 'translateY(120px)' : 'translateY(0)';
         ta.addEventListener('focus', onTextareaFocus);
         ta.addEventListener('blur', onTextareaBlur);
         return true;
@@ -563,8 +578,9 @@ export async function toggleAutoHideInput(enabled: boolean) {
       inputClipEl.style.overflow = 'hidden';
       inputHideEl.style.transition = 'transform 0.35s ease';
       inputFocused = document.activeElement === ta;
-      inputCurrentlyHidden = !inputFocused;
-      inputHideEl.style.transform = inputFocused ? 'translateY(0)' : 'translateY(120px)';
+      const hasMessages = !!document.querySelector('[class*="ds-message"]');
+      inputCurrentlyHidden = !inputFocused && hasMessages && ta.value.trim().length === 0;
+      inputHideEl.style.transform = inputCurrentlyHidden ? 'translateY(120px)' : 'translateY(0)';
       ta.addEventListener('focus', onTextareaFocus);
       ta.addEventListener('blur', onTextareaBlur);
       return true;

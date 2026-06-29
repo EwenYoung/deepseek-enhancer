@@ -5,24 +5,18 @@ let dropdownEl: HTMLElement | null = null;
 let selectedIndex = 0;
 let currentMatches: Skill[] = [];
 let boundInput: HTMLElement | null = null;
-let ignoreNextInput = false;
-let currentSkillId = ''; // 当前激活的 skill ID（用于去重）
+let ignoreInputUntil = 0;
+let currentSkillId = '';
 
-// ============================================================
-// 向主世界发送 skill 指令
-// ============================================================
 async function applySkillFromText(text: string) {
-  // 解析 /skillname 命令
   if (!text || !text.startsWith('/')) {
     if (currentSkillId) {
       currentSkillId = '';
       window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'CLEAR_SKILL' }, '*');
-      console.log('[DS-Mini:UI] Skill cleared (no slash command)');
     }
     return;
   }
-
-  const afterSlash = text.slice(1).split(/\s/)[0]; // 取第一个词作为 skill name
+  const afterSlash = text.slice(1).split(/\s/)[0];
   if (!afterSlash) {
     if (currentSkillId) {
       currentSkillId = '';
@@ -30,7 +24,6 @@ async function applySkillFromText(text: string) {
     }
     return;
   }
-
   const skill = await getSkillByName(afterSlash);
   if (!skill || !skill.enabled) {
     if (currentSkillId) {
@@ -39,57 +32,40 @@ async function applySkillFromText(text: string) {
     }
     return;
   }
-
-  // skill 没变就不重复发
   if (currentSkillId === skill.id) return;
-
   currentSkillId = skill.id;
   window.postMessage({
-    source: 'DS_MINI_ISOLATED',
-    type: 'SET_SKILL',
-    skillName: skill.name,
-    skill: skill,
-    instructions: skill.instructions,
+    source: 'DS_MINI_ISOLATED', type: 'SET_SKILL',
+    skillName: skill.name, skill, instructions: skill.instructions,
   }, '*');
-  console.log('[DS-Mini:UI] Skill set:', skill.name);
 }
 
-// ============================================================
-// 初始化
-// ============================================================
 export function initAutocomplete(_state: AppState) {
   const inputEl = findInputArea();
   if (!inputEl) return;
-
   if (boundInput && boundInput !== inputEl) {
     boundInput.removeEventListener('input', onInput);
     boundInput = null;
   }
   if (boundInput === inputEl) return;
-
   inputEl.addEventListener('input', onInput);
   window.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('mousedown', onDocClick, true);
   boundInput = inputEl;
 }
 
-// ============================================================
-// 输入处理 — 管理下拉 + skill 注入
-// ============================================================
 async function onInput(e: Event) {
-  if (ignoreNextInput) { ignoreNextInput = false; return; }
-
+  if (Date.now() < ignoreInputUntil) return;
   const target = e.target as HTMLElement;
   const text = getInputText(target);
   const hasSlash = !!(text && text.startsWith('/'));
 
-  // --- 下拉逻辑 ---
   if (hasSlash) {
     const afterSlash = text!.slice(1);
     if (!afterSlash.includes(' ')) {
       currentMatches = await matchSkills(afterSlash);
       if (currentMatches.length > 0) {
-        selectedIndex = 0;
+        selectedIndex = Math.min(selectedIndex, currentMatches.length - 1);
         showDropdown(target);
       } else {
         if (dropdownEl) dropdownEl.style.display = 'none';
@@ -104,22 +80,15 @@ async function onInput(e: Event) {
       selectedIndex = 0;
     }
   }
-
-  // --- skill 注入逻辑（每次输入都检测）---
   await applySkillFromText(text);
 }
 
-// ============================================================
-// 键盘处理
-// ============================================================
 function onKeyDown(e: KeyboardEvent) {
-  if (e.target !== boundInput) return;
-
   switch (e.key) {
     case 'ArrowDown':
     case 'ArrowUp':
       if (!dropdownEl) break;
-      ignoreNextInput = true;
+      ignoreInputUntil = Date.now() + 200;
       if (e.key === 'ArrowDown') {
         selectedIndex = Math.min(selectedIndex + 1, currentMatches.length - 1);
       } else {
@@ -157,53 +126,73 @@ function selectSkill(skill: Skill) {
   setInputText(inputEl, newText);
   closeDropdown();
   inputEl.focus();
-  // skill 注入由 onInput 触发
 }
 
-// ============================================================
-// 下拉 UI
-// ============================================================
 function showDropdown(anchorEl: HTMLElement) {
   if (dropdownEl && document.body.contains(dropdownEl)) {
-    dropdownEl.style.display = '';
-    dropdownEl.style.left = anchorEl.getBoundingClientRect().left + 'px';
-    dropdownEl.style.bottom = (window.innerHeight - anchorEl.getBoundingClientRect().top + 8) + 'px';
+    dropdownEl.innerHTML = '';
+    dropdownEl.style.cssText = cssDropdownText(anchorEl) + 'display: block;';
+    buildDropdownItems();
     updateSelection();
     return;
   }
 
   const wrap = document.createElement('div');
   wrap.className = 'ds-mini-ac-shadow';
-  wrap.style.cssText = `
+  wrap.style.cssText = cssDropdownText(anchorEl);
+  dropdownEl = wrap;
+  buildDropdownItems();
+  document.body.appendChild(wrap);
+}
+
+function cssDropdownText(anchorEl: HTMLElement): string {
+  const r = anchorEl.getBoundingClientRect();
+  return `
     position: fixed; z-index: 999999; pointer-events: auto;
-    left: ${anchorEl.getBoundingClientRect().left}px;
-    bottom: ${window.innerHeight - anchorEl.getBoundingClientRect().top + 8}px;
+    left: ${r.left}px;
+    bottom: ${window.innerHeight - r.top + 8}px;
     min-width: 280px; max-width: 400px; max-height: 300px; overflow-y: auto;
-    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    font-family: -apple-system, sans-serif; font-size: 14px; color: #1f2937;
+    background: var(--panel-bg, rgba(255,255,255,0.92));
+    backdrop-filter: var(--panel-blur, blur(20px));
+    -webkit-backdrop-filter: var(--panel-blur, blur(20px));
+    border: 1px solid var(--panel-border, rgba(0,0,0,0.08));
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    font-size: 14px;
+    color: var(--panel-text, #1f2937);
+    padding: 6px;
   `;
+}
+
+function buildDropdownItems() {
+  if (!dropdownEl) return;
   currentMatches.forEach((skill, i) => {
     const item = document.createElement('div');
     item.className = 'ds-mini-ac-shadow-item';
-    item.style.cssText = 'padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6;';
-    if (i === selectedIndex) item.style.background = '#f3f4f6';
-    item.innerHTML = `<span style="color:#6b7280;font-weight:600;min-width:20px;">/</span>
-      <div style="flex:1;min-width:0;"><div style="font-weight:600;color:#1f2937;">${esc(skill.name)}</div>
-      <div style="font-size:12px;color:#9ca3af;">${esc(skill.description)}</div></div>
-      <span style="margin-left:auto;font-size:12px;color:#d1d5db;">${skill.source}</span>`;
+    item.style.cssText = `
+      padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      border-radius: 8px;
+      background: ${i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent'};
+    `;
+    item.innerHTML = `
+      <span style="color:var(--accent,#007AFF);font-weight:600;min-width:20px;">/</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;color:var(--panel-text,#1f2937);">${esc(skill.name)}</div>
+        <div style="font-size:12px;color:var(--panel-text-secondary,#6b7280);">${esc(skill.description)}</div>
+      </div>
+      <span style="margin-left:auto;font-size:12px;color:var(--panel-text-secondary,#9ca3af);">${skill.source}</span>`;
     item.addEventListener('click', () => selectSkill(skill));
     item.addEventListener('mouseenter', () => { selectedIndex = i; updateSelection(); });
-    wrap.appendChild(item);
+    dropdownEl.appendChild(item);
   });
-  dropdownEl = wrap;
-  document.body.appendChild(wrap);
 }
 
 function updateSelection() {
   if (!dropdownEl) return;
   dropdownEl.querySelectorAll('.ds-mini-ac-shadow-item').forEach((item, i) => {
-    (item as HTMLElement).style.background = i === selectedIndex ? '#f3f4f6' : 'transparent';
+    (item as HTMLElement).style.background = i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent';
+    if (i === selectedIndex) (item as HTMLElement).scrollIntoView({ block: 'nearest' });
   });
 }
 

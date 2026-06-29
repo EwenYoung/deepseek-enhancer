@@ -4,3 +4,4 @@
 - [测试策略](testing-strategy.md) — 确定性代码我写 assert 测试，非确定性的交互交用户手动测试
 - [面板深色适配与输入框隐藏调试](panel-dark-mode-and-input-hide-debug.md) — 迟滞效应、MutationObserver SPA 重建、background 简写覆盖、自定义滚动条
 - [UI 重设计玻璃面板](glassmorphism-panel-redesign.md) — 玻璃面板、Tools 开关跨世界通信、Modal 弹窗系统、设置3 tab、Token 速度
+- [Autocomplete 修复与排序](autocomplete-fix-and-sort.md) — 方向键高亮消失、不翻页、首字母不联想、ignoreNextInput 时间窗口修复、Skill 字母排序

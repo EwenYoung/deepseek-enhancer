@@ -27,7 +27,7 @@ export async function loadSkills(): Promise<Skill[]> {
   // 非内置的用户自定义技能
   const custom = userSkills.filter(s => s.source !== 'builtin');
 
-  return [...builtin, ...custom];
+  return [...builtin, ...custom].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function loadUserSkills(): Promise<Skill[]> {

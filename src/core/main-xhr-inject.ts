@@ -9,6 +9,22 @@
 
   console.log('[DS-Mini:MAIN] XHR hook installed');
 
+  // 立即拦截 fetch 以捕获 auth 请求头（放最前面确保不遗漏）
+  var __origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.indexOf('/api/v0/') !== -1 && opts && opts.headers) {
+      var h = opts.headers;
+      if (h instanceof Headers) {
+        if (h.has('authorization')) window.__DS_DELETE_AUTH__ = h.get('authorization');
+        if (h.has('Authorization')) window.__DS_DELETE_AUTH__ = h.get('Authorization');
+      } else if (typeof h === 'object') {
+        if (h.authorization) window.__DS_DELETE_AUTH__ = h.authorization;
+        if (h.Authorization) window.__DS_DELETE_AUTH__ = h.Authorization;
+      }
+    }
+    return __origFetch.call(this, url, opts);
+  };
+
   // ==========================================================
   // 模式检测 — 使用 _31a22b0 定位实际激活的模式
   // ==========================================================
@@ -151,6 +167,15 @@
     this.__ds_method = method;
     return origOpen.apply(this, arguments);
   };
+
+  var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+    if (header.toLowerCase() === 'authorization' && value) {
+      window.__DS_DELETE_AUTH__ = value;
+    }
+    return origSetHeader.apply(this, arguments);
+  };
+
 
   XMLHttpRequest.prototype.send = function (body) {
     var url = this.__ds_url || '';
@@ -568,4 +593,101 @@
 
   window.__DS_MINI_MODE = currentMode;
   console.log('[DS-Mini:MAIN] Ready, mode:', currentMode);
+
+  // ==========================================================
+  // 分类插件删除请求
+  // ==========================================================
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_DELETE_SESSION') {
+      var sid = event.data.sessionId;
+
+      // 从 localStorage 读取 token（DeepSeek 的存储方式）
+      var token = '';
+      try {
+        // 常见的 token 存储 key
+        var keys = ['token', 'accessToken', 'access_token', 'dsToken', 'ds_access_token', 'Authorization', 'userToken'];
+        for (var i = 0; i < keys.length; i++) {
+          var val = localStorage.getItem(keys[i]);
+          if (val) { token = val; break; }
+        }
+        // 如果 localStorage 没找到，尝试从 cookie 读取
+        if (!token) {
+          var cookies = document.cookie.split(';');
+          for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.indexOf('token=') === 0 || c.indexOf('access=') === 0 || c.indexOf('auth=') === 0) {
+              token = c.substring(c.indexOf('=') + 1);
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+
+      var headers = { 'Content-Type': 'application/json' };
+      // 优先使用捕获到的页面 auth header
+      var capturedAuth = window.__DS_DELETE_AUTH__;
+      if (capturedAuth) {
+        headers['Authorization'] = capturedAuth;
+      }
+
+      // 如果还没捕获到，直接去 localStorage 读各种可能 key
+      if (!capturedAuth) {
+        try {
+          for (var lsi = 0; lsi < localStorage.length; lsi++) {
+            var lsk = localStorage.key(lsi);
+            if (lsk && (lsk.indexOf('token') !== -1 || lsk.indexOf('auth') !== -1 || lsk.indexOf('Token') !== -1 || lsk.indexOf('Auth') !== -1)) {
+              var lsv = localStorage.getItem(lsk);
+              console.log('[DS-Mini:MAIN] localStorage token candidate:', lsk, '=', lsv ? lsv.substring(0, 30) + '...' : 'empty');
+            }
+          }
+        } catch(e) {}
+
+        // 检查 sessionStorage
+        try {
+          for (var ssi = 0; ssi < sessionStorage.length; ssi++) {
+            var ssk = sessionStorage.key(ssi);
+            if (ssk && (ssk.indexOf('token') !== -1 || ssk.indexOf('auth') !== -1)) {
+              var ssv = sessionStorage.getItem(ssk);
+              console.log('[DS-Mini:MAIN] sessionStorage token candidate:', ssk, '=', ssv ? ssv.substring(0, 30) + '...' : 'empty');
+            }
+          }
+        } catch(e) {}
+
+        // 读取 cookies（完整输出用于诊断）
+        console.log('[DS-Mini:MAIN] Cookies:', document.cookie);
+      }
+
+      console.log('[DS-Mini:MAIN] Delete request for', sid, 'auth:', headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE');
+
+      fetch('/api/v0/chat_session/delete', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ chat_session_id: sid }),
+      })
+      .then(function(r) { return r.json().catch(function() { return { code: r.status, msg: r.statusText }; }); })
+      .then(function(data) {
+        window.postMessage({
+          source: 'DS_MINI_MAIN',
+          type: 'DS_MINI_DELETE_RESPONSE',
+          sessionId: sid,
+          success: data.code === 0 || data.code === 200 || !data.code,
+          response: data,
+        }, '*');
+        if (data.code === 0 || data.code === 200 || !data.code) {
+          console.log('[DS-Mini:MAIN] Session deleted:', sid);
+        } else {
+          console.warn('[DS-Mini:MAIN] Delete failed:', data);
+        }
+      })
+      .catch(function(err) {
+        window.postMessage({
+          source: 'DS_MINI_MAIN',
+          type: 'DS_MINI_DELETE_RESPONSE',
+          sessionId: sid,
+          success: false,
+          error: err.message,
+        }, '*');
+      });
+    }
+  });
 })();

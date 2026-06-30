@@ -11,7 +11,6 @@ export default defineContentScript({
   world: 'MAIN',
 
   main() {
-    // 将 pre-bundled 的 XHR hook 代码作为 IIFE 注入到页面
     // ponytail: eval the raw code string so it runs in main world as an IIFE
     const script = document.createElement('script');
     script.textContent = mainXHRCode;

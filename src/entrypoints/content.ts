@@ -8,6 +8,7 @@ import { initToolBlocks, handleMainWorldToolCalls, setSilentMode } from '../core
 import { initArtifacts } from '../core/artifact';
 import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
 import { setDisabledTools } from '../core/inject-context';
+import { initCategories } from '../core/ui-categories';
 import type { AppState } from '../core/types';
 
 export const state: AppState = {
@@ -57,6 +58,7 @@ export default defineContentScript({
     initPanel(state);
     initToolBlocks(state);
     initArtifacts();
+    initCategories();
 
     // 增强器功能
     loadEnhancerFeatures();

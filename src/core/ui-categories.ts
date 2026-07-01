@@ -67,7 +67,7 @@ const CAT_PANEL_CSS = `
   }
   #ds-cat-header .ds-cat-actions button:hover {
     background: var(--card-border, rgba(0,0,0,0.08));
-    color: var(--panel-text, #1f2937);
+    color: var(--accent, #007AFF);
   }
   #ds-cat-body { overflow-y: auto; max-height: 0; transition: max-height 0.25s ease; }
   #ds-cat-body.ds-cat-expanded { max-height: 35vh; }
@@ -98,7 +98,7 @@ const CAT_PANEL_CSS = `
     opacity: 0; transition: opacity 0.15s;
   }
   .ds-cat-item-header:hover .ds-cat-menu { opacity: 1; }
-  .ds-cat-item-header .ds-cat-menu:hover { background: var(--card-border); }
+  .ds-cat-item-header .ds-cat-menu:hover { opacity: 1 !important; color: var(--accent, #007AFF); background: var(--card-border); }
   .ds-cat-item-header .ds-cat-add-session {
     background: none; border: none; cursor: pointer;
     width: 20px; height: 20px; border-radius: 4px;
@@ -126,7 +126,7 @@ const CAT_PANEL_CSS = `
     opacity: 0; transition: opacity 0.15s;
   }
   .ds-cat-session:hover .ds-cat-session-remove { opacity: 1; }
-  .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); }
+  .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); background: var(--card-border); }
 
   /* 三点菜单注入按钮 */
   .ds-cat-menu-inject {
@@ -450,9 +450,14 @@ function buildCategoryListHTML(): string {
 
 function getSessionTitleFromDOM(sid: string): string {
   for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) {
-    if (extractSessionId(link as HTMLAnchorElement) === sid) return getConversationTitle(link as HTMLAnchorElement);
+    if (extractSessionId(link as HTMLAnchorElement) === sid) {
+      const title = getConversationTitle(link as HTMLAnchorElement);
+      // 如果标题是空的或默认的新会话标题，显示一个友好名称
+      const trimmed = title.trim();
+      if (trimmed && trimmed !== '新会话' && trimmed !== 'New Chat') return title;
+    }
   }
-  return '已删除';
+  return '新会话';
 }
 
 // ============================================================
@@ -614,7 +619,18 @@ function showCategoryMenu(anchor: HTMLElement, catName: string) {
 // 导航 / 移出
 // ============================================================
 function navigateToSession(sid: string) {
-  for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) { if (extractSessionId(link as HTMLAnchorElement) === sid) { (link as HTMLAnchorElement).click(); return; } }
+  // 重试查找链接并点击（新生成的会话可能还没渲染）
+  var retries = 10;
+  function tryClick() {
+    for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) {
+      if (extractSessionId(link as HTMLAnchorElement) === sid) {
+        link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        return;
+      }
+    }
+    if (--retries > 0) setTimeout(tryClick, 300);
+  }
+  tryClick();
 }
 async function handleUncategorize(sid: string) { uncategorizeSession(catState, sid); await saveCategories(catState); applyHiddenSessions(); refreshPanel(); }
 
@@ -623,27 +639,47 @@ async function handleUncategorize(sid: string) { uncategorizeSession(catState, s
 // ============================================================
 /** 在指定分类中创建新会话 */
 function createSessionInCategory(catName: string) {
-  // 通过 localStorage 标记待归类（MAIN world 可同步读取）
   try { localStorage.setItem('ds_mini_pending_category', catName); } catch(e) {}
-  // 导航到新对话主页
   location.href = '/chat';
 }
 
-// ============================================================
-// 监听 MAIN world 发来的新会话通知
-// ============================================================
 function setupNewSessionListener() {
   window.addEventListener('message', (event) => {
     if (event.data?.source === 'DS_MINI_MAIN' && event.data?.type === 'DS_MINI_NEW_SESSION') {
       const { sessionId, categoryName } = event.data;
       if (!sessionId || !categoryName) return;
+
+      // 完整归类流程（加入 hiddenSessions → 隐藏侧边栏条目）
       categorizeSession(catState, sessionId, categoryName);
-      saveCategories(catState).then(() => refreshPanel());
-      console.log('[Categories] New session categorized:', categoryName, sessionId);
+      saveCategories(catState).then(() => {
+        refreshPanel();
+        applyHiddenSessions(); // 立即隐藏已归类条目
+      });
+
+      // 轮询更新标题（display:none 不影响 textContent）
+      let titleCheck = setInterval(() => {
+        for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) {
+          if (extractSessionId(link as HTMLAnchorElement) === sessionId) {
+            const newTitle = getConversationTitle(link as HTMLAnchorElement);
+            if (panelEl) {
+              const sessionEl = panelEl.querySelector(`[data-session-id="${sessionId}"]`);
+              const titleEl = sessionEl?.querySelector('.ds-cat-session-title');
+              if (titleEl && titleEl.textContent !== newTitle) {
+                titleEl.textContent = newTitle;
+              }
+            }
+            break;
+          }
+        }
+      }, 1000);
+      setTimeout(() => clearInterval(titleCheck), 30000);
     }
   });
 }
 
+// ============================================================
+// 监听 MAIN world 发来的新会话通知
+// ============================================================
 // ============================================================
 // 隐藏
 // ============================================================

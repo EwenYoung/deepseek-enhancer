@@ -140,13 +140,8 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-session:hover .ds-cat-session-remove { opacity: 1; }
   .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); background: var(--card-border); }
-  .ds-cat-item.ds-cat-dragging { opacity: 0.3; background: var(--card-bg); }
-  .ds-cat-item.ds-cat-drag-over { position: relative; }
-  .ds-cat-item.ds-cat-drag-over::before {
-    content: ''; position: absolute; left: 8px; right: 8px; top: -1px;
-    height: 2px; background: var(--accent, #007AFF); border-radius: 1px;
-    z-index: 1;
-  }
+  .ds-cat-item.ds-cat-dragging { opacity: 0.3; }
+  .ds-cat-item.ds-cat-drag-over { box-shadow: inset 0 2px 0 0 var(--accent, #007AFF) !important; border-radius: 2px; }
 
   /* 三点菜单注入按钮 — 完全继承父级字体，不覆盖 */
   .ds-cat-menu-inject {
@@ -465,7 +460,7 @@ function buildCategoryListHTML(): string {
     // 按排序模式渲染会话列表
     let sessionIds = [...item.sessions];
     if (item.sortBy === 'time-asc') sessionIds.reverse();
-    return '<div class="ds-cat-item" draggable="true" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-sort-btn" title="' + getSortLabel(item.sortBy) + '">' + getSortIcon(item.sortBy) + '</button><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (sessionIds.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : sessionIds.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
+    return '<div class="ds-cat-item" draggable="true" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><button class="ds-cat-sort-btn" title="' + getSortLabel(item.sortBy) + '">' + getSortIcon(item.sortBy) + '</button><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (sessionIds.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : sessionIds.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
   }).join('');
 }
 
@@ -565,9 +560,14 @@ function bindCategoryEvents() {
     if (!el || el.closest('#ds-cat-header')) { e.preventDefault(); return; }
     _dragCatIdx = Array.from(panelEl.querySelectorAll('.ds-cat-item')).indexOf(el);
     el.classList.add('ds-cat-dragging');
-    e.dataTransfer?.setData('text/plain', String(_dragCatIdx));
+    panelEl.classList.add('ds-cat-dragging-active');
+    // 减小拖拽鬼影，防止文字重叠
+    e.dataTransfer?.setDragImage(document.createElement('div'), 0, 0);
+    e.dataTransfer.effectAllowed = 'move';
   });
   panelEl.addEventListener('dragend', () => {
+    _dragCatIdx = -1;
+    panelEl.classList.remove('ds-cat-dragging-active');
     panelEl.querySelectorAll('.ds-cat-dragging, .ds-cat-drag-over').forEach(el => el.classList.remove('ds-cat-dragging', 'ds-cat-drag-over'));
   });
   panelEl.addEventListener('dragover', (e) => {

@@ -188,6 +188,20 @@
         if (parsedCtx.chat_session_id) {
           lastCtx.chat_session_id = parsedCtx.chat_session_id;
           lastCtx.model_type = parsedCtx.model_type || 'default';
+
+          // 检查是否有待归类的新会话
+          try {
+            var pendingCat = localStorage.getItem('ds_mini_pending_category');
+            if (pendingCat && parsedCtx.chat_session_id) {
+              localStorage.removeItem('ds_mini_pending_category');
+              window.postMessage({
+                source: 'DS_MINI_MAIN',
+                type: 'DS_MINI_NEW_SESSION',
+                sessionId: parsedCtx.chat_session_id,
+                categoryName: pendingCat,
+              }, '*');
+            }
+          } catch(pendingErr) {}
         }
       } catch (e) {}
 

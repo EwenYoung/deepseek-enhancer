@@ -99,6 +99,16 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-item-header:hover .ds-cat-menu { opacity: 1; }
   .ds-cat-item-header .ds-cat-menu:hover { background: var(--card-border); }
+  .ds-cat-item-header .ds-cat-add-session {
+    background: none; border: none; cursor: pointer;
+    width: 20px; height: 20px; border-radius: 4px;
+    font-size: 13px; padding: 0;
+    color: var(--panel-text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s, color 0.15s;
+  }
+  .ds-cat-item-header:hover .ds-cat-add-session { opacity: 0.5; }
+  .ds-cat-item-header .ds-cat-add-session:hover { opacity: 1 !important; color: var(--accent, #007AFF); background: var(--card-border); }
   .ds-cat-item-sessions { display: none; }
   .ds-cat-item-sessions.open { display: block; }
   .ds-cat-session {
@@ -155,25 +165,29 @@ const CAT_PANEL_CSS = `
 
   /* 批量操作栏 */
   #ds-batch-bar {
-    display: none; align-items: center; justify-content: flex-end; gap: 4px;
-    padding: 5px 8px; border-top: 1px solid var(--card-border);
-    font-size: 11px;
+    display: none; align-items: center; justify-content: flex-end; gap: 6px;
+    padding: 6px 8px; border-top: 1px solid var(--card-border);
+    font-size: 12px;
   }
   #ds-batch-bar.ds-batch-active { display: flex; }
   #ds-batch-bar .ds-batch-count { font-weight: 600; flex: 1; }
   #ds-batch-bar .ds-batch-btn {
-    padding: 3px 8px; border-radius: 5px;
-    background: var(--card-bg); color: var(--panel-text);
-    border: 1px solid var(--card-border); cursor: pointer;
-    font-size: 11px; font-weight: 500;
-    transition: all 0.15s;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 500; border: 1px solid;
+    transition: all 0.15s; white-space: nowrap;
+    background: var(--card-bg); color: var(--panel-text); border-color: var(--card-border);
   }
-  #ds-batch-bar .ds-batch-btn:hover { filter: brightness(0.92); }
-  #ds-batch-bar .ds-batch-btn.ds-batch-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  #ds-batch-bar .ds-batch-btn.ds-batch-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-primary { background: #007AFF; color: #fff; }
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-danger { background: #FF3B30; color: #fff; }
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn { color: #1f2937; }
+  #ds-batch-bar .ds-batch-btn:hover { filter: brightness(0.93); }
+  /* 归类到 — 用蓝色文字 + 蓝色边框 + 弱蓝背景，所有浅色主题清晰 */
+  #ds-batch-bar .ds-batch-btn.ds-batch-primary,
+  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-primary { color: #1a56db; border-color: #1a56db; background: #eef4ff; }
+  /* 删除 — 用红色文字 + 红色边框 + 弱红背景 */
+  #ds-batch-bar .ds-batch-btn.ds-batch-danger,
+  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #dc2626; border-color: #dc2626; background: #fef2f2; }
+  /* 深色主题：亮色文字 + 半透明背景 */
+  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-primary { color: #93b4f8; border-color: #93b4f8; background: rgba(147,180,248,0.1); }
+  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #fca5a5; border-color: #fca5a5; background: rgba(252,165,165,0.1); }
+  html.ds-dark #ds-batch-bar .ds-batch-btn { color: #e0e0e0; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
 
   /* 复选框 */
   .ds-session-checkbox { display: none !important; }
@@ -202,6 +216,7 @@ export async function initCategories() {
   injectPanelCSS();
   tryInjectPanel();
   captureThreeDotClicks();
+  setupNewSessionListener();
 
   // 面板重注入 observer
   if (!sidebarObserver) {
@@ -429,7 +444,7 @@ function buildCategoryListHTML(): string {
   return cats.order.map(n => {
     const item = cats.items[n]; if (!item) return '';
     const open = sessionStorage.getItem('ds_cat_open_' + n) !== 'false';
-    return '<div class="ds-cat-item" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (item.sessions.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : item.sessions.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
+    return '<div class="ds-cat-item" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (item.sessions.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : item.sessions.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
   }).join('');
 }
 
@@ -460,6 +475,14 @@ function bindCategoryEvents() {
     if (target.closest('#ds-cat-toggle-all')) { e.stopPropagation(); togglePanel(); return; }
     // 新建分类
     if (target.closest('#ds-cat-add')) { e.stopPropagation(); showCategoryDialog('new'); return; }
+    // 分类内新建会话
+    if (target.closest('.ds-cat-add-session')) {
+      e.stopPropagation();
+      const item = target.closest('.ds-cat-item') as HTMLElement;
+      const catName = item?.dataset.catName || '';
+      if (catName) createSessionInCategory(catName);
+      return;
+    }
     // 批量按钮
     if (target.closest('#ds-cat-batch')) { e.stopPropagation(); toggleBatchMode(); return; }
     // 分类项标题（展开/折叠）
@@ -594,6 +617,32 @@ function navigateToSession(sid: string) {
   for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) { if (extractSessionId(link as HTMLAnchorElement) === sid) { (link as HTMLAnchorElement).click(); return; } }
 }
 async function handleUncategorize(sid: string) { uncategorizeSession(catState, sid); await saveCategories(catState); applyHiddenSessions(); refreshPanel(); }
+
+// ============================================================
+// 分类内创建新会话
+// ============================================================
+/** 在指定分类中创建新会话 */
+function createSessionInCategory(catName: string) {
+  // 通过 localStorage 标记待归类（MAIN world 可同步读取）
+  try { localStorage.setItem('ds_mini_pending_category', catName); } catch(e) {}
+  // 导航到新对话主页
+  location.href = '/chat';
+}
+
+// ============================================================
+// 监听 MAIN world 发来的新会话通知
+// ============================================================
+function setupNewSessionListener() {
+  window.addEventListener('message', (event) => {
+    if (event.data?.source === 'DS_MINI_MAIN' && event.data?.type === 'DS_MINI_NEW_SESSION') {
+      const { sessionId, categoryName } = event.data;
+      if (!sessionId || !categoryName) return;
+      categorizeSession(catState, sessionId, categoryName);
+      saveCategories(catState).then(() => refreshPanel());
+      console.log('[Categories] New session categorized:', categoryName, sessionId);
+    }
+  });
+}
 
 // ============================================================
 // 隐藏

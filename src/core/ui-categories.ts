@@ -5,7 +5,8 @@ import {
   loadCategories, saveCategories, addCategory, renameCategory,
   deleteCategory, categorizeSession, uncategorizeSession,
   extractSessionId, getConversationTitle,
-  type CategoryState,
+  toggleSortMode, getSortIcon, getSortLabel, reorderCategory,
+  type CategoryState, type SortMode,
 } from './conversation-store';
 
 let catState: CategoryState = { categories: { order: [], items: {}, sessionCategory: {} }, hiddenSessions: [] };
@@ -69,7 +70,8 @@ const CAT_PANEL_CSS = `
     background: var(--card-border, rgba(0,0,0,0.08));
     color: var(--accent, #007AFF);
   }
-  #ds-cat-body { overflow-y: auto; max-height: 0; transition: max-height 0.25s ease; }
+  #ds-cat-body { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; max-height: 0; transition: max-height 0.25s ease; }
+  #ds-cat-body::-webkit-scrollbar { display: none; }
   #ds-cat-body.ds-cat-expanded { max-height: 35vh; }
   .ds-cat-item { border-top: 1px solid var(--card-border, rgba(0,0,0,0.04)); }
   .ds-cat-item-header {
@@ -109,6 +111,17 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-item-header:hover .ds-cat-add-session { opacity: 0.5; }
   .ds-cat-item-header .ds-cat-add-session:hover { opacity: 1 !important; color: var(--accent, #007AFF); background: var(--card-border); }
+  .ds-cat-item-header .ds-cat-sort-btn {
+    background: none; border: none; cursor: pointer;
+    width: 20px; height: 20px; border-radius: 4px;
+    font-size: 10px; padding: 0; font-weight: 600;
+    color: var(--panel-text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity 0.15s, background 0.15s, color 0.15s;
+    opacity: 0;
+  }
+  .ds-cat-item-header:hover .ds-cat-sort-btn { opacity: 0.6; }
+  .ds-cat-item-header .ds-cat-sort-btn:hover { opacity: 1 !important; background: var(--card-border); color: var(--accent, #007AFF); }
   .ds-cat-item-sessions { display: none; }
   .ds-cat-item-sessions.open { display: block; }
   .ds-cat-session {
@@ -127,16 +140,21 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-session:hover .ds-cat-session-remove { opacity: 1; }
   .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); background: var(--card-border); }
+  .ds-cat-item.ds-cat-dragging { opacity: 0.3; background: var(--card-bg); }
+  .ds-cat-item.ds-cat-drag-over { position: relative; }
+  .ds-cat-item.ds-cat-drag-over::before {
+    content: ''; position: absolute; left: 8px; right: 8px; top: -1px;
+    height: 2px; background: var(--accent, #007AFF); border-radius: 1px;
+    z-index: 1;
+  }
 
-  /* 三点菜单注入按钮 */
+  /* 三点菜单注入按钮 — 完全继承父级字体，不覆盖 */
   .ds-cat-menu-inject {
     display: flex !important; align-items: center; gap: 6px;
     width: 100% !important; cursor: pointer;
     padding: 8px 12px !important; box-sizing: border-box !important;
-    font-family: inherit; font-size: 13px; color: inherit;
-    line-height: 1.4; border: none; background: none; outline: none;
+    font: inherit; color: inherit; border: none; background: none; outline: none;
     transition: background 0.1s;
-    min-height: 36px; font-weight: 500;
   }
   .ds-cat-menu-inject:hover { background: var(--ds-dropdown-hover, rgba(0,0,0,0.05)) !important; }
   .ds-cat-menu-inject svg { flex-shrink: 0; }
@@ -288,13 +306,13 @@ function injectIntoContextMenu(menu: HTMLElement, sessionId: string) {
   btn.className = 'ds-cat-menu-inject';
   btn.setAttribute('tabindex', '-1');
   btn.setAttribute('role', 'menuitem');
-  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>归类';
-  btn.style.cssText = 'display:flex;align-items:center;gap:6px;width:100%!important;cursor:pointer;padding:6px 12px;box-sizing:border-box;font-family:inherit;font-size:13px;color:inherit;line-height:1.4;font-weight:500;transition:background 0.1s;border:none;background:none;outline:none;';
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>归类到';
+  btn.style.cssText = 'display:flex;align-items:center;gap:6px;width:100%!important;cursor:pointer;padding:6px 12px;box-sizing:border-box;font:inherit;color:inherit;transition:background 0.1s;border:none;background:none;outline:none;';
   btn.addEventListener('mouseenter', () => btn.style.background = 'var(--ds-dropdown-hover,rgba(0,0,0,0.05))');
   btn.addEventListener('mouseleave', () => btn.style.background = '');
   btn.addEventListener('click', (e) => {
     e.preventDefault(); e.stopPropagation();
-    showCategorizePopup(btn, sessionId);
+    showBatchCategorizeDialog([sessionId]);
   });
   if (innerMenu.firstChild) {
     innerMenu.insertBefore(btn, innerMenu.firstChild);
@@ -435,7 +453,7 @@ function chevronRightSVG() { return '<svg width="10" height="10" viewBox="0 0 24
 // ============================================================
 function buildCategoryHTML(): string {
   const ex = sessionStorage.getItem(CAT_KEY) !== 'false';
-  return '<div id="ds-cat-header"><span>' + folderSVG() + ' 分类</span><div class="ds-cat-actions"><button id="ds-cat-toggle-all" title="' + (ex ? '收起' : '展开') + '">' + (ex ? chevronDownSVG() : chevronRightSVG()) + '</button><button id="ds-cat-add" title="新建分类">' + plusSVG() + '</button><button id="ds-cat-batch" title="批量选择">' + listSVG() + '</button></div></div><div id="ds-cat-body" class="' + (ex ? 'ds-cat-expanded' : '') + '">' + buildCategoryListHTML() + '</div><div id="ds-batch-bar"><span>已选 <span id="ds-batch-count" class="ds-batch-count">0</span></span><button id="ds-batch-categorize" class="ds-batch-btn ds-batch-primary">归类到</button><button id="ds-batch-delete" class="ds-batch-btn ds-batch-danger">删除</button><button id="ds-batch-cancel" class="ds-batch-btn">取消</button></div>';
+  return '<div id="ds-cat-header"><span style="display:inline-flex;align-items:center;gap:4px;">' + folderSVG() + '分类</span><div class="ds-cat-actions"><button id="ds-cat-toggle-all" title="' + (ex ? '收起' : '展开') + '">' + (ex ? chevronDownSVG() : chevronRightSVG()) + '</button><button id="ds-cat-add" title="新建分类">' + plusSVG() + '</button><button id="ds-cat-batch" title="批量选择">' + listSVG() + '</button></div></div><div id="ds-cat-body" class="' + (ex ? 'ds-cat-expanded' : '') + '">' + buildCategoryListHTML() + '</div><div id="ds-batch-bar"><span>已选 <span id="ds-batch-count" class="ds-batch-count">0</span></span><button id="ds-batch-categorize" class="ds-batch-btn ds-batch-primary">归类到</button><button id="ds-batch-delete" class="ds-batch-btn ds-batch-danger">删除</button><button id="ds-batch-cancel" class="ds-batch-btn">取消</button></div>';
 }
 
 function buildCategoryListHTML(): string {
@@ -444,7 +462,10 @@ function buildCategoryListHTML(): string {
   return cats.order.map(n => {
     const item = cats.items[n]; if (!item) return '';
     const open = sessionStorage.getItem('ds_cat_open_' + n) !== 'false';
-    return '<div class="ds-cat-item" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (item.sessions.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : item.sessions.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
+    // 按排序模式渲染会话列表
+    let sessionIds = [...item.sessions];
+    if (item.sortBy === 'time-asc') sessionIds.reverse();
+    return '<div class="ds-cat-item" draggable="true" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-sort-btn" title="' + getSortLabel(item.sortBy) + '">' + getSortIcon(item.sortBy) + '</button><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (sessionIds.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : sessionIds.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
   }).join('');
 }
 
@@ -452,16 +473,13 @@ function getSessionTitleFromDOM(sid: string): string {
   for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) {
     if (extractSessionId(link as HTMLAnchorElement) === sid) {
       const title = getConversationTitle(link as HTMLAnchorElement);
-      // 如果标题是空的或默认的新会话标题，显示一个友好名称
       const trimmed = title.trim();
       if (trimmed && trimmed !== '新会话' && trimmed !== 'New Chat') return title;
     }
   }
-  return '新会话';
+  return sid;
 }
 
-// ============================================================
-// 事件绑定
 // ============================================================
 function bindCategoryEvents() {
   if (!panelEl) return;
@@ -491,7 +509,7 @@ function bindCategoryEvents() {
     // 批量按钮
     if (target.closest('#ds-cat-batch')) { e.stopPropagation(); toggleBatchMode(); return; }
     // 分类项标题（展开/折叠）
-    if (target.closest('.ds-cat-item-header') && !target.closest('.ds-cat-menu')) {
+    if (target.closest('.ds-cat-item-header') && !target.closest('.ds-cat-menu') && !target.closest('.ds-cat-sort-btn') && !target.closest('.ds-cat-add-session')) {
       const item = target.closest('.ds-cat-item') as HTMLElement;
       const name = item?.dataset.catName || '';
       const s = item?.querySelector('.ds-cat-item-sessions') as HTMLElement;
@@ -508,6 +526,17 @@ function bindCategoryEvents() {
       e.stopPropagation();
       const item = target.closest('.ds-cat-item') as HTMLElement;
       showCategoryMenu(target as HTMLElement, item?.dataset.catName || '');
+      return;
+    }
+    // 排序模式切换（↓ 最新优先 ↔ ↑ 最早优先）
+    if (target.closest('.ds-cat-sort-btn')) {
+      e.stopPropagation();
+      const item = target.closest('.ds-cat-item') as HTMLElement;
+      const catName = item?.dataset.catName || '';
+      const catItem = catState.categories.items[catName];
+      if (!catItem) return;
+      toggleSortMode(catItem);
+      saveCategories(catState).then(() => refreshPanel());
       return;
     }
     // 分类内会话点击
@@ -527,6 +556,36 @@ function bindCategoryEvents() {
     if (target.closest('#ds-batch-categorize')) { const s = getSelectedSessions(); if (s.length) showBatchCategorizeDialog(s); return; }
     if (target.closest('#ds-batch-delete')) { const s = getSelectedSessions(); if (s.length) showBatchDeleteDialog(s); return; }
     if (target.closest('#ds-batch-cancel')) { toggleBatchMode(); return; }
+  });
+
+  // 分类拖拽排序
+  let _dragCatIdx = -1;
+  panelEl.addEventListener('dragstart', (e) => {
+    const el = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
+    if (!el || el.closest('#ds-cat-header')) { e.preventDefault(); return; }
+    _dragCatIdx = Array.from(panelEl.querySelectorAll('.ds-cat-item')).indexOf(el);
+    el.classList.add('ds-cat-dragging');
+    e.dataTransfer?.setData('text/plain', String(_dragCatIdx));
+  });
+  panelEl.addEventListener('dragend', () => {
+    panelEl.querySelectorAll('.ds-cat-dragging, .ds-cat-drag-over').forEach(el => el.classList.remove('ds-cat-dragging', 'ds-cat-drag-over'));
+  });
+  panelEl.addEventListener('dragover', (e) => {
+    const el = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
+    if (!el || _dragCatIdx < 0) return;
+    e.preventDefault();
+    panelEl.querySelectorAll('.ds-cat-drag-over').forEach(el => el.classList.remove('ds-cat-drag-over'));
+    el.classList.add('ds-cat-drag-over');
+  });
+  panelEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (_dragCatIdx < 0) return;
+    const target = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
+    if (!target) return;
+    const toIdx = Array.from(panelEl.querySelectorAll('.ds-cat-item')).indexOf(target);
+    if (toIdx < 0 || toIdx === _dragCatIdx) return;
+    reorderCategory(catState, _dragCatIdx, toIdx);
+    saveCategories(catState).then(() => refreshPanel());
   });
 
   const toggleBtn = panelEl.querySelector('#ds-cat-toggle-all') as HTMLElement;
@@ -562,7 +621,7 @@ function showCategorizePopup(anchor: HTMLElement, sessionId: string) {
   document.body.appendChild(popup);
 
   function closePopup() { popup.remove(); document.removeEventListener('mousedown', close); closeDeepSeekMenu(); }
-  popup.querySelectorAll('[data-action="cat"]').forEach(b => { b.addEventListener('click', async () => { const cn = (b as HTMLElement).dataset.cat || ''; categorizeSession(catState, sessionId, cn); await saveCategories(catState); closePopup(); applyHiddenSessions(); refreshPanel(); }); });
+  popup.querySelectorAll('[data-action="cat"]').forEach(b => { b.addEventListener('click', async () => { const cn = (b as HTMLElement).dataset.cat || ''; console.log('[Categories] Categorize click:', cn, sessionId); categorizeSession(catState, sessionId, cn); await saveCategories(catState); console.log('[Categories] Saved, removing popup'); popup.remove(); document.removeEventListener('mousedown', close); applyHiddenSessions(); refreshPanel(); closeDeepSeekMenu(); }); });
   popup.querySelector('[data-action="new"]')?.addEventListener('click', () => {
     popup.remove(); const n = prompt('新建分类名称：');
     if (n && n.trim()) { const t = n.trim(); addCategory(catState, t); categorizeSession(catState, sessionId, t); saveCategories(catState).then(() => { closeDeepSeekMenu(); applyHiddenSessions(); refreshPanel(); }); }

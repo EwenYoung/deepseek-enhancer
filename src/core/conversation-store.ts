@@ -19,9 +19,12 @@ export interface CategoriesData {
   sessionCategory: Record<string, string>;
 }
 
+export type SortMode = 'time-desc' | 'time-asc';
+
 export interface CategoryItem {
   createdAt: number;
   sessions: string[];
+  sortBy?: SortMode;
 }
 
 export interface CategoryState {
@@ -142,7 +145,7 @@ export function categorizeSession(state: CategoryState, sessionId: string, categ
   state.categories.sessionCategory[sessionId] = categoryName;
   const item = state.categories.items[categoryName];
   if (!item.sessions.includes(sessionId)) {
-    item.sessions.push(sessionId);
+    item.sessions.unshift(sessionId); // 新会话在最前（time-desc 默认）
   }
 
   // 加入隐藏列表
@@ -188,6 +191,37 @@ export function addHiddenSession(state: CategoryState, sessionId: string) {
 export function removeHiddenSession(state: CategoryState, sessionId: string) {
   const idx = state.hiddenSessions.indexOf(sessionId);
   if (idx !== -1) state.hiddenSessions.splice(idx, 1);
+}
+
+// ============================================================
+// 排序功能
+// ============================================================
+
+/** 切换排序模式：time-desc ↔ time-asc */
+export function toggleSortMode(item: CategoryItem): SortMode {
+  const next = item.sortBy === 'time-asc' ? 'time-desc' : 'time-asc';
+  item.sortBy = next;
+  return next;
+}
+
+export function getSortIcon(mode?: SortMode): string {
+  return mode === 'time-asc' ? '↑' : '↓';
+}
+
+export function getSortLabel(mode?: SortMode): string {
+  return mode === 'time-asc' ? '最早优先' : '最新优先';
+}
+
+// ============================================================
+// 分类拖拽排序
+// ============================================================
+
+/** 拖拽后将分类移到新位置 */
+export function reorderCategory(state: CategoryState, fromIndex: number, toIndex: number) {
+  const order = state.categories.order;
+  if (fromIndex < 0 || fromIndex >= order.length || toIndex < 0 || toIndex >= order.length) return;
+  const [moved] = order.splice(fromIndex, 1);
+  order.splice(toIndex, 0, moved);
 }
 
 // ============================================================

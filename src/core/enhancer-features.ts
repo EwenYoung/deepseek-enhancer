@@ -239,12 +239,23 @@ export async function applyTheme(idx: number) {
     #root ._31a22b0 svg {
       color: ${theme.brandColor} !important;
     }
-    /* toggle 按钮文本：选中=品牌色，未选中=灰色 */
+    /* toggle 按钮：选中=品牌色，未选中=灰色 */
     #root .ds-toggle-button--selected {
       color: ${theme.brandColor} !important;
+      border-color: ${theme.brandColor} !important;
     }
     #root .ds-toggle-button:not(.ds-toggle-button--selected) {
       color: ${dark ? 'rgb(160, 160, 170)' : 'rgb(130, 130, 140)'} !important;
+      border-color: ${dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'} !important;
+    }
+    /* 输入框边框 + 阴影着色（新对话页 _9996a53 / 会话页 _3d616d3） */
+    #root ._9996a53, #root ._3d616d3 {
+      border-color: ${theme.brandColor}26 !important;
+      box-shadow: 0 4px 12px ${theme.brandColor}0D, 0 2px 2px ${theme.brandColor}08, 0 30px 60px ${theme.brandColor}0D !important;
+    }
+    /* mode tab 选中态 oval box-shadow */
+    #root .c15ec89f {
+      box-shadow: inset 0 0 0 2px ${theme.brandColor}66 !important;
     }
     ` : ''}
     #root [data-ds-sidebar] {
@@ -407,21 +418,21 @@ export async function applyTheme(idx: number) {
     }, true);
   }
 
-  // 禁用磨砂玻璃效果：CSS 全局禁用 backdrop-filter
+  // 禁用磨砂玻璃效果：CSS 全局禁用 backdrop-filter（排除面板）
   applyCSS('frosted', `
-    * {
+    *:not(#ds-mini-panel):not(#ds-mini-panel *) {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
   `);
 
-  // JS 兜底：查找带 backdrop-filter 的元素，设为透明
+  // JS 兜底：查找带 backdrop-filter 的元素，设为透明（排除面板）
   const allEls = document.querySelectorAll('*');
   for (let i = 0; i < allEls.length; i++) {
     const el = allEls[i] as HTMLElement;
     const cs = getComputedStyle(el);
     const bf = cs.backdropFilter || (cs as any).webkitBackdropFilter || '';
-    if (bf && bf !== 'none') {
+    if (bf && bf !== 'none' && !el.closest('#ds-mini-panel')) {
       el.style.setProperty('opacity', '0', 'important');
       el.setAttribute('data-ds-no-bg', '');
     }
@@ -829,4 +840,15 @@ export async function loadEnhancerFeatures() {
   if (cfg.hideScrollbar) await toggleScrollbar(true);
   if (cfg.autoHideInput) await toggleAutoHideInput(true);
   if (cfg.voiceInput) { setTimeout(() => { createVoiceButton(); setupVoiceObserver(); document.addEventListener('keydown', onVoiceKeydown); }, 1000); }
+
+  // 始终应用（不依赖主题）
+  applyCSS('voice-btn', `
+    #root button[style*="border"][style*="rgba(77"] {
+      border-radius: 50% !important;
+    }
+    #ds-mini-panel[style*="opacity: 0"],
+    #ds-mini-panel[style*="opacity:0"] {
+      pointer-events: none !important;
+    }
+  `);
 }

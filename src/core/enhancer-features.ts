@@ -745,14 +745,14 @@ function createVoiceButton() {
   btn.title = '语音输入';
   const c = currentBrandColor;
   btn.style.cssText = `
-    width: 34px; height: 34px; border-radius: 50%;
+    width: 38px; height: 38px; border-radius: 50%;
     border: none;
     background: ${c}1A;
     color: ${c}; cursor: pointer; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.2s; margin-right: 8px;
   `;
-  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+  btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M12 16v3"/><path d="M8 21h8"/><path d="M5 11a7 7 0 0 0 14 0"/></svg>`;
 
   btn.addEventListener('click', (e) => {
     e.preventDefault();

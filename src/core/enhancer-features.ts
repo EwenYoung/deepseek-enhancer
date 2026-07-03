@@ -167,16 +167,16 @@ export async function toggleWideScreen(enabled: boolean) {
 // ============================================================
 const LIGHT_THEMES = [
   { name: '默认',  bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
-  { name: 'Claude浅', bg: '#f5ece2', chatBg: '#fbf3e8',  sidebarBg: '#ede0d4', sidebarHighlight: '#ded0be', brandColor: '#D98A6A' },
-  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6', brandColor: '#8839ef' },
+  { name: 'Claude浅', bg: '#f7f0e8', chatBg: '#fcf7f0',  sidebarBg: '#f2e8dc', sidebarHighlight: '#e6dccd', brandColor: '#D98A6A' },
+  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6', brandColor: '#179299' },
   { name: 'Dracula浅', bg: '#f5ecec', chatBg: '#fbf4f2',  sidebarBg: '#ebe0de', sidebarHighlight: '#ddd0ce', brandColor: '#bd93f9' },
   { name: 'OneHalf浅', bg: '#edf0e8', chatBg: '#f4f7f0',  sidebarBg: '#e0e5d8', sidebarHighlight: '#ced4c8', brandColor: '#61afef' },
 ];
 
 const DARK_THEMES = [
   { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
-  { name: 'Claude深', bg: '#1a1625', chatBg: '#1e1a2a',  sidebarBg: '#15121f', sidebarHighlight: '#261f35', brandColor: '#E07850' },
-  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#cba6f7' },
+  { name: 'Claude深', bg: '#1c1a18', chatBg: '#201d1c',  sidebarBg: '#171513', sidebarHighlight: '#292421', brandColor: '#E07850' },
+  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#1e66f5' },
   { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e', brandColor: '#bd93f9' },
   { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d', brandColor: '#61afef' },
 ];
@@ -205,10 +205,12 @@ export async function applyTheme(idx: number) {
 
   const dark = isDarkMode();
   const theme = getTheme(idx, dark);
+  currentBrandColor = theme.brandColor || '#4d6bfe';
 
   if (idx === 0 || !theme.bg) {
     removeCSS('theme');
     clearInlineBg();
+    updateVoiceBtnColor();
     return;
   }
 
@@ -248,10 +250,10 @@ export async function applyTheme(idx: number) {
       color: ${dark ? 'rgb(160, 160, 170)' : 'rgb(130, 130, 140)'} !important;
       border-color: ${dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'} !important;
     }
-    /* 输入框边框 + 阴影着色（新对话页 _9996a53 / 会话页 _3d616d3） */
+    /* 输入框边框着色 + 移除原生阴影（新对话页 _9996a53 / 会话页 _3d616d3） */
     #root ._9996a53, #root ._3d616d3 {
       border-color: ${theme.brandColor}26 !important;
-      box-shadow: 0 4px 12px ${theme.brandColor}0D, 0 2px 2px ${theme.brandColor}08, 0 30px 60px ${theme.brandColor}0D !important;
+      box-shadow: none !important;
     }
     /* mode tab 选中态 oval box-shadow */
     #root .c15ec89f {
@@ -437,6 +439,8 @@ export async function applyTheme(idx: number) {
       el.setAttribute('data-ds-no-bg', '');
     }
   }
+
+  updateVoiceBtnColor();
 }
 
 function clearInlineBg() {
@@ -679,6 +683,7 @@ export async function toggleAutoHideInput(enabled: boolean) {
 // ============================================================
 let recognition: SpeechRecognition | null = null;
 let isRecording = false;
+let currentBrandColor = '#4d6bfe';
 
 function onVoiceKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
@@ -718,23 +723,36 @@ export async function toggleVoiceInput(enabled: boolean) {
 
 function createVoiceButton() {
   if (document.getElementById('ds-voice-btn')) return;
-  const ta = document.querySelector('textarea');
-  if (!ta) return;
+
+  // 找到底部工具栏：从 toggle 按钮定位到 toolbar row 的右组
+  const toggleBtn = document.querySelector('.ds-toggle-button');
+  if (!toggleBtn) return;
+
+  const leftGroup = toggleBtn.parentElement;
+  const toolbarRow = leftGroup?.parentElement;
+  if (!toolbarRow) return;
+
+  // 右组 = toolbar row 中不是左组的那个孩子
+  let rightGroup: Element | null = null;
+  for (const child of toolbarRow.children) {
+    if (child !== leftGroup) { rightGroup = child; break; }
+  }
+  if (!rightGroup) return;
 
   const btn = document.createElement('button');
   btn.id = 'ds-voice-btn';
   btn.type = 'button';
   btn.title = '语音输入';
+  const c = currentBrandColor;
   btn.style.cssText = `
-    position: absolute; right: 12px; bottom: 12px;
-    width: 28px; height: 28px; border-radius: 6px;
-    border: 1px solid rgba(77,107,254,0.3);
-    background: rgba(77,107,254,0.1);
-    color: #4d6bfe; cursor: pointer; z-index: 10;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none;
+    background: ${c}1A;
+    color: ${c}; cursor: pointer; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.2s; margin-right: 8px;
   `;
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
 
   btn.addEventListener('click', (e) => {
     e.preventDefault();
@@ -742,11 +760,15 @@ function createVoiceButton() {
     toggleRecording(btn);
   });
 
-  const container = ta.closest('div') || ta.parentElement;
-  if (container && getComputedStyle(container).position === 'static') {
-    (container as HTMLElement).style.position = 'relative';
-  }
-  container?.appendChild(btn);
+  rightGroup.insertBefore(btn, rightGroup.firstChild);
+}
+
+function updateVoiceBtnColor() {
+  const btn = document.getElementById('ds-voice-btn');
+  if (!btn) return;
+  const c = currentBrandColor;
+  btn.style.background = c + '1A';
+  btn.style.color = c;
 }
 
 // 语音按钮的 textarea 重建监听

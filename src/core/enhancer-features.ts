@@ -166,19 +166,19 @@ export async function toggleWideScreen(enabled: boolean) {
 // 5.2 背景色主题
 // ============================================================
 const LIGHT_THEMES = [
-  { name: '默认',  bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '' },
-  { name: 'Claude浅', bg: '#f5ece2', chatBg: '#fbf3e8',  sidebarBg: '#ede0d4', sidebarHighlight: '#ded0be' },
-  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6' },
-  { name: 'Dracula浅', bg: '#f5ecec', chatBg: '#fbf4f2',  sidebarBg: '#ebe0de', sidebarHighlight: '#ddd0ce' },
-  { name: 'OneHalf浅', bg: '#edf0e8', chatBg: '#f4f7f0',  sidebarBg: '#e0e5d8', sidebarHighlight: '#ced4c8' },
+  { name: '默认',  bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
+  { name: 'Claude浅', bg: '#f5ece2', chatBg: '#fbf3e8',  sidebarBg: '#ede0d4', sidebarHighlight: '#ded0be', brandColor: '#D98A6A' },
+  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6', brandColor: '#8839ef' },
+  { name: 'Dracula浅', bg: '#f5ecec', chatBg: '#fbf4f2',  sidebarBg: '#ebe0de', sidebarHighlight: '#ddd0ce', brandColor: '#bd93f9' },
+  { name: 'OneHalf浅', bg: '#edf0e8', chatBg: '#f4f7f0',  sidebarBg: '#e0e5d8', sidebarHighlight: '#ced4c8', brandColor: '#61afef' },
 ];
 
 const DARK_THEMES = [
-  { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '' },
-  { name: 'Claude深', bg: '#1a1625', chatBg: '#1e1a2a',  sidebarBg: '#15121f', sidebarHighlight: '#261f35' },
-  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a' },
-  { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e' },
-  { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d' },
+  { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
+  { name: 'Claude深', bg: '#1a1625', chatBg: '#1e1a2a',  sidebarBg: '#15121f', sidebarHighlight: '#261f35', brandColor: '#E07850' },
+  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#cba6f7' },
+  { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e', brandColor: '#bd93f9' },
+  { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d', brandColor: '#61afef' },
 ];
 
 function isDarkMode(): boolean {
@@ -223,6 +223,30 @@ export async function applyTheme(idx: number) {
     html, body, #root {
       background-color: ${theme.bg} !important;
     }
+    ${theme.brandColor ? `
+    body { --dsw-alias-brand-primary: ${theme.brandColor} !important; }
+    /* 精确着色：仅对标记了蓝色的原生图标位置 */
+    /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/
+    #root .the-header .ds-icon,
+    /* 2. 已思考 brain icon */
+    #root [style*="collapsible-area"] .ds-icon,
+    /* 3. Toggle 按钮图标（仅开启状态） */
+    #root .ds-toggle-button--selected .ds-toggle-button__icon,
+    /* 4. 新对话页 whale icon */
+    #root .cddfb2ed,
+    /* 5. 活跃 mode tab（_31a22b0 是 DeepSeek 活跃模式标识类）*/
+    #root ._31a22b0,
+    #root ._31a22b0 svg {
+      color: ${theme.brandColor} !important;
+    }
+    /* toggle 按钮文本：选中=品牌色，未选中=灰色 */
+    #root .ds-toggle-button--selected {
+      color: ${theme.brandColor} !important;
+    }
+    #root .ds-toggle-button:not(.ds-toggle-button--selected) {
+      color: ${dark ? 'rgb(160, 160, 170)' : 'rgb(130, 130, 140)'} !important;
+    }
+    ` : ''}
     #root [data-ds-sidebar] {
       background-color: ${theme.sidebarBg} !important;
     }
@@ -262,6 +286,28 @@ export async function applyTheme(idx: number) {
       background-color: ${theme.chatBg} !important;
       border-radius: 6px !important;
       margin-bottom: 0 !important;
+    }
+    /* 思考内容子区域的背景也用主题色 - 同类优先级覆盖 no-bg 的透明化 */
+    #root [data-ds-chatpanel] [data-ds-no-bg] .ds-think-content,
+    #root [data-ds-chatpanel] .ds-think-content {
+      background: ${theme.chatBg} !important;
+    }
+    /* 思考内容内的子元素同样适配主题 */
+    #root [data-ds-chatpanel] [data-ds-no-bg] .ds-think-content .ds-markdown,
+    #root [data-ds-chatpanel] [data-ds-no-bg] .ds-think-content .ds-markdown-paragraph,
+    #root [data-ds-chatpanel] [data-ds-no-bg] .ds-think-content ._9ecc93a,
+    #root [data-ds-chatpanel] [data-ds-no-bg] .ds-think-content .ddd26891,
+    #root [data-ds-chatpanel] .ds-think-content .ds-markdown,
+    #root [data-ds-chatpanel] .ds-think-content .ds-markdown-paragraph,
+    #root [data-ds-chatpanel] .ds-think-content ._9ecc93a,
+    #root [data-ds-chatpanel] .ds-think-content .ddd26891 {
+      background: ${theme.chatBg} !important;
+    }
+    /* 折叠标题栏伪元素（::before/::after）融入主题色，覆盖 DeepSeek 默认白色 */
+    #root [data-ds-chatpanel] [style*="collapsible-area"] ::before,
+    #root [data-ds-chatpanel] [style*="collapsible-area"] ::after {
+      background-color: ${theme.chatBg} !important;
+      border-radius: 8px !important;
     }
   `);
 

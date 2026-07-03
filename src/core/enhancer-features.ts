@@ -176,7 +176,7 @@ const LIGHT_THEMES = [
 const DARK_THEMES = [
   { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
   { name: 'Claude深', bg: '#1c1a18', chatBg: '#201d1c',  sidebarBg: '#171513', sidebarHighlight: '#292421', brandColor: '#E07850' },
-  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#1e66f5' },
+  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#89b4fa' },
   { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e', brandColor: '#bd93f9' },
   { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d', brandColor: '#61afef' },
 ];

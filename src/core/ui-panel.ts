@@ -10,6 +10,7 @@ import {
   toggleWideScreen, applyTheme, toggleScrollbar,
   toggleAutoHideInput, toggleVoiceInput,
   getConfig, getThemeCount,
+  applyChatFont, applyChatMonoFont, getFontOptions, preloadFonts,
 } from './enhancer-features';
 
 // ============================================================
@@ -293,6 +294,21 @@ function buildPanelHTML(): string {
           <div class="ds-card-body">
             ${enhToggle('ds-enh-wide','宽屏模式')}
             <div class="ds-switch-row"><span>背景主题</span><div style="display:flex;align-items:center;gap:4px;"><button id="ds-enh-theme-prev" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">‹</button><span id="ds-enh-theme-name" style="font-size:11px;color:var(--panel-text);min-width:40px;text-align:center;">默认</span><button id="ds-enh-theme-next" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">›</button></div></div>
+            <!-- 字体设置（可折叠） -->
+            <div id="ds-font-toggle" class="ds-switch-row" style="cursor:pointer;">
+              <span>字体设置</span>
+              <span id="ds-font-arrow" style="font-size:11px;color:var(--panel-text-secondary);">˅</span>
+            </div>
+            <div id="ds-font-body" style="display:none;padding:0 0 4px 0;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:11px;color:var(--panel-text-secondary);">正文字体</span>
+                <select id="ds-font-chat" style="padding:2px 4px;border:1px solid var(--input-border);border-radius:5px;background:var(--input-bg);color:var(--panel-text);font-size:11px;min-width:130px;"></select>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:11px;color:var(--panel-text-secondary);">代码字体</span>
+                <select id="ds-font-mono" style="padding:2px 4px;border:1px solid var(--input-border);border-radius:5px;background:var(--input-bg);color:var(--panel-text);font-size:11px;min-width:130px;"></select>
+              </div>
+            </div>
             ${enhToggle('ds-enh-scrollbar','隐藏滚动条')}
             ${enhToggle('ds-enh-autohide','隐藏输入框')}
             ${enhToggle('ds-enh-voice','语音输入')}
@@ -331,7 +347,7 @@ function buildPanelHTML(): string {
   `;
 }
 // ============================================================
-function bindPanelEvents(state: AppState) {
+async function bindPanelEvents(state: AppState) {
   if (!panelEl) return;
 
   panelEl.querySelector('#ds-mini-panel-close')?.addEventListener('click', () => closePanel());
@@ -502,6 +518,41 @@ function bindPanelEvents(state: AppState) {
     updateThemeName();
   });
 
+  // 字体设置
+  const fontToggle = panelEl.querySelector('#ds-font-toggle') as HTMLElement | null;
+  const fontBody = panelEl.querySelector('#ds-font-body') as HTMLElement | null;
+  const fontArrow = panelEl.querySelector('#ds-font-arrow') as HTMLElement | null;
+  const chatSelect = panelEl.querySelector('#ds-font-chat') as HTMLSelectElement | null;
+  const monoSelect = panelEl.querySelector('#ds-font-mono') as HTMLSelectElement | null;
+
+  if (fontToggle && fontBody && fontArrow) {
+    // 折叠/展开
+    fontToggle.addEventListener('click', () => {
+      const wasVisible = fontBody.style.display !== 'none';
+      fontBody.style.display = wasVisible ? 'none' : 'block';
+      fontArrow.textContent = !wasVisible ? '\u02C4' : '\u02C5';
+    });
+    // 初始化折叠状态
+    fontBody.style.display = 'none';
+    fontArrow.textContent = '\u02C5';
+  }
+
+  // 填充下拉选项
+  if (chatSelect) {
+    chatSelect.innerHTML = '<option value="">默认</option>' + getFontOptions('chat').map(f => `<option value="${f.key}">${f.label}</option>`).join('');
+    chatSelect.addEventListener('change', () => applyChatFont(chatSelect.value));
+  }
+  if (monoSelect) {
+    monoSelect.innerHTML = '<option value="">默认</option>' + getFontOptions('mono').map(f => `<option value="${f.key}">${f.label}</option>`).join('');
+    monoSelect.addEventListener('change', () => applyChatMonoFont(monoSelect.value));
+  }
+
+  // 恢复已选字体 + 预加载
+  const cfg = await getConfig();
+  if (cfg.chatFont && chatSelect) chatSelect.value = cfg.chatFont;
+  if (cfg.chatMonoFont && monoSelect) monoSelect.value = cfg.chatMonoFont;
+  preloadFonts(cfg.chatFont, cfg.chatMonoFont);
+
   refreshSkillList(state);
 }
 
@@ -634,6 +685,11 @@ async function loadEnhancerPanel() {
   updateEnhButton('ds-enh-voice', enhState.voiceInput);
   updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
   updateThemeName();
+  // 恢复字体下拉
+  const chatSel = panelEl?.querySelector('#ds-font-chat') as HTMLSelectElement | null;
+  const monoSel = panelEl?.querySelector('#ds-font-mono') as HTMLSelectElement | null;
+  if (chatSel) chatSel.value = enhState.chatFont || '';
+  if (monoSel) monoSel.value = enhState.chatMonoFont || '';
   // 加载透明度
   const isDark = document.body.classList.contains('dark');
   chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {

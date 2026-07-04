@@ -12,6 +12,8 @@ interface EnhancerConfig {
   autoHideInput: boolean;
   voiceInput: boolean;
   tokenSpeed: boolean;    // token 速度显示
+  chatFont: string;       // '' = 默认, 字体 key
+  chatMonoFont: string;   // '' = 默认, 字体 key
 }
 
 // ============================================================
@@ -20,8 +22,8 @@ interface EnhancerConfig {
 export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
-    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false };
-  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false }; }
+    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '' };
+  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '' }; }
 }
 
 async function saveConfig(cfg: EnhancerConfig) {
@@ -853,6 +855,103 @@ function stopRecording(btn: HTMLElement) {
 }
 
 // ============================================================
+// 5.6 聊天字体
+// ============================================================
+interface FontDef {
+  label: string;
+  family: string;
+  urls: string[] | null;  // null = system font, no CDN needed
+}
+
+const FONT_PRESETS: Record<string, Record<string, FontDef>> = {
+  chat: {
+    'wenkai':   { label: '霞鹜文楷',   family: "'LXGW WenKai', '霞鹜文楷', serif",      urls: 'https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.css' },
+    'noto':     { label: '思源宋体',   family: "'Noto Serif SC', '思源宋体', serif",      urls: 'https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap' },
+    'noto-sans': { label: '思源黑体', family: "'Noto Sans SC', '思源黑体', sans-serif", urls: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap' },
+  },
+  mono: {
+    'jetbrains':  { label: 'JetBrains Mono',  family: "'JetBrains Mono', monospace",   urls: ['https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/700.css'] },
+    'fira':       { label: 'Fira Code',       family: "'Fira Code', monospace",        urls: ['https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/700.css'] },
+    'cascadia':   { label: 'Cascadia Code',   family: "'Cascadia Code', monospace",    urls: ['https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/700.css'] },
+  },
+};
+
+const CHAT_ID = 'chat-font';
+const MONO_ID = 'chat-mono-font';
+
+export function getFontOptions(type: 'chat' | 'mono'): { key: string; label: string }[] {
+  return Object.entries(FONT_PRESETS[type]).map(([k, v]) => ({ key: k, label: v.label }));
+}
+
+async function _loadFontCSS(urls: string[] | null) {
+  if (!urls) return;
+  const list = typeof urls === 'string' ? [urls] : urls;
+  for (const url of list) {
+    if (document.querySelector(`link[data-font-css="${url}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = url;
+    link.setAttribute('data-font-css', url);
+    document.head.appendChild(link);
+  }
+}
+
+function _injectChatFont(family: string) {
+  applyCSS(CHAT_ID, `
+    #root { font-family: ${family} !important; }
+    #root .ds-markdown, #root .ds-message, #root textarea { font-family: ${family} !important; }
+  `);
+}
+
+function _injectMonoFont(family: string) {
+  applyCSS(MONO_ID, `
+    #root code, #root pre, #root [class*="code"],
+    #root .ds-markdown code, #root .ds-markdown pre { font-family: ${family} !important; }
+  `);
+}
+
+export async function applyChatFont(key: string) {
+  const cfg = await getConfig();
+  cfg.chatFont = key;
+  await saveConfig(cfg);
+
+  if (!key) { removeCSS(CHAT_ID); return; }
+  const def = FONT_PRESETS.chat[key];
+  if (!def) return;
+  await _loadFontCSS(def.urls);
+  _injectChatFont(def.family);
+}
+
+export async function applyChatMonoFont(key: string) {
+  const cfg = await getConfig();
+  cfg.chatMonoFont = key;
+  await saveConfig(cfg);
+
+  if (!key) { removeCSS(MONO_ID); return; }
+  const def = FONT_PRESETS.mono[key];
+  if (!def) return;
+  await _loadFontCSS(def.urls);
+  _injectMonoFont(def.family);
+}
+
+export function preloadFonts(chatKey: string, monoKey: string) {
+  for (const [key, type] of [[chatKey, 'chat'], [monoKey, 'mono']] as const) {
+    if (!key) continue;
+    const def = FONT_PRESETS[type][key];
+    if (!def?.urls) continue;
+    const list = typeof def.urls === 'string' ? [def.urls] : def.urls;
+    for (const url of list) {
+      if (document.querySelector(`link[href="${url}"]`)) continue;
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'style';
+      link.href = url;
+      document.head.appendChild(link);
+    }
+  }
+}
+
+// ============================================================
 // 初始加载
 // ============================================================
 export async function loadEnhancerFeatures() {
@@ -862,6 +961,8 @@ export async function loadEnhancerFeatures() {
   if (cfg.hideScrollbar) await toggleScrollbar(true);
   if (cfg.autoHideInput) await toggleAutoHideInput(true);
   if (cfg.voiceInput) { setTimeout(() => { createVoiceButton(); setupVoiceObserver(); document.addEventListener('keydown', onVoiceKeydown); }, 1000); }
+  if (cfg.chatFont) applyChatFont(cfg.chatFont);
+  if (cfg.chatMonoFont) applyChatMonoFont(cfg.chatMonoFont);
 
   // 始终应用（不依赖主题）
   applyCSS('voice-btn', `

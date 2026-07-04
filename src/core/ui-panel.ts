@@ -77,6 +77,29 @@ function createPanel(state: AppState) {
       --input-border: rgba(255,255,255,0.12);
       --overlay-bg: rgba(0,0,0,0.5);
     }
+    .ds-custom-select { position: relative; min-width: 130px; font-size: 11px; }
+    .ds-custom-select-trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1px 6px; border: 1px solid var(--input-border);
+      border-radius: 5px; background: var(--input-bg); color: var(--panel-text);
+      cursor: pointer; user-select: none; gap: 4px;
+    }
+    .ds-custom-select-arrow { font-size: 8px; color: var(--panel-text-secondary); transition: transform 0.15s; }
+    .ds-custom-select-trigger.open .ds-custom-select-arrow { transform: rotate(180deg); }
+    .ds-custom-select-options {
+      position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 9999;
+      border: 1px solid var(--panel-border); border-radius: 8px;
+      background: var(--panel-bg);
+      backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+      max-height: 200px; overflow-y: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .ds-custom-select-opt {
+      padding: 3px 8px; cursor: pointer; color: var(--panel-text);
+      font-size: 11px; line-height: 1.4; transition: background 0.1s;
+    }
+    .ds-custom-select-opt:hover { background: var(--card-bg); }
+    .ds-custom-select-opt.selected { color: var(--accent); font-weight: 500; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition-duration: 0s !important; }
     }
@@ -297,16 +320,22 @@ function buildPanelHTML(): string {
             <!-- 字体设置（可折叠） -->
             <div id="ds-font-toggle" class="ds-switch-row" style="cursor:pointer;">
               <span>字体设置</span>
-              <span id="ds-font-arrow" style="font-size:11px;color:var(--panel-text-secondary);">˅</span>
+              <span id="ds-font-arrow" style="font-size:9px;color:var(--panel-text-secondary);">⌄</span>
             </div>
-            <div id="ds-font-body" style="display:none;padding:0 0 4px 0;">
+            <div id="ds-font-body" style="display:none;padding:0 0 4px 12px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                 <span style="font-size:11px;color:var(--panel-text-secondary);">正文字体</span>
-                <select id="ds-font-chat" style="padding:2px 4px;border:1px solid var(--input-border);border-radius:5px;background:var(--input-bg);color:var(--panel-text);font-size:11px;min-width:130px;"></select>
+                <div class="ds-custom-select" id="ds-font-chat">
+                  <div class="ds-custom-select-trigger" id="ds-font-chat-trigger"><span class="ds-custom-select-label">默认</span><span class="ds-custom-select-arrow">⌄</span></div>
+                  <div class="ds-custom-select-options" id="ds-font-chat-options" style="display:none;"></div>
+                </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <span style="font-size:11px;color:var(--panel-text-secondary);">代码字体</span>
-                <select id="ds-font-mono" style="padding:2px 4px;border:1px solid var(--input-border);border-radius:5px;background:var(--input-bg);color:var(--panel-text);font-size:11px;min-width:130px;"></select>
+                <div class="ds-custom-select" id="ds-font-mono">
+                  <div class="ds-custom-select-trigger" id="ds-font-mono-trigger"><span class="ds-custom-select-label">默认</span><span class="ds-custom-select-arrow">⌄</span></div>
+                  <div class="ds-custom-select-options" id="ds-font-mono-options" style="display:none;"></div>
+                </div>
               </div>
             </div>
             ${enhToggle('ds-enh-scrollbar','隐藏滚动条')}
@@ -522,38 +551,75 @@ async function bindPanelEvents(state: AppState) {
   const fontToggle = panelEl.querySelector('#ds-font-toggle') as HTMLElement | null;
   const fontBody = panelEl.querySelector('#ds-font-body') as HTMLElement | null;
   const fontArrow = panelEl.querySelector('#ds-font-arrow') as HTMLElement | null;
-  const chatSelect = panelEl.querySelector('#ds-font-chat') as HTMLSelectElement | null;
-  const monoSelect = panelEl.querySelector('#ds-font-mono') as HTMLSelectElement | null;
-
   if (fontToggle && fontBody && fontArrow) {
     // 折叠/展开
     fontToggle.addEventListener('click', () => {
       const wasVisible = fontBody.style.display !== 'none';
       fontBody.style.display = wasVisible ? 'none' : 'block';
-      fontArrow.textContent = !wasVisible ? '\u02C4' : '\u02C5';
+      fontArrow.textContent = !wasVisible ? '\u2303' : '\u2304';
     });
     // 初始化折叠状态
     fontBody.style.display = 'none';
-    fontArrow.textContent = '\u02C5';
+    fontArrow.textContent = '\u2304';
   }
 
-  // 填充下拉选项
-  if (chatSelect) {
-    chatSelect.innerHTML = '<option value="">默认</option>' + getFontOptions('chat').map(f => `<option value="${f.key}">${f.label}</option>`).join('');
-    chatSelect.addEventListener('change', () => applyChatFont(chatSelect.value));
-  }
-  if (monoSelect) {
-    monoSelect.innerHTML = '<option value="">默认</option>' + getFontOptions('mono').map(f => `<option value="${f.key}">${f.label}</option>`).join('');
-    monoSelect.addEventListener('change', () => applyChatMonoFont(monoSelect.value));
-  }
+  // 自定义下拉框初始化
+  initCustomSelect('ds-font-chat', getFontOptions('chat'), applyChatFont);
+  initCustomSelect('ds-font-mono', getFontOptions('mono'), applyChatMonoFont);
 
   // 恢复已选字体 + 预加载
   const cfg = await getConfig();
-  if (cfg.chatFont && chatSelect) chatSelect.value = cfg.chatFont;
-  if (cfg.chatMonoFont && monoSelect) monoSelect.value = cfg.chatMonoFont;
+  if (cfg.chatFont) updateCustomSelect('ds-font-chat', cfg.chatFont);
+  if (cfg.chatMonoFont) updateCustomSelect('ds-font-mono', cfg.chatMonoFont);
   preloadFonts(cfg.chatFont, cfg.chatMonoFont);
 
   refreshSkillList(state);
+}
+
+// 自定义下拉框
+function initCustomSelect(id: string, options: {key: string; label: string}[], onChange: (key: string) => void) {
+  const trigger = document.getElementById(id + '-trigger') as HTMLElement | null;
+  const optsContainer = document.getElementById(id + '-options') as HTMLElement | null;
+  if (!trigger || !optsContainer) return;
+
+  optsContainer.innerHTML = '<div class="ds-custom-select-opt" data-val="">默认</div>' + options.map(o => `<div class="ds-custom-select-opt" data-val="${o.key}">${o.label}</div>`).join('');
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = optsContainer.style.display !== 'none';
+    optsContainer.style.display = open ? 'none' : 'block';
+    trigger.classList.toggle('open', !open);
+  });
+
+  optsContainer.addEventListener('click', (e) => {
+    const opt = (e.target as HTMLElement).closest('.ds-custom-select-opt') as HTMLElement | null;
+    if (!opt) return;
+    const val = opt.dataset.val || '';
+    const label = trigger.querySelector('.ds-custom-select-label');
+    if (label) label.textContent = opt.textContent || '默认';
+    optsContainer.style.display = 'none';
+    trigger.classList.remove('open');
+    optsContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    opt.classList.add('selected');
+    onChange(val);
+  });
+
+  document.addEventListener('click', () => {
+    optsContainer.style.display = 'none';
+    trigger.classList.remove('open');
+  });
+}
+
+function updateCustomSelect(id: string, key: string) {
+  const optsContainer = document.getElementById(id + '-options') as HTMLElement | null;
+  if (!optsContainer) return;
+  const opt = optsContainer.querySelector(`[data-val="${key}"]`) as HTMLElement | null;
+  if (opt) {
+    const label = document.querySelector(`#${id}-trigger .ds-custom-select-label`);
+    if (label) label.textContent = opt.textContent || key;
+    optsContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    opt.classList.add('selected');
+  }
 }
 
 // ============================================================
@@ -686,10 +752,8 @@ async function loadEnhancerPanel() {
   updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
   updateThemeName();
   // 恢复字体下拉
-  const chatSel = panelEl?.querySelector('#ds-font-chat') as HTMLSelectElement | null;
-  const monoSel = panelEl?.querySelector('#ds-font-mono') as HTMLSelectElement | null;
-  if (chatSel) chatSel.value = enhState.chatFont || '';
-  if (monoSel) monoSel.value = enhState.chatMonoFont || '';
+  if (enhState.chatFont) updateCustomSelect('ds-font-chat', enhState.chatFont);
+  if (enhState.chatMonoFont) updateCustomSelect('ds-font-mono', enhState.chatMonoFont);
   // 加载透明度
   const isDark = document.body.classList.contains('dark');
   chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {

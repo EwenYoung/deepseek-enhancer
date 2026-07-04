@@ -865,14 +865,20 @@ interface FontDef {
 
 const FONT_PRESETS: Record<string, Record<string, FontDef>> = {
   chat: {
-    'wenkai':   { label: '霞鹜文楷',   family: "'LXGW WenKai', '霞鹜文楷', serif",      urls: 'https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.css' },
-    'noto':     { label: '思源宋体',   family: "'Noto Serif SC', '思源宋体', serif",      urls: 'https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap' },
-    'noto-sans': { label: '思源黑体', family: "'Noto Sans SC', '思源黑体', sans-serif", urls: 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap' },
+    'wenkai':    { label: '霞鹜文楷',   family: "'LXGW WenKai', '霞鹜文楷', serif",         urls: 'https://fontsapi.zeoseven.com/292/main/result.css' },
+    'noto-serif':{ label: '思源宋体',   family: "'Noto Serif CJK', '思源宋体', serif",         urls: 'https://fontsapi.zeoseven.com/285/main/result.css' },
+    'noto-sans': { label: '思源黑体',   family: "'Noto Sans CJK', '思源黑体', sans-serif",     urls: 'https://fontsapi.zeoseven.com/69/main/result.css' },
+    'zhuque':    { label: '朱雀仿宋',   family: "'Zhuque Fangsong', '朱雀仿宋', serif",      urls: 'https://fontsapi.zeoseven.com/7/main/result.css' },
+    'hanchan':   { label: '寒蝉活宋体', family: "'ChillHuoSong_F', '寒蝉活宋体', serif",    urls: 'https://fontsapi.zeoseven.com/875/main/result.css' },
+    'chill':     { label: '寒蝉全圆体', family: "'ChillRoundF', '寒蝉全圆体', sans-serif",    urls: 'https://fontsapi.zeoseven.com/3/main/result.css' },
   },
   mono: {
     'jetbrains':  { label: 'JetBrains Mono',  family: "'JetBrains Mono', monospace",   urls: ['https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/700.css'] },
     'fira':       { label: 'Fira Code',       family: "'Fira Code', monospace",        urls: ['https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/700.css'] },
     'cascadia':   { label: 'Cascadia Code',   family: "'Cascadia Code', monospace",    urls: ['https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/700.css'] },
+    'source-code':{ label: 'Source Code Pro', family: "'Source Code Pro', monospace",  urls: ['https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/700.css'] },
+    'ibm-plex':   { label: 'IBM Plex Mono',   family: "'IBM Plex Mono', monospace",    urls: ['https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/700.css'] },
+    'roboto':     { label: 'Roboto Mono',     family: "'Roboto Mono', monospace",      urls: ['https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/700.css'] },
   },
 };
 

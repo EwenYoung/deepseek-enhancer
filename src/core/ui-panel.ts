@@ -10,7 +10,7 @@ import {
   toggleWideScreen, applyTheme, toggleScrollbar,
   toggleAutoHideInput, toggleVoiceInput,
   getConfig, getThemeCount,
-  applyChatFont, applyChatMonoFont, getFontOptions, preloadFonts,
+  applyChatFont, applyChatMonoFont, applyChatFontSize, getFontOptions, preloadFonts,
 } from './enhancer-features';
 
 // ============================================================
@@ -299,7 +299,7 @@ function buildPanelHTML(): string {
           <div class="ds-card-body">
             ${enhToggle('ds-enh-wide','宽屏模式')}
             <div class="ds-switch-row"><span>背景主题</span><div style="display:flex;align-items:center;gap:4px;"><button id="ds-enh-theme-prev" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">‹</button><span id="ds-enh-theme-name" style="font-size:11px;color:var(--panel-text);min-width:40px;text-align:center;">默认</span><button id="ds-enh-theme-next" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">›</button></div></div>
-            <!-- 字体设置（可折叠） -->
+<!-- 字体设置（可折叠） -->
             <div id="ds-font-toggle" class="ds-switch-row" style="cursor:pointer;">
               <span>字体设置</span>
               <span id="ds-font-arrow" style="font-size:9px;color:var(--panel-text-secondary);">⌄</span>
@@ -317,6 +317,16 @@ function buildPanelHTML(): string {
                 <div class="ds-custom-select" id="ds-font-mono">
                   <div class="ds-custom-select-trigger" id="ds-font-mono-trigger"><span class="ds-custom-select-label">默认</span><span class="ds-custom-select-arrow">⌄</span></div>
                   <div class="ds-custom-select-options" id="ds-font-mono-options" style="display:none;"></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+                <span style="font-size:11px;color:var(--panel-text-secondary);">字号</span>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <button id="ds-font-size-s" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">小</button>
+                  <button id="ds-font-size-m" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">中</button>
+                  <button id="ds-font-size-l" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">大</button>
+                  <input id="ds-font-size-slider" type="range" min="10" max="24" value="16" step="1" style="width:60px;height:3px;cursor:pointer;accent-color:var(--accent);">
+                  <span id="ds-font-size-val" style="font-size:10px;color:var(--panel-text-secondary);min-width:20px;text-align:right;">默认</span>
                 </div>
               </div>
             </div>
@@ -494,10 +504,37 @@ async function bindPanelEvents(state: AppState) {
   initCustomSelect('ds-font-chat', getFontOptions('chat'), applyChatFont);
   initCustomSelect('ds-font-mono', getFontOptions('mono'), applyChatMonoFont);
 
+  // 字号调节
+  const SIZE_PRESETS: Record<string, number> = { 'ds-font-size-s': 13, 'ds-font-size-m': 16, 'ds-font-size-l': 19 };
+  const sizeSlider = document.getElementById('ds-font-size-slider') as HTMLInputElement | null;
+  const sizeVal = document.getElementById('ds-font-size-val');
+
+  panelEl?.querySelectorAll('.ds-font-size-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const size = SIZE_PRESETS[btn.id];
+      if (size === undefined) return;
+      if (sizeSlider) sizeSlider.value = String(size);
+      if (sizeVal) sizeVal.textContent = size + 'px';
+      applyChatFontSize(size);
+    });
+  });
+
+  if (sizeSlider) {
+    sizeSlider.addEventListener('input', () => {
+      const v = parseInt(sizeSlider.value);
+      if (sizeVal) sizeVal.textContent = v + 'px';
+      applyChatFontSize(v);
+    });
+  }
+
   // 恢复已选字体 + 预加载
   const cfg = await getConfig();
   if (cfg.chatFont) updateCustomSelect('ds-font-chat', cfg.chatFont);
   if (cfg.chatMonoFont) updateCustomSelect('ds-font-mono', cfg.chatMonoFont);
+  if (cfg.chatFontSize) {
+    if (sizeSlider) sizeSlider.value = String(cfg.chatFontSize);
+    if (sizeVal) sizeVal.textContent = cfg.chatFontSize + 'px';
+  }
   preloadFonts(cfg.chatFont, cfg.chatMonoFont);
 
   refreshSkillList(state);
@@ -688,6 +725,12 @@ async function loadEnhancerPanel() {
   // 恢复字体下拉
   if (enhState.chatFont) updateCustomSelect('ds-font-chat', enhState.chatFont);
   if (enhState.chatMonoFont) updateCustomSelect('ds-font-mono', enhState.chatMonoFont);
+  if (enhState.chatFontSize) {
+    const sz = document.getElementById('ds-font-size-slider') as HTMLInputElement | null;
+    const sv = document.getElementById('ds-font-size-val');
+    if (sz) sz.value = String(enhState.chatFontSize);
+    if (sv) sv.textContent = enhState.chatFontSize + 'px';
+  }
   // 加载透明度
   const isDark = document.body.classList.contains('dark');
   chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {

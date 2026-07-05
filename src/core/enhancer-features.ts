@@ -14,6 +14,7 @@ interface EnhancerConfig {
   tokenSpeed: boolean;    // token 速度显示
   chatFont: string;       // '' = 默认, 字体 key
   chatMonoFont: string;   // '' = 默认, 字体 key
+  chatFontSize: number;   // 0 = 默认, 10-24
 }
 
 // ============================================================
@@ -22,8 +23,8 @@ interface EnhancerConfig {
 export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
-    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '' };
-  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '' }; }
+    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 };
+  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 }; }
 }
 
 async function saveConfig(cfg: EnhancerConfig) {
@@ -884,6 +885,7 @@ const FONT_PRESETS: Record<string, Record<string, FontDef>> = {
 
 const CHAT_ID = 'chat-font';
 const MONO_ID = 'chat-mono-font';
+const SIZE_ID = 'chat-font-size';
 
 export function getFontOptions(type: 'chat' | 'mono'): { key: string; label: string }[] {
   return Object.entries(FONT_PRESETS[type]).map(([k, v]) => ({ key: k, label: v.label }));
@@ -957,6 +959,18 @@ export function preloadFonts(chatKey: string, monoKey: string) {
   }
 }
 
+export async function applyChatFontSize(size: number) {
+  const cfg = await getConfig();
+  cfg.chatFontSize = size;
+  await saveConfig(cfg);
+
+  if (!size) { removeCSS(SIZE_ID); return; }
+  applyCSS(SIZE_ID, `
+    #root .ds-markdown, #root .ds-message { font-size: ${size}px !important; }
+    #root textarea { font-size: ${size}px !important; }
+  `);
+}
+
 // ============================================================
 // 初始加载
 // ============================================================
@@ -969,6 +983,7 @@ export async function loadEnhancerFeatures() {
   if (cfg.voiceInput) { setTimeout(() => { createVoiceButton(); setupVoiceObserver(); document.addEventListener('keydown', onVoiceKeydown); }, 1000); }
   if (cfg.chatFont) applyChatFont(cfg.chatFont);
   if (cfg.chatMonoFont) applyChatMonoFont(cfg.chatMonoFont);
+  if (cfg.chatFontSize) applyChatFontSize(cfg.chatFontSize);
 
   // 始终应用（不依赖主题）
   applyCSS('voice-btn', `

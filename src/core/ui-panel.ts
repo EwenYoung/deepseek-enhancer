@@ -77,26 +77,28 @@ function createPanel(state: AppState) {
       --input-border: rgba(255,255,255,0.12);
       --overlay-bg: rgba(0,0,0,0.5);
     }
-    .ds-custom-select { position: relative; min-width: 130px; font-size: 11px; }
+    .ds-custom-select { position: relative; min-width: 108px; font-size: 9px; }
     .ds-custom-select-trigger {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 1px 6px; border: 1px solid var(--input-border);
-      border-radius: 5px; background: var(--input-bg); color: var(--panel-text);
+      padding: 0px 6px; border: 1px solid var(--input-border);
+      border-radius: 4px; background: var(--input-bg); color: var(--panel-text);
       cursor: pointer; user-select: none; gap: 4px;
+      font-size: 9px;
     }
-    .ds-custom-select-arrow { font-size: 8px; color: var(--panel-text-secondary); transition: transform 0.15s; }
+    .ds-custom-select-arrow { font-size: 7px; color: var(--panel-text-secondary); transition: transform 0.15s; }
     .ds-custom-select-trigger.open .ds-custom-select-arrow { transform: rotate(180deg); }
     .ds-custom-select-options {
       position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 9999;
-      border: 1px solid var(--panel-border); border-radius: 8px;
+      border: 1px solid var(--panel-border); border-radius: 6px;
       background: var(--panel-bg);
       backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-      max-height: 200px; overflow-y: auto;
+      max-height: 160px; overflow-y: auto;
       box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     }
     .ds-custom-select-opt {
-      padding: 3px 8px; cursor: pointer; color: var(--panel-text);
-      font-size: 11px; line-height: 1.4; transition: background 0.1s;
+      padding: 2px 8px; cursor: pointer; color: var(--panel-text);
+      font-size: 9px; line-height: 1.3; transition: background 0.1s;
+      border-radius: 4px;
     }
     .ds-custom-select-opt:hover { background: var(--card-bg); }
     .ds-custom-select-opt.selected { color: var(--accent); font-weight: 500; }

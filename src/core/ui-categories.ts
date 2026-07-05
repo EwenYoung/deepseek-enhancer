@@ -191,15 +191,11 @@ const CAT_PANEL_CSS = `
     background: var(--card-bg); color: var(--panel-text); border-color: var(--card-border);
   }
   #ds-batch-bar .ds-batch-btn:hover { filter: brightness(0.93); }
-  /* 归类到 — 用蓝色文字 + 蓝色边框 + 弱蓝背景，所有浅色主题清晰 */
-  #ds-batch-bar .ds-batch-btn.ds-batch-primary,
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-primary { color: #1a56db; border-color: #1a56db; background: #eef4ff; }
-  /* 删除 — 用红色文字 + 红色边框 + 弱红背景 */
+  /* 删除 — 用红色文字 + 弱红背景 */
   #ds-batch-bar .ds-batch-btn.ds-batch-danger,
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #dc2626; border-color: #dc2626; background: #fef2f2; }
+  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #dc2626; border-color: transparent; background: #fef2f2; }
   /* 深色主题：亮色文字 + 半透明背景 */
-  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-primary { color: #93b4f8; border-color: #93b4f8; background: rgba(147,180,248,0.1); }
-  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #fca5a5; border-color: #fca5a5; background: rgba(252,165,165,0.1); }
+  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #fca5a5; border-color: transparent; background: rgba(252,165,165,0.1); }
   html.ds-dark #ds-batch-bar .ds-batch-btn { color: #e0e0e0; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
 
   /* 复选框 */

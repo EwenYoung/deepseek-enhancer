@@ -61,6 +61,11 @@ async function onInput(e: Event) {
   const hasSlash = !!(text && text.startsWith('/'));
 
   if (hasSlash) {
+    const agentMode = await chrome.storage.local.get('ds_mini_agent_mode');
+    if (!agentMode.ds_mini_agent_mode) {
+      showToast('请先开启 Agent 模式');
+      return;
+    }
     const afterSlash = text!.slice(1);
     if (!afterSlash.includes(' ')) {
       currentMatches = await matchSkills(afterSlash);
@@ -227,4 +232,23 @@ function setInputText(el: HTMLElement, text: string) {
 function esc(s: string): string {
   const d = document.createElement('div');
   d.textContent = s; return d.innerHTML;
+}
+
+function showToast(msg: string) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = `
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    z-index:9999999;background:var(--panel-bg, #1f2937);color:var(--panel-text, #fff);
+    border:1px solid var(--panel-border);
+    padding:8px 20px;
+    border-radius:8px;font-size:13px;font-family:'DM Sans',-apple-system,sans-serif;
+    backdrop-filter:var(--panel-blur);
+    -webkit-backdrop-filter:var(--panel-blur);
+    box-shadow:0 4px 16px rgba(0,0,0,0.15);
+    transition:opacity 0.3s;
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+  setTimeout(() => { toast.remove(); }, 2500);
 }

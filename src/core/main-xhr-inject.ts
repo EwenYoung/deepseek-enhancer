@@ -228,19 +228,8 @@
       return JSON.stringify(parsed);
     }
 
-    // Agent 模式关闭 → 不注入工具定义
+    // Agent 模式关闭 → 不注入任何内容
     if (!agentModeEnabled) {
-      // 只注入 skill 指令（如果有）
-      if (skillInstructions) {
-        var skillCmd = parseSkillCommand(userContent);
-        if (skillCmd) {
-          var skillPrefix = skillInstructions + '\n---\n';
-          var userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
-          parsed.prompt = skillPrefix + (userArgs || userContent);
-          console.log('[DS-Mini:MAIN] Skill injected (agent off), length:', parsed.prompt.length);
-          return JSON.stringify(parsed);
-        }
-      }
       return JSON.stringify(parsed);
     }
 

@@ -3,7 +3,7 @@
 // ============================================================
 // 从页面右侧滑出的管理面板
 import type { AppState, Skill } from './types';
-import { loadSkills, saveSkill, deleteSkill, toggleSkill } from './skill-registry';
+import { loadSkills, saveSkill, deleteSkill } from './skill-registry';
 import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
 import {
@@ -234,18 +234,9 @@ function buildPanelHTML(): string {
   const keySVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3Z"/></svg>';
   const gridSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>';
 
-  function toolRow(name: string, label: string, svg: string) {
-    return '<div class="ds-tool-row" data-tool="' + name + '" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--card-bg);">' + svg + '<span style="font-size:12px;font-weight:500;color:var(--panel-text);flex:1;">' + label + '</span><span class="ds-tool-toggle" data-tool="' + name + '" style="position:relative;display:inline-block;width:28px;height:16px;cursor:pointer;flex-shrink:0;background:var(--toggle-on);border-radius:16px;transition:background 0.2s;"><span style="position:absolute;top:2px;right:2px;width:12px;height:12px;background:var(--toggle-knob);border-radius:50%;transition:right 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>';
-  }
   function enhToggle(id: string, label: string) {
     return '<div class="ds-switch-row"><span>' + label + '</span><span class="ds-enh-toggle" data-id="' + id + '" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>';
   }
-
-  const s = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
-  const g = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
-  const n = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>';
-  const gh = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>';
-  const d = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
 
   return `
     <!-- 标题栏 -->
@@ -276,19 +267,8 @@ function buildPanelHTML(): string {
         </div>
 
         <!-- Tools 内部滚动 -->
-        <div style="padding:8px 16px;border-bottom:1px solid var(--panel-border);">
-          <div style="font-size:12px;font-weight:600;color:var(--panel-text-secondary);margin-bottom:6px;">Tools</div>
-          <div id="ds-tools-list" style="max-height:108px;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:4px;">
-            ${toolRow('web_search','搜索','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>')}
-            ${toolRow('web_fetch','抓取','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>')}
-            ${toolRow('news_hub','新闻','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>')}
-            ${toolRow('github_trending','GitHub 趋势','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>')}
-            ${toolRow('doc_generate','生成文档','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>')}
-          </div>
-        </div>
-
         <!-- Skills -->
-        <div style="padding:8px 16px;border-bottom:1px solid var(--panel-border);">
+        <div id="ds-skills-section" style="padding:8px 16px;border-bottom:1px solid var(--panel-border);">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:12px;font-weight:600;color:var(--panel-text-secondary);">Skills</span>
             <div style="display:flex;gap:4px;">
@@ -482,61 +462,6 @@ async function bindPanelEvents(state: AppState) {
     });
   }
 
-  // Tools 开关
-  const TOOLS_KEY = 'ds_mini_tools_state';
-  function updateToolToggle(el: Element, on: boolean) {
-    el.classList.toggle('ds-tool-on', on);
-    (el as HTMLElement).style.background = on ? 'var(--toggle-on)' : 'var(--toggle-off)';
-    const knob = el.querySelector('span') as HTMLElement | null;
-    if (knob) knob.style.right = on ? '2px' : '14px';
-    const row = el.closest('.ds-tool-row') as HTMLElement | null;
-    if (row) row.style.opacity = on ? '1' : '0.4';
-  }
-  function postToolsState() {
-    chrome.storage.local.get(TOOLS_KEY).then(r => {
-      const tools = r[TOOLS_KEY] || {};
-      // ponytail: 直接写 window 变量 + localStorage，给 inject-context / MAIN world 读取
-      (window as any).__DS_TOOLS_STATE__ = tools;
-      try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(tools)); } catch {}
-      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'SET_TOOLS_STATE', tools }, '*');
-      setTimeout(() => {
-        window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'SET_TOOLS_STATE', tools }, '*');
-      }, 500);
-    });
-  }
-  // 加载初始状态
-  chrome.storage.local.get(TOOLS_KEY).then(r => {
-    const tools = r[TOOLS_KEY] || {};
-    (window as any).__DS_TOOLS_STATE__ = tools;
-    try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(tools)); } catch {}
-    panelEl?.querySelectorAll('.ds-tool-toggle').forEach(el => {
-      const tool = el.getAttribute('data-tool') || '';
-      updateToolToggle(el, tools[tool] !== false);
-    });
-  });
-  // 绑定点击
-  panelEl?.querySelectorAll('.ds-tool-toggle').forEach(el => {
-    el.addEventListener('click', () => {
-      const tool = el.getAttribute('data-tool') || '';
-      const isOn = el.classList.contains('ds-tool-on');
-      const newOn = !isOn;
-      updateToolToggle(el, newOn);
-      // 立即更新 window 变量，不等 storage 回调
-      const storedTools = (window as any).__DS_TOOLS_STATE__ || {};
-      storedTools[tool] = newOn;
-      (window as any).__DS_TOOLS_STATE__ = storedTools;
-      // 同步写入 localStorage（MAIN 世界可直接读取）
-      try { localStorage.setItem('ds_mini_tools_state', JSON.stringify(storedTools)); } catch {}
-      // 异步保存 + postMessage
-      chrome.storage.local.get(TOOLS_KEY).then(r => {
-        const tools = r[TOOLS_KEY] || {};
-        tools[tool] = newOn;
-        chrome.storage.local.set({ [TOOLS_KEY]: tools });
-        postToolsState();
-      });
-    });
-  });
-
   // 主题切换
   panelEl.querySelector('#ds-enh-theme-prev')?.addEventListener('click', () => {
     enhState.themeIdx = (enhState.themeIdx - 1 + getThemeCount()) % getThemeCount();
@@ -716,6 +641,7 @@ async function loadAgentMode() {
     checkbox.checked = enabled;
     updateAgentSlider(enabled);
     postAgentMode(enabled);
+    toggleSkillsSection(enabled);
   } catch { /* ignore */ }
 }
 
@@ -728,6 +654,7 @@ function toggleAgentMode() {
   updateAgentSlider(enabled);
   chrome.storage.local.set({ [AGENT_MODE_KEY]: enabled });
   postAgentMode(enabled);
+  toggleSkillsSection(enabled);
   showToast(enabled ? 'Agent 模式已开启' : 'Agent 模式已关闭');
 }
 
@@ -739,6 +666,11 @@ function postAgentMode(enabled: boolean) {
   }, '*');
   console.log('[DS-Mini:UI] Agent mode:', enabled ? 'ON' : 'OFF');
 }
+
+  function toggleSkillsSection(enabled: boolean) {
+    const skillsSection = panelEl?.querySelector('#ds-skills-section') as HTMLElement | null;
+    if (skillsSection) skillsSection.style.display = enabled ? '' : 'none';
+  }
 
 // ============================================================
 // 增强器功能
@@ -855,13 +787,6 @@ async function refreshSkillList(state: AppState) {
   // 绑定每个卡片的按钮
   listEl.querySelectorAll('[data-skill-id]').forEach(card => {
     const id = card.getAttribute('data-skill-id')!;
-    card.querySelector('.ds-mini-toggle')?.addEventListener('click', async () => {
-      const skill = state.skills.find(s => s.id === id);
-      if (skill) {
-        await toggleSkill(id, !skill.enabled);
-        await refreshSkillList(state);
-      }
-    });
     card.querySelector('.ds-mini-edit')?.addEventListener('click', () => {
       const skill = state.skills.find(s => s.id === id);
       if (skill) showModalEditor(state, skill);
@@ -901,12 +826,6 @@ function skillCardHTML(skill: Skill): string {
           <span style="font-size:11px;color:var(--panel-text-secondary);margin-left:6px;">${esc(sourceLabel)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;">
-            <input type="checkbox" style="opacity:0;width:0;height:0;" ${skill.enabled ? 'checked' : ''}>
-            <span class="ds-mini-toggle" style="position:absolute;inset:0;background:${skill.enabled ? 'var(--toggle-on)' : 'var(--toggle-off)'};border-radius:20px;transition:background 0.2s;cursor:pointer;">
-              <span style="position:absolute;top:2px;left:${skill.enabled ? '18px' : '2px'};width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span>
-            </span>
-          </label>
           ${skill.source !== 'builtin' ? `
             <button class="ds-mini-edit" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             <button class="ds-mini-delete" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>

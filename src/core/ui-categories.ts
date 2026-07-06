@@ -148,8 +148,10 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-session:hover .ds-cat-session-remove { opacity: 1; }
   .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); background: var(--card-border); }
-  .ds-cat-item.ds-cat-dragging { opacity: 0.3; }
-  .ds-cat-item.ds-cat-drag-over { box-shadow: inset 0 2px 0 0 var(--accent, #007AFF) !important; border-radius: 2px; }
+  .ds-cat-item.ds-cat-dragging { opacity: 0.35; transform: scale(0.97); }
+  .ds-cat-item.ds-cat-drag-over { background: var(--accent-bg, rgba(0,122,255,0.06)); border-radius: 10px; }
+  .ds-cat-item.ds-cat-drag-over-before { box-shadow: inset 0 3px 0 0 var(--accent, #007AFF); }
+  .ds-cat-item.ds-cat-drag-over-after { box-shadow: inset 0 -3px 0 0 var(--accent, #007AFF); }
 
   /* 三点菜单注入按钮 — 完全继承父级字体，不覆盖 */
   .ds-cat-menu-inject {
@@ -577,30 +579,37 @@ function bindCategoryEvents() {
     _dragCatIdx = Array.from(panelEl.querySelectorAll('.ds-cat-item')).indexOf(el);
     el.classList.add('ds-cat-dragging');
     panelEl.classList.add('ds-cat-dragging-active');
-    // 减小拖拽鬼影，防止文字重叠
     e.dataTransfer?.setDragImage(document.createElement('div'), 0, 0);
     e.dataTransfer.effectAllowed = 'move';
   });
   panelEl.addEventListener('dragend', () => {
     _dragCatIdx = -1;
     panelEl.classList.remove('ds-cat-dragging-active');
-    panelEl.querySelectorAll('.ds-cat-dragging, .ds-cat-drag-over').forEach(el => el.classList.remove('ds-cat-dragging', 'ds-cat-drag-over'));
+    panelEl.querySelectorAll('.ds-cat-dragging, .ds-cat-drag-over, .ds-cat-drag-over-before, .ds-cat-drag-over-after')
+      .forEach(el => el.classList.remove('ds-cat-dragging', 'ds-cat-drag-over', 'ds-cat-drag-over-before', 'ds-cat-drag-over-after'));
   });
   panelEl.addEventListener('dragover', (e) => {
     const el = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
     if (!el || _dragCatIdx < 0) return;
     e.preventDefault();
-    panelEl.querySelectorAll('.ds-cat-drag-over').forEach(el => el.classList.remove('ds-cat-drag-over'));
-    el.classList.add('ds-cat-drag-over');
+    panelEl.querySelectorAll('.ds-cat-drag-over, .ds-cat-drag-over-before, .ds-cat-drag-over-after')
+      .forEach(el => el.classList.remove('ds-cat-drag-over', 'ds-cat-drag-over-before', 'ds-cat-drag-over-after'));
+    const rect = el.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const isBefore = e.clientY < midY;
+    el.classList.add('ds-cat-drag-over', isBefore ? 'ds-cat-drag-over-before' : 'ds-cat-drag-over-after');
   });
   panelEl.addEventListener('drop', (e) => {
     e.preventDefault();
     if (_dragCatIdx < 0) return;
-    const target = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
-    if (!target) return;
-    const toIdx = Array.from(panelEl.querySelectorAll('.ds-cat-item')).indexOf(target);
-    if (toIdx < 0 || toIdx === _dragCatIdx) return;
-    reorderCategory(catState, _dragCatIdx, toIdx);
+    const overEl = panelEl.querySelector('.ds-cat-drag-over-before, .ds-cat-drag-over-after') as HTMLElement | null;
+    if (!overEl) return;
+    const items = Array.from(panelEl.querySelectorAll('.ds-cat-item'));
+    const overIdx = items.indexOf(overEl);
+    if (overIdx < 0) return;
+    const targetIdx = overEl.classList.contains('ds-cat-drag-over-before') ? overIdx : overIdx + 1;
+    if (targetIdx === _dragCatIdx) return;
+    reorderCategory(catState, _dragCatIdx, targetIdx);
     saveCategories(catState).then(() => refreshPanel());
   });
 

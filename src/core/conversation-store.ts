@@ -30,6 +30,8 @@ export interface CategoryItem {
 export interface CategoryState {
   categories: CategoriesData;
   hiddenSessions: string[];
+  /** sid → title 缓存，解决隐藏会话 DOM 取不到标题的问题 */
+  sessionTitles: Record<string, string>;
 }
 
 // ============================================================
@@ -41,20 +43,23 @@ function emptyCategories(): CategoriesData {
 }
 
 function emptyState(): CategoryState {
-  return { categories: emptyCategories(), hiddenSessions: [] };
+  return { categories: emptyCategories(), hiddenSessions: [], sessionTitles: {} };
 }
 
 // ============================================================
 // 存储操作
 // ============================================================
 
+const STORAGE_KEY_TITLES = 'ds_mini_session_titles';
+
 /** 加载分类数据 */
 export async function loadCategories(): Promise<CategoryState> {
   try {
-    const r = await chrome.storage.local.get([STORAGE_KEY_CATEGORIES, STORAGE_KEY_HIDDEN]);
+    const r = await chrome.storage.local.get([STORAGE_KEY_CATEGORIES, STORAGE_KEY_HIDDEN, STORAGE_KEY_TITLES]);
     const categories = r[STORAGE_KEY_CATEGORIES] || emptyCategories();
     const hiddenSessions: string[] = r[STORAGE_KEY_HIDDEN] || [];
-    return { categories, hiddenSessions };
+    const sessionTitles: Record<string, string> = r[STORAGE_KEY_TITLES] || {};
+    return { categories, hiddenSessions, sessionTitles };
   } catch {
     return emptyState();
   }
@@ -65,6 +70,7 @@ export async function saveCategories(state: CategoryState): Promise<void> {
   await chrome.storage.local.set({
     [STORAGE_KEY_CATEGORIES]: state.categories,
     [STORAGE_KEY_HIDDEN]: state.hiddenSessions,
+    [STORAGE_KEY_TITLES]: state.sessionTitles,
   });
 }
 

@@ -132,6 +132,14 @@ const CAT_PANEL_CSS = `
   }
   .ds-cat-session:hover { background: var(--card-border, rgba(0,0,0,0.04)); color: var(--panel-text); }
   .ds-cat-session .ds-cat-session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ds-cat-session .ds-cat-session-rename {
+    background: none; border: none; cursor: pointer;
+    padding: 0 3px; font-size: 11px;
+    color: var(--panel-text-secondary); border-radius: 3px;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .ds-cat-session:hover .ds-cat-session-rename { opacity: 1; }
+  .ds-cat-session .ds-cat-session-rename:hover { color: var(--accent, #007AFF); background: var(--card-border); }
   .ds-cat-session .ds-cat-session-remove {
     background: none; border: none; cursor: pointer;
     padding: 0 3px; font-size: 11px;
@@ -456,7 +464,7 @@ function buildCategoryListHTML(): string {
     // 按排序模式渲染会话列表
     let sessionIds = [...item.sessions];
     if (item.sortBy === 'time-asc') sessionIds.reverse();
-    return '<div class="ds-cat-item" draggable="true" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><button class="ds-cat-sort-btn" title="' + getSortLabel(item.sortBy) + '">' + getSortIcon(item.sortBy) + '</button><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (sessionIds.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : sessionIds.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
+    return '<div class="ds-cat-item" draggable="true" data-cat-name="' + escAttr(n) + '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' + (open ? chevronDownSVG() : chevronRightSVG()) + '</span><span class="ds-cat-name">' + escHtml(n) + '</span><button class="ds-cat-sort-btn" title="' + getSortLabel(item.sortBy) + '">' + getSortIcon(item.sortBy) + '</button><button class="ds-cat-add-session" title="新建会话">' + plusSVG() + '</button><span class="ds-cat-count">' + item.sessions.length + '</span><button class="ds-cat-menu" title="操作">' + moreSVG() + '</button></div><div class="ds-cat-item-sessions ' + (open ? 'open' : '') + '">' + (sessionIds.length === 0 ? '<div style="padding:2px 12px 2px 28px;font-size:11px;color:var(--panel-text-secondary);">空</div>' : sessionIds.map(sid => '<div class="ds-cat-session" data-session-id="' + escAttr(sid) + '"><span class="ds-cat-session-title">' + escHtml(getSessionTitleFromDOM(sid)) + '</span><button class="ds-cat-session-rename" title="重命名">✎</button><button class="ds-cat-session-remove" title="移出分类">✕</button></div>').join('')) + '</div></div>';
   }).join('');
 }
 
@@ -465,10 +473,15 @@ function getSessionTitleFromDOM(sid: string): string {
     if (extractSessionId(link as HTMLAnchorElement) === sid) {
       const title = getConversationTitle(link as HTMLAnchorElement);
       const trimmed = title.trim();
-      if (trimmed && trimmed !== '新会话' && trimmed !== 'New Chat') return title;
+      if (trimmed && trimmed !== '新会话' && trimmed !== 'New Chat') {
+        // 缓存到 store，下次刷新时可用
+        catState.sessionTitles[sid] = trimmed;
+        return trimmed;
+      }
     }
   }
-  return sid;
+  // DOM 取不到（隐藏会话、未渲染等），回退缓存标题
+  return catState.sessionTitles[sid] || sid;
 }
 
 // ============================================================
@@ -531,9 +544,16 @@ function bindCategoryEvents() {
       return;
     }
     // 分类内会话点击
-    if (target.closest('.ds-cat-session') && !target.closest('.ds-cat-session-remove')) {
+    if (target.closest('.ds-cat-session') && !target.closest('.ds-cat-session-remove') && !target.closest('.ds-cat-session-rename')) {
       const sid = target.closest('.ds-cat-session')?.getAttribute('data-session-id');
       if (sid) navigateToSession(sid);
+      return;
+    }
+    // 重命名会话
+    if (target.closest('.ds-cat-session-rename')) {
+      e.stopPropagation();
+      const sid = target.closest('.ds-cat-session')?.getAttribute('data-session-id');
+      if (sid) renameSession(sid);
       return;
     }
     // 移出分类
@@ -688,6 +708,53 @@ function navigateToSession(sid: string) {
   tryClick();
 }
 async function handleUncategorize(sid: string) { uncategorizeSession(catState, sid); await saveCategories(catState); applyHiddenSessions(); refreshPanel(); }
+
+// ============================================================
+// 重命名会话
+// ============================================================
+async function renameSession(sid: string) {
+  const oldTitle = getSessionTitleFromDOM(sid);
+  const newTitle = prompt('重命名会话：', oldTitle);
+  if (!newTitle || !newTitle.trim() || newTitle.trim() === oldTitle) return;
+
+  const ok = await callRenameAPI(sid, newTitle.trim());
+  if (!ok) { alert('重命名失败，请重试'); return; }
+
+  const t = newTitle.trim();
+
+  // 更新面板显示
+  if (panelEl) {
+    const el = panelEl.querySelector(`[data-session-id="${sid}"]`) as HTMLElement;
+    const titleEl = el?.querySelector('.ds-cat-session-title') as HTMLElement;
+    if (titleEl) titleEl.textContent = t;
+  }
+
+  // 更新侧边栏 DOM（即使是 display:none），移出分类后显示正确名称
+  for (const link of document.querySelectorAll('a[href*="/chat/s/"]')) {
+    if (extractSessionId(link as HTMLAnchorElement) === sid) {
+      (link as HTMLElement).textContent = t;
+      break;
+    }
+  }
+
+  // 缓存标题到 store，刷新后仍可读取
+  catState.sessionTitles[sid] = t;
+  saveCategories(catState);
+}
+
+function callRenameAPI(sid: string, title: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    function handler(event: MessageEvent) {
+      if (event.data?.source === 'DS_MINI_MAIN' && event.data?.type === 'DS_MINI_RENAME_RESPONSE' && event.data.sessionId === sid) {
+        window.removeEventListener('message', handler);
+        resolve(event.data.success === true);
+      }
+    }
+    window.addEventListener('message', handler);
+    window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_RENAME_SESSION', sessionId: sid, title }, '*');
+    setTimeout(() => { window.removeEventListener('message', handler); resolve(false); }, 5000);
+  });
+}
 
 // ============================================================
 // 分类内创建新会话
@@ -923,6 +990,8 @@ function refreshPanel() {
     if (!panelEl || !document.body.contains(panelEl)) { panelInjected = false; tryInjectPanel(); return; }
     const b = panelEl.querySelector('#ds-cat-body') as HTMLElement;
     if (b) { b.innerHTML = buildCategoryListHTML(); bindCategoryEvents(); }
+    // 持久化 buildCategoryListHTML 中从 DOM 缓存的标题
+    saveCategories(catState);
   } catch (e) { console.error('[Categories] refreshPanel:', e); }
 }
 function escHtml(s: string): string { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }

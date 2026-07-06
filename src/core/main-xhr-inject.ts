@@ -693,4 +693,46 @@
       });
     }
   });
+
+  // ==========================================================
+  // 分类插件重命名请求
+  // ==========================================================
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_RENAME_SESSION') {
+      var sid = event.data.sessionId;
+      var newTitle = event.data.title;
+
+      var headers = { 'Content-Type': 'application/json' };
+      var capturedAuth = window.__DS_DELETE_AUTH__;
+      if (capturedAuth) {
+        headers['Authorization'] = capturedAuth;
+      }
+
+      fetch('/api/v0/chat_session/update_title', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ chat_session_id: sid, title: newTitle }),
+      })
+      .then(function(r) { return r.json().catch(function() { return { code: r.status, msg: r.statusText }; }); })
+      .then(function(data) {
+        window.postMessage({
+          source: 'DS_MINI_MAIN',
+          type: 'DS_MINI_RENAME_RESPONSE',
+          sessionId: sid,
+          title: newTitle,
+          success: data.code === 0 || data.code === 200 || !data.code,
+          response: data,
+        }, '*');
+      })
+      .catch(function(err) {
+        window.postMessage({
+          source: 'DS_MINI_MAIN',
+          type: 'DS_MINI_RENAME_RESPONSE',
+          sessionId: sid,
+          success: false,
+          error: err.message,
+        }, '*');
+      });
+    }
+  });
 })();

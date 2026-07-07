@@ -1,10 +1,10 @@
 // ============================================================
-// deepseek-enhancer — Fetch 拦截 + 上下文注入
+// deepseek-enhancer — Fetch 拦截 + 上下文增强
 // ============================================================
 // 拦截 chat API 请求，在用户消息前注入工具定义和 skill 指令
 // 同时拦截 SSE 响应流，检测工具调用
 import type { AppState } from './types';
-import { buildInjectionContext, buildContextPrefix, parseSkillCommand } from './inject-context';
+import { buildContext, buildContextPrefix, parseSkillCommand } from './context-builder';
 import { TOOL_DESCRIPTORS } from './tool-descriptors';
 import { parseSSEChunk, extractToolCalls, type ParsedMessage } from './sse-parser';
 import { onSSEToolCallDetected } from './ui-tool-blocks';
@@ -63,7 +63,7 @@ function augmentRequestBody(body: BodyInit, state: AppState): BodyInit {
   if (!parsed.messages || parsed.messages.length === 0) return body;
 
   // 构建注入上下文
-  const ctx = buildInjectionContext(TOOL_DESCRIPTORS, state.activeSkill);
+  const ctx = buildContext(TOOL_DESCRIPTORS, state.activeSkill);
   const prefix = buildContextPrefix(ctx);
   if (!prefix) return body; // 没有需要注入的内容
 
@@ -79,7 +79,7 @@ function augmentRequestBody(body: BodyInit, state: AppState): BodyInit {
     // 匹配 skill 并注入其 instructions
     const skill = state.skills.find(s => s.name === skillCmd.skillName && s.enabled);
     if (skill) {
-      const skillCtx = buildInjectionContext(TOOL_DESCRIPTORS, skill);
+      const skillCtx = buildContext(TOOL_DESCRIPTORS, skill);
       const skillPrefix = buildContextPrefix(skillCtx);
       const userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
       parsed.messages[lastUserIdx].content = skillPrefix + (userArgs || userContent);

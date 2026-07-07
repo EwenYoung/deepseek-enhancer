@@ -1,11 +1,11 @@
 // ============================================================
-// deepseek-enhancer — XHR 拦截 + 上下文注入
+// deepseek-enhancer — XHR 拦截 + 上下文增强
 // ============================================================
 // DeepSeek 网页端使用 XMLHttpRequest (不是 fetch) 发送聊天请求
 // 端点: /api/v0/chat/completion, 请求体: {prompt: "..."}
 // 响应: SSE 流通过 XHR progress 事件
 import type { AppState } from './types';
-import { buildInjectionContext, buildContextPrefix, parseSkillCommand } from './inject-context';
+import { buildContext, buildContextPrefix, parseSkillCommand } from './context-builder';
 import { TOOL_DESCRIPTORS } from './tool-descriptors';
 import { parseSSEChunk, extractToolCalls, type ParsedMessage } from './sse-parser';
 import { onSSEToolCallDetected } from './ui-tool-blocks';
@@ -60,7 +60,7 @@ function augmentPrompt(
   const userContent = parsed.prompt;
 
   // 构建注入上下文
-  const ctx = buildInjectionContext(TOOL_DESCRIPTORS, state.activeSkill);
+  const ctx = buildContext(TOOL_DESCRIPTORS, state.activeSkill);
   const prefix = buildContextPrefix(ctx);
 
   // 检测 /skill 命令
@@ -69,7 +69,7 @@ function augmentPrompt(
   if (skillCmd) {
     const skill = state.skills.find(s => s.name === skillCmd.skillName && s.enabled);
     if (skill) {
-      const skillCtx = buildInjectionContext(TOOL_DESCRIPTORS, skill);
+      const skillCtx = buildContext(TOOL_DESCRIPTORS, skill);
       const skillPrefix = buildContextPrefix(skillCtx);
       const userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
       parsed.prompt = skillPrefix + (userArgs || userContent);

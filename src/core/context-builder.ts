@@ -1,7 +1,7 @@
 // ============================================================
 // deepseek-enhancer — 上下文构建
 // ============================================================
-// 构建注入到用户消息前的上下文前缀（工具定义 + skill 指令）
+// 构建增强到用户消息前的上下文前缀（工具定义 + skill 指令）
 import type { Skill, InjectionContext, ToolDescriptor } from './types';
 import { TOOL_DESCRIPTORS } from './tool-descriptors';
 
@@ -20,11 +20,11 @@ export function setDisabledTools(tools: Record<string, boolean>) {
 }
 
 /**
- * 构建注入上下文
+ * 构建增强上下文
  * - toolDefinitions: 工具定义的 XML 文本，告诉模型哪些工具可用
  * - skillInstructions: 激活的 skill 指令
  */
-export function buildInjectionContext(
+export function buildContext(
   tools: ToolDescriptor[],
   skill: Skill | null,
 ): InjectionContext {
@@ -45,7 +45,7 @@ export function buildInjectionContext(
 }
 
 /**
- * 将上下文拼接为注入到用户消息前面的文本前缀
+ * 将上下文拼接为增强到用户消息前面的文本前缀
  */
 export function buildContextPrefix(ctx: InjectionContext): string {
   const parts: string[] = [];

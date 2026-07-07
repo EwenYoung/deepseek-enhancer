@@ -7,7 +7,7 @@ import { initPanel } from '../core/ui-panel';
 import { initToolBlocks, handleMainWorldToolCalls, setSilentMode } from '../core/ui-tool-blocks';
 import { initArtifacts } from '../core/artifact';
 import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
-import { setDisabledTools } from '../core/inject-context';
+import { setDisabledTools } from '../core/context-builder';
 import { initCategories } from '../core/ui-categories';
 import type { AppState } from '../core/types';
 

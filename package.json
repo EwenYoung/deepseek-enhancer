@@ -12,12 +12,19 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["deepseek", "tool-calling", "skills", "browser-extension"],
+  "keywords": [
+    "deepseek",
+    "tool-calling",
+    "skills",
+    "browser-extension"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@types/chrome": "^0.2.0",
+    "eslint": "^10.6.0",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.63.0",
     "wxt": "^0.20.26"
   }
 }

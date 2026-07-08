@@ -20,10 +20,8 @@ export function exportChat(format: ExportFormat) {
 
 async function scrollToTopAndExport(format: ExportFormat) {
   // 1. 查找可滚动的聊天容器
-  var container = findScrollContainer();
+  const container = findScrollContainer();
   if (container) {
-    // 记录当前位置
-    var wasAtBottom = isNearBottom(container);
     // 滚动到顶部
     container.scrollTop = 0;
     // 等待虚拟滚动加载
@@ -34,7 +32,7 @@ async function scrollToTopAndExport(format: ExportFormat) {
   }
 
   // 2. 抓取消息
-  var messages = scrapeMessages();
+  const messages = scrapeMessages();
   if (messages.length === 0) {
     alert('没有找到聊天消息');
     return;
@@ -43,8 +41,8 @@ async function scrollToTopAndExport(format: ExportFormat) {
   // 3. 合并注入指令
   mergeInjectedPrefixes(messages);
 
-  var title = getChatTitle();
-  var filename = 'deepseek-' + slugify(title) + '-' + dateStamp();
+  const title = getChatTitle();
+  const filename = 'deepseek-' + slugify(title) + '-' + dateStamp();
 
   if (format === 'markdown') {
     download(renderMarkdown(messages, title), filename + '.md', 'text/markdown');
@@ -57,19 +55,15 @@ async function scrollToTopAndExport(format: ExportFormat) {
 
 function findScrollContainer(): HTMLElement | null {
   // 找到包含大量 .ds-message 的可滚动容器
-  var all = document.querySelectorAll('*');
-  for (var i = 0; i < all.length; i++) {
-    var el = all[i] as HTMLElement;
+  const all = document.querySelectorAll('*');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i] as HTMLElement;
     // 检查是否有滚动条且包含 .ds-message
     if (el.scrollHeight > el.clientHeight + 50 && el.querySelectorAll('.ds-message').length > 1) {
       return el;
     }
   }
   return null;
-}
-
-function isNearBottom(el: HTMLElement): boolean {
-  return el.scrollHeight - el.scrollTop - el.clientHeight < 200;
 }
 
 function delay(ms: number): Promise<void> {
@@ -80,30 +74,30 @@ function delay(ms: number): Promise<void> {
 // 从 DOM 抓取消息
 // ============================================================
 function scrapeMessages(): ChatMessage[] {
-  var messages: ChatMessage[] = [];
-  var msgEls = document.querySelectorAll<HTMLElement>('.ds-message');
+  const messages: ChatMessage[] = [];
+  const msgEls = document.querySelectorAll<HTMLElement>('.ds-message');
   if (msgEls.length === 0) {
     console.warn('[DS-Mini] Export: no .ds-message found');
     return messages;
   }
 
   // 读取缓存的原始助手响应文本（含 Markdown）
-  var asstRawEl = document.getElementById('ds-mini-asst-raw');
-  var asstRawTexts = asstRawEl ? (asstRawEl.textContent || '').split('||ASST_SEP||') : [];
-  var asstIdx = 0;
+  const asstRawEl = document.getElementById('ds-mini-asst-raw');
+  const asstRawTexts = asstRawEl ? (asstRawEl.textContent || '').split('||ASST_SEP||') : [];
+  let asstIdx = 0;
 
-  for (var i = 0; i < msgEls.length; i++) {
-    var el = msgEls[i];
+  for (let i = 0; i < msgEls.length; i++) {
+    const el = msgEls[i];
     if (el.closest('.ds-mini-tool-block')) continue;
 
-    var replyEl = el.querySelector<HTMLElement>('.ds-assistant-message-main-content');
-    var thinkEl = el.querySelector<HTMLElement>('.ds-think-content');
+    const replyEl = el.querySelector<HTMLElement>('.ds-assistant-message-main-content');
+    const thinkEl = el.querySelector<HTMLElement>('.ds-think-content');
 
     if (replyEl) {
       // Assistant 消息 — 优先使用缓存的原始 Markdown 文本
-      var thinking = thinkEl?.textContent?.trim() || '';
-      var raw = asstRawTexts[asstIdx];
-      var reply = raw ? raw.trim() : replyEl.textContent?.trim();
+      const thinking = thinkEl?.textContent?.trim() || '';
+      const raw = asstRawTexts[asstIdx];
+      const reply = raw ? raw.trim() : replyEl.textContent?.trim();
       if (reply) {
         messages.push({ role: 'assistant' as const, content: reply, thinking: thinking || undefined });
       }
@@ -112,13 +106,13 @@ function scrapeMessages(): ChatMessage[] {
       // User 消息 — 跳过包含 assistant 子元素的
       if (el.querySelector('.ds-markdown, .ds-think-content')) continue;
 
-      var text = '';
+      let text = '';
       // 找第一个有文本的直接子元素
-      for (var j = 0; j < el.children.length; j++) {
-        var child = el.children[j] as HTMLElement;
-        var childCls = child.className || '';
+      for (let j = 0; j < el.children.length; j++) {
+        const child = el.children[j] as HTMLElement;
+        const childCls = child.className || '';
         if (childCls.includes('ds-markdown') || childCls.includes('ds-think')) continue;
-        var t = child.textContent?.trim();
+        const t = child.textContent?.trim();
         if (t && t.length > 2) { text = t; break; }
       }
       // 兜底
@@ -136,19 +130,19 @@ function scrapeMessages(): ChatMessage[] {
 // 读取主世界储存的注入记录，合并到 user 消息
 // ============================================================
 function mergeInjectedPrefixes(messages: ChatMessage[]) {
-  var el = document.getElementById('ds-mini-injected');
+  const el = document.getElementById('ds-mini-injected');
   if (!el) return;
 
-  var raw = el.textContent || '';
+  const raw = el.textContent || '';
   if (!raw) return;
 
   // 解析存储记录
-  var records: Array<{ prefix: string; originalText: string }> = [];
-  var parts = raw.split('||MSG_SEP||');
-  for (var i = 0; i < parts.length; i++) {
-    var part = parts[i].trim();
+  const records: Array<{ prefix: string; originalText: string }> = [];
+  const parts = raw.split('||MSG_SEP||');
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i].trim();
     if (!part) continue;
-    var sepIdx = part.indexOf('||SEP||');
+    const sepIdx = part.indexOf('||SEP||');
     if (sepIdx === -1) continue;
     records.push({
       prefix: part.slice(0, sepIdx),
@@ -159,11 +153,11 @@ function mergeInjectedPrefixes(messages: ChatMessage[]) {
   if (records.length === 0) return;
 
   // records 和 user 消息按顺序一一对应
-  var rIdx = 0;
-  for (var i = 0; i < messages.length && rIdx < records.length; i++) {
+  let rIdx = 0;
+  for (let i = 0; i < messages.length && rIdx < records.length; i++) {
     if (messages[i].role !== 'user') continue;
 
-    var rec = records[rIdx];
+    const rec = records[rIdx];
     // 如果这个消息是工具结果回注，跳过（不对应任何 injection）
     if (messages[i].content.indexOf('[工具执行结果]') === 0) continue;
 
@@ -182,7 +176,7 @@ function mergeInjectedPrefixes(messages: ChatMessage[]) {
 function getChatTitle(): string {
   const t = document.querySelector('title');
   if (t) {
-    let s = t.textContent?.replace(/ - DeepSeek.*$/i, '').trim();
+    const s = t.textContent?.replace(/ - DeepSeek.*$/i, '').trim();
     if (s) return s;
   }
   const h1 = document.querySelector('h1');
@@ -336,16 +330,16 @@ function wrapToolResultMD(content: string): string {
   // 将匹配到的 [工具执行结果] 区域包裹在 ``` 代码块中
   return content.replace(/(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g, function (match) {
     // 去掉末尾可能匹配到的 ---
-    var clean = match.replace(/\n---$/, '');
+    const clean = match.replace(/\n---$/, '');
     return '```\n' + clean + '\n```\n---';
   });
 }
 
 function renderUserContentHTML(content: string): string {
-  var re = /(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g;
-  var parts: string[] = [];
-  var lastIdx = 0;
-  var match: RegExpExecArray | null;
+  const re = /(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g;
+  const parts: string[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
 
   while ((match = re.exec(content)) !== null) {
     // 普通内容部分
@@ -353,7 +347,7 @@ function renderUserContentHTML(content: string): string {
       parts.push(renderMarkdownToHTML(content.slice(lastIdx, match.index)));
     }
     // 工具结果部分 → <pre> 包裹，不渲染 markdown
-    var raw = match[1].replace(/\n---$/, '');
+    const raw = match[1].replace(/\n---$/, '');
     parts.push('<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#374151;">' + escapeHTML(raw) + '</pre>');
     lastIdx = match.index + match[0].length;
   }

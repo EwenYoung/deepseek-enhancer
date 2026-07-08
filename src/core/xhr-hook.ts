@@ -7,8 +7,14 @@
 import type { AppState } from './types';
 import { buildContext, buildContextPrefix, parseSkillCommand } from './context-builder';
 import { TOOL_DESCRIPTORS } from './tool-descriptors';
-import { parseSSEChunk, extractToolCalls, type ParsedMessage } from './sse-parser';
+import { extractToolCalls } from './sse-parser';
 import { onSSEToolCallDetected } from './ui-tool-blocks';
+
+// Augment XMLHttpRequest with custom properties for hook state tracking
+interface AugmentedXHR extends XMLHttpRequest {
+  _ds_url?: string;
+  _ds_method?: string;
+}
 
 // ============================================================
 // XHR Hook
@@ -22,16 +28,16 @@ export function hookFetch(state: AppState) {
     url: string | URL,
     ...rest: unknown[]
   ) {
-    (this as any)._ds_url = String(url);
-    (this as any)._ds_method = method;
-    return (origOpen as Function).apply(this, [method, url, ...rest] as any);
+    (this as AugmentedXHR)._ds_url = String(url);
+    (this as AugmentedXHR)._ds_method = method;
+    return origOpen.apply(this, [method, url, ...rest]);
   };
 
   XMLHttpRequest.prototype.send = function (
     body?: Document | XMLHttpRequestBodyInit | null,
   ) {
-    const url = (this as any)._ds_url || '';
-    const method = (this as any)._ds_method || '';
+    const url = (this as AugmentedXHR)._ds_url || '';
+    const method = (this as AugmentedXHR)._ds_method || '';
 
     if (isChatCompletion(url, method)) {
       // 1. 注入上下文到 prompt
@@ -89,7 +95,7 @@ function augmentPrompt(
 let sseTextBuffer = '';
 let lastProcessedLength = 0;
 
-function createSSEProgressHandler(state: AppState) {
+function createSSEProgressHandler(_state: AppState) {
   return function (_event: ProgressEvent) {
     const xhr = _event.target as XMLHttpRequest;
     if (!xhr || !xhr.responseText) return;
@@ -149,7 +155,7 @@ function extractTextFromDeepSeekData(data: unknown): string {
   if (Array.isArray(obj.choices)) {
     let text = '';
     for (const choice of obj.choices) {
-      const delta = (choice as any)?.delta;
+      const delta = (choice as { delta?: { content?: string } })?.delta;
       if (delta?.content && typeof delta.content === 'string') {
         text += delta.content;
       }
@@ -174,9 +180,9 @@ function extractTextFromDeepSeekData(data: unknown): string {
 
   let text = '';
   for (const frag of fragments) {
-    const op = (frag as any)?.o || (frag as any)?.op;
-    const path = (frag as any)?.path || '';
-    const value = (frag as any)?.v;
+    const op = (frag as Record<string, unknown>)?.o || (frag as Record<string, unknown>)?.op;
+    const path = (frag as Record<string, unknown>)?.path || '';
+    const value = (frag as Record<string, unknown>)?.v;
 
     if ((op === 'APPEND' || op === 'append') && typeof value === 'string') {
       if (path.includes('content') || path.includes('text') || path.includes('delta')) {
@@ -219,12 +225,12 @@ function isStreamFinished(data: unknown): boolean {
 
   // 检查 response/status === "FINISHED"
   const v = obj.v as Record<string, unknown> | undefined;
-  if (v?.response && (v.response as any)?.status === 'FINISHED') return true;
+  if (v?.response && (v.response as Record<string, unknown>)?.status === 'FINISHED') return true;
 
   // 检查顶层 finish_reason
   if (Array.isArray(obj.choices)) {
     for (const c of obj.choices) {
-      if ((c as any)?.finish_reason === 'stop') return true;
+      if ((c as { finish_reason?: string })?.finish_reason === 'stop') return true;
     }
   }
 

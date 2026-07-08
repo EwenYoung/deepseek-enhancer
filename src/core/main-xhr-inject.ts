@@ -1,6 +1,7 @@
 // ============================================================
 // deepseek-enhancer — 主世界 XHR 拦截脚本
 // ============================================================
+/* eslint-disable no-var, @typescript-eslint/no-unused-vars */
 (function () {
   'use strict';
 
@@ -10,10 +11,10 @@
   console.log('[DS-Mini:MAIN] XHR hook installed');
 
   // 立即拦截 fetch 以捕获 auth 请求头（放最前面确保不遗漏）
-  var __origFetch = window.fetch;
+  const __origFetch = window.fetch;
   window.fetch = function(url, opts) {
     if (typeof url === 'string' && url.indexOf('/api/v0/') !== -1 && opts && opts.headers) {
-      var h = opts.headers;
+      const h = opts.headers;
       if (h instanceof Headers) {
         if (h.has('authorization')) window.__DS_DELETE_AUTH__ = h.get('authorization');
         if (h.has('Authorization')) window.__DS_DELETE_AUTH__ = h.get('Authorization');
@@ -28,20 +29,20 @@
   // ==========================================================
   // 模式检测 — 使用 _31a22b0 定位实际激活的模式
   // ==========================================================
-  var currentMode = 'expert';  // 默认专家
+  let currentMode = 'expert';  // 默认专家
 
   function detectMode() {
     // 查找所有模式 span: 快速/专家/识图
-    var spans = document.querySelectorAll('span._321831d');
-    for (var i = 0; i < spans.length; i++) {
-      var s = spans[i];
+    const spans = document.querySelectorAll('span._321831d');
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
       // 激活的模式条目: 它所在的 .aa40b5de 的祖父级有 _31a22b0 类
-      var p = s.parentElement;
+      const p = s.parentElement;
       if (!p || !p.classList.contains('aa40b5de')) continue;
-      var gp = p.parentElement;
+      const gp = p.parentElement;
       if (!gp || !gp.classList.contains('_31a22b0')) continue;
 
-      var t = s.textContent || '';
+      const t = s.textContent || '';
       if (t.indexOf('快速') !== -1) return 'fast';
       if (t.indexOf('专家') !== -1) return 'expert';
       if (t.indexOf('识图') !== -1) return 'image';
@@ -53,13 +54,13 @@
   currentMode = detectMode();
 
   // 监听模式切换（带去重保护，防止 SPA 反复触发）
-  var modeObserverTimer = null;
-  var modeObserver = new MutationObserver(function () {
+  let modeObserverTimer = null;
+  const modeObserver = new MutationObserver(function () {
     if (modeObserverTimer) return;
     modeObserverTimer = setTimeout(function () {
       modeObserverTimer = null;
-      var prev = currentMode;
-      var next = detectMode();
+      const prev = currentMode;
+      const next = detectMode();
       if (prev !== next) {
         currentMode = next;
         console.log('[DS-Mini:MAIN] Mode:', prev, '→', next);
@@ -73,50 +74,50 @@
   // ==========================================================
   // 工具定义
   // ==========================================================
-  var TOOL_DEFS = [
+  const TOOL_DEFS = [
     { name: 'web_search',    label: '联网搜索',   params: { query: { desc: '搜索关键词' } } },
     { name: 'web_fetch',     label: '网页抓取',   params: { url: { desc: '目标网页的完整 URL' } } },
     { name: 'news_hub',      label: '新闻聚合',   params: { sources: { desc: '搜索源（可选）' } } },
     { name: 'github_trending', label: 'GitHub热门', params: { language: { desc: '语言' }, since: { desc: '周期' } } },
     { name: 'doc_generate',  label: '生成文档',   params: { title: { desc: '文件名' }, format: { desc: '格式: md/html' }, content: { desc: '文档内容（Markdown）' } } },
   ];
-  var disabledTools = {}; // 用户禁用的工具列表
+  let disabledTools = {}; // 用户禁用的工具列表
 
   // 监听来自 isolated world 的工具状态
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     if (e.data && e.data.source === 'DS_MINI_ISOLATED' && e.data.type === 'SET_TOOLS_STATE') {
       disabledTools = {};
-      for (var k in e.data.tools) {
+      for (const k in e.data.tools) {
         if (!e.data.tools[k]) disabledTools[k] = true;
       }
       TOOL_DEFS_CACHE = {}; // 清空缓存
       // 清空旧注入记录，避免导出时混入旧工具定义
-      var el = document.getElementById('ds-mini-injected');
+      const el = document.getElementById('ds-mini-injected');
       if (el) el.textContent = '';
     }
   });
 
   function buildToolDefs(mode) {
     try {
-      var ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
-      for (var k in ls) { if (!ls[k]) disabledTools[k] = true; }
+      const ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
+      for (const k in ls) { if (!ls[k]) disabledTools[k] = true; }
     } catch(e) {}
-    var avail = [];
+    let avail = [];
     for (var i = 0; i < TOOL_DEFS.length; i++) {
       if (!disabledTools[TOOL_DEFS[i].name]) avail.push(TOOL_DEFS[i]);
     }
     if (mode === 'fast') avail = avail.filter(function (t) { return t.name === 'web_fetch' || t.name === 'doc_generate'; });
     if (avail.length === 0) return '';
 
-    var lines = [];
+    const lines = [];
 
     lines.push('【工具调用说明】');
     lines.push('如果需要实时信息（如新闻、天气、网页内容），请按以下格式调用工具：');
     lines.push('');
 
     for (var i = 0; i < avail.length; i++) {
-      var t = avail[i];
+      const t = avail[i];
       if (t.name === 'web_search') {
         lines.push('搜索网络：<web_search>{"query": "你的搜索关键词"}</web_search>');
         lines.push('例如：<web_search>{"query": "2026年6月24日热点新闻"}</web_search>');
@@ -155,43 +156,43 @@
   // ==========================================================
   // XHR Hook (prototype 级别)
   // ==========================================================
-  var origOpen = XMLHttpRequest.prototype.open;
-  var origSend = XMLHttpRequest.prototype.send;
-  var activeSkill = null;
-  var skillInstructions = '';
-  var agentModeEnabled = false;
-  var lastCtx = { chat_session_id: '', model_type: '' };  // 用于静默循环
+  const origOpen = XMLHttpRequest.prototype.open;
+  const origSend = XMLHttpRequest.prototype.send;
+  let activeSkill = null;
+  let skillInstructions = '';
+  let agentModeEnabled = false;
+  const lastCtx = { chat_session_id: '', model_type: '' };  // 用于静默循环
 
-  XMLHttpRequest.prototype.open = function (method, url) {
+  XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...args: unknown[]) {
     this.__ds_url = String(url);
     this.__ds_method = method;
-    return origOpen.apply(this, arguments);
+    return origOpen.call(this, method, url, ...args);
   };
 
-  var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+  const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = function(header: string, value: string, ...rest: unknown[]) {
     if (header.toLowerCase() === 'authorization' && value) {
       window.__DS_DELETE_AUTH__ = value;
     }
-    return origSetHeader.apply(this, arguments);
+    return origSetHeader.call(this, header, value, ...rest);
   };
 
 
   XMLHttpRequest.prototype.send = function (body) {
-    var url = this.__ds_url || '';
-    var method = this.__ds_method || '';
+    const url = this.__ds_url || '';
+    const method = this.__ds_method || '';
 
     if (method.toUpperCase() === 'POST' && url.indexOf('/api/v0/chat/completion') !== -1) {
       // 保存会话上下文
       try {
-        var parsedCtx = JSON.parse(body);
+        const parsedCtx = JSON.parse(body);
         if (parsedCtx.chat_session_id) {
           lastCtx.chat_session_id = parsedCtx.chat_session_id;
           lastCtx.model_type = parsedCtx.model_type || 'default';
 
           // 检查是否有待归类的新会话
           try {
-            var pendingCat = localStorage.getItem('ds_mini_pending_category');
+            const pendingCat = localStorage.getItem('ds_mini_pending_category');
             if (pendingCat && parsedCtx.chat_session_id) {
               localStorage.removeItem('ds_mini_pending_category');
               window.postMessage({
@@ -217,11 +218,11 @@
   // ==========================================================
   function augmentPrompt(body) {
     if (typeof body !== 'string') return body;
-    var parsed;
+    let parsed;
     try { parsed = JSON.parse(body); } catch (e) { return body; }
     if (!parsed.prompt || typeof parsed.prompt !== 'string') return body;
 
-    var userContent = parsed.prompt;
+    const userContent = parsed.prompt;
 
     // 工具结果回注 → 不注入，直接放行
     if (userContent.indexOf('[工具执行结果]') === 0) {
@@ -233,17 +234,17 @@
       return JSON.stringify(parsed);
     }
 
-    var toolDefs = getToolDefs(currentMode);
-    var prefix = '';
+    const toolDefs = getToolDefs(currentMode);
+    let prefix = '';
 
     // 检测 /skill 命令
-    var skillCmd = parseSkillCommand(userContent);
+    const skillCmd = parseSkillCommand(userContent);
     if (skillCmd && skillInstructions) {
-      var parts = [];
+      const parts = [];
       if (toolDefs) parts.push(toolDefs);
       if (skillInstructions) parts.push(skillInstructions);
       prefix = parts.join('\n') + '\n---\n';
-      var userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
+      const userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
       parsed.prompt = prefix + (userArgs || userContent);
     } else if (toolDefs) {
       prefix = toolDefs + '\n---\n';
@@ -258,7 +259,7 @@
   }
 
   function storeInjectionRecord(prefix, userText) {
-    var el = document.getElementById('ds-mini-injected');
+    let el = document.getElementById('ds-mini-injected');
     if (!el) {
       el = document.createElement('div');
       el.id = 'ds-mini-injected';
@@ -266,26 +267,26 @@
       document.body.appendChild(el);
     }
     // 每条记录格式:  prefix||SEP||original_user_input||MSG_SEP||
-    var record = prefix + '||SEP||' + userText + '||MSG_SEP||';
+    const record = prefix + '||SEP||' + userText + '||MSG_SEP||';
     el.textContent = (el.textContent || '') + record;
   }
 
   // 保存助手原始响应文本（带 Markdown），供导出使用
   function saveAssistantResponse(text) {
     if (!text || !text.trim()) return;
-    var el = document.getElementById('ds-mini-asst-raw');
+    let el = document.getElementById('ds-mini-asst-raw');
     if (!el) {
       el = document.createElement('div');
       el.id = 'ds-mini-asst-raw';
       el.style.display = 'none';
       document.body.appendChild(el);
     }
-    var existing = el.textContent || '';
+    const existing = el.textContent || '';
     el.textContent = existing ? existing + '||ASST_SEP||' + text : text;
   }
 
   function parseSkillCommand(text) {
-    var match = text.match(/^\/([\w-]+)\s*(.*)/s);
+    const match = text.match(/^\/([\w-]+)\s*(.*)/s);
     if (!match) return null;
     return { skillName: match[1], args: match[2].trim() };
   }
@@ -307,33 +308,33 @@
 
   function createProgressHandler() {
     return function (event) {
-      var xhr = event.target;
+      const xhr = event.target;
       if (!xhr || !xhr.responseText) return;
 
       // Token 速度: 记录首次响应时间
       if (!xhr.__ds_start) { xhr.__ds_start = performance.now(); xhr.__ds_chars = 0; xhr.__ds_lastLen = 0; }
 
       var fullText = xhr.responseText;
-      var pos = getBuf(xhr, 'pos');
+      const pos = getBuf(xhr, 'pos');
       if (fullText.length <= pos) return;
 
-      var newPart = fullText.slice(pos);
+      const newPart = fullText.slice(pos);
       setBuf(xhr, 'pos', fullText.length);
 
-      var lines = newPart.split('\n');
-      var finished = false;
+      const lines = newPart.split('\n');
+      let finished = false;
 
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
         if (!line.startsWith('data:')) continue;
 
-        var dataStr = line.slice(5).trim();
+        const dataStr = line.slice(5).trim();
         if (!dataStr || dataStr === '[DONE]') continue;
 
         var data;
         try { data = JSON.parse(dataStr); } catch (e) { continue; }
 
-        var text = extractTextFromData(data);
+        const text = extractTextFromData(data);
         if (text) setBuf(xhr, 'text', getBuf(xhr, 'text') + text);
 
         // 方法2: 直接扫描原始 data 行
@@ -351,7 +352,7 @@
         xhr.__ds_lastLen = getBuf(xhr, 'text').length;
         var elapsed = (performance.now() - xhr.__ds_start) / 1000;
         if (elapsed > 0.5) {
-          var tokPerSec = ((xhr.__ds_chars || 0) * 0.35) / elapsed;
+          const tokPerSec = ((xhr.__ds_chars || 0) * 0.35) / elapsed;
           window.postMessage({ type: 'DS_MINI_TOKEN_SPEED', tokPerSec: tokPerSec, finished: false }, '*');
         }
       }
@@ -359,8 +360,8 @@
       if (finished) {
         if (xhr.__ds_start) {
           var elapsed = (performance.now() - xhr.__ds_start) / 1000;
-          var totalChars = xhr.__ds_chars || 0;
-          var finalTokPerSec = totalChars > 0 && elapsed > 0 ? (totalChars * 0.35) / elapsed : 0;
+          const totalChars = xhr.__ds_chars || 0;
+          const finalTokPerSec = totalChars > 0 && elapsed > 0 ? (totalChars * 0.35) / elapsed : 0;
           window.postMessage({ type: 'DS_MINI_TOKEN_SPEED', tokPerSec: finalTokPerSec, finished: true }, '*');
         }
         var fullText = getBuf(xhr, 'text');
@@ -381,25 +382,25 @@
     if (Array.isArray(data.choices)) {
       var text = '';
       for (var i = 0; i < data.choices.length; i++) {
-        var delta = data.choices[i].delta;
+        const delta = data.choices[i].delta;
         if (delta && typeof delta.content === 'string') text += delta.content;
       }
       return text;
     }
 
-    var v = data.v;
+    const v = data.v;
     if (!v || typeof v !== 'object') return '';
-    var response = v.response;
+    const response = v.response;
     if (!response || typeof response !== 'object') return '';
 
-    var fragments = response.fragments;
+    const fragments = response.fragments;
     if (!Array.isArray(fragments)) return '';
 
     var text = '';
     for (var i = 0; i < fragments.length; i++) {
-      var frag = fragments[i];
-      var op = frag.o || frag.op;
-      var val = frag.v;
+      const frag = fragments[i];
+      const op = frag.o || frag.op;
+      const val = frag.v;
       if ((op === 'APPEND' || op === 'append') && typeof val === 'string') {
         text += val;
       }
@@ -411,7 +412,7 @@
     if (!data || typeof data !== 'object') return false;
     if (data.v && data.v.response && data.v.response.status === 'FINISHED') return true;
     if (Array.isArray(data.choices)) {
-      for (var i = 0; i < data.choices.length; i++) {
+      for (let i = 0; i < data.choices.length; i++) {
         if (data.choices[i].finish_reason === 'stop') return true;
       }
     }
@@ -422,11 +423,11 @@
   // 工具调用检测（双路径）— 使用 XHR 绑定的 buffer
   // ==========================================================
   function checkToolCallsBoth(xhr) {
-    var textBuf = getBuf(xhr, 'text');
-    var rawBuf  = getBuf(xhr, 'raw');
+    let textBuf = getBuf(xhr, 'text');
+    let rawBuf  = getBuf(xhr, 'raw');
 
     // 路径A: 从文本 buffer 中检测
-    var calls = extractFromText(textBuf);
+    let calls = extractFromText(textBuf);
     if (calls.length === 0) {
       // 路径B: 从原始 data 行中直扫
       calls = extractFromText(rawBuf);
@@ -434,7 +435,7 @@
     if (calls.length === 0) return;
 
     console.log('[DS-Mini:MAIN] Tool calls detected:', calls.map(function (c) { return c.name; }));
-    for (var i = 0; i < calls.length; i++) {
+    for (let i = 0; i < calls.length; i++) {
       setBuf(xhr, 'text', textBuf.replace(calls[i].raw, ''));
       setBuf(xhr, 'raw', rawBuf.replace(calls[i].raw, ''));
       textBuf = getBuf(xhr, 'text');
@@ -445,15 +446,15 @@
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
   function extractFromText(text) {
-    var regex = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
-    var calls = [];
-    var match;
+    const regex = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+    const calls = [];
+    let match;
     while ((match = regex.exec(text)) !== null) {
-      var name = match[1];
-      var body = match[2].trim();
-      var payload = {};
+      const name = match[1];
+      const body = match[2].trim();
+      let payload = {};
       try {
-        var parsed = JSON.parse(body);
+        const parsed = JSON.parse(body);
         if (parsed && typeof parsed === 'object') payload = parsed;
       } catch (e) {}
       calls.push({
@@ -501,8 +502,8 @@
   // ==========================================================
   // 静默循环 — 直接 XHR 发送工具结果，不经过 DOM
   // ==========================================================
-  var silentDepth = 0;
-  var MAX_SILENT = 10;
+  let silentDepth = 0;
+  const MAX_SILENT = 10;
 
   function handleSilentLoop(resultText) {
     if (!lastCtx.chat_session_id) {
@@ -521,41 +522,41 @@
 
     // 延迟 1.5s 防 429
     setTimeout(function () {
-      var xhr = new XMLHttpRequest();
+      const xhr = new XMLHttpRequest();
       origOpen.call(xhr, 'POST', '/api/v0/chat/completion');
       xhr.setRequestHeader('Content-Type', 'application/json');
 
       // 解析 SSE 响应
-      var buf = { text: '', raw: '', pos: 0 };
+      let buf = { text: '', raw: '', pos: 0 };
 
       xhr.addEventListener('progress', function () {
         if (!xhr.responseText) return;
-        var fullText = xhr.responseText;
+        const fullText = xhr.responseText;
         if (fullText.length <= buf.pos) return;
-        var part = fullText.slice(buf.pos);
+        const part = fullText.slice(buf.pos);
         buf.pos = fullText.length;
 
-        var lines = part.split('\n');
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
+        const lines = part.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
           if (!line.startsWith('data:')) continue;
-          var ds = line.slice(5).trim();
+          const ds = line.slice(5).trim();
           if (!ds || ds === '[DONE]') continue;
 
           buf.raw += ds;
           var data;
           try { data = JSON.parse(ds); } catch (e) { continue; }
 
-          var text = extractTextFromData(data);
+          const text = extractTextFromData(data);
           if (text) buf.text += text;
 
           if (isStreamFinished(data)) {
             // 检测新工具调用
-            var reg = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
-            var calls = [];
+            const reg = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+            const calls = [];
             var m;
             while ((m = reg.exec(buf.raw)) !== null) {
-              var p = {};
+              let p = {};
               try { p = JSON.parse(m[2]); } catch {}
               calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
             }
@@ -602,22 +603,22 @@
   // ==========================================================
   window.addEventListener('message', function(event) {
     if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_DELETE_SESSION') {
-      var sid = event.data.sessionId;
+      const sid = event.data.sessionId;
 
       // 从 localStorage 读取 token（DeepSeek 的存储方式）
-      var token = '';
+      let token = '';
       try {
         // 常见的 token 存储 key
-        var keys = ['token', 'accessToken', 'access_token', 'dsToken', 'ds_access_token', 'Authorization', 'userToken'];
+        const keys = ['token', 'accessToken', 'access_token', 'dsToken', 'ds_access_token', 'Authorization', 'userToken'];
         for (var i = 0; i < keys.length; i++) {
-          var val = localStorage.getItem(keys[i]);
+          const val = localStorage.getItem(keys[i]);
           if (val) { token = val; break; }
         }
         // 如果 localStorage 没找到，尝试从 cookie 读取
         if (!token) {
-          var cookies = document.cookie.split(';');
+          const cookies = document.cookie.split(';');
           for (var i = 0; i < cookies.length; i++) {
-            var c = cookies[i].trim();
+            const c = cookies[i].trim();
             if (c.indexOf('token=') === 0 || c.indexOf('access=') === 0 || c.indexOf('auth=') === 0) {
               token = c.substring(c.indexOf('=') + 1);
               break;
@@ -626,9 +627,9 @@
         }
       } catch (e) {}
 
-      var headers = { 'Content-Type': 'application/json' };
+      const headers = { 'Content-Type': 'application/json' };
       // 优先使用捕获到的页面 auth header
-      var capturedAuth = window.__DS_DELETE_AUTH__;
+      const capturedAuth = window.__DS_DELETE_AUTH__;
       if (capturedAuth) {
         headers['Authorization'] = capturedAuth;
       }
@@ -636,10 +637,10 @@
       // 如果还没捕获到，直接去 localStorage 读各种可能 key
       if (!capturedAuth) {
         try {
-          for (var lsi = 0; lsi < localStorage.length; lsi++) {
-            var lsk = localStorage.key(lsi);
+          for (let lsi = 0; lsi < localStorage.length; lsi++) {
+            const lsk = localStorage.key(lsi);
             if (lsk && (lsk.indexOf('token') !== -1 || lsk.indexOf('auth') !== -1 || lsk.indexOf('Token') !== -1 || lsk.indexOf('Auth') !== -1)) {
-              var lsv = localStorage.getItem(lsk);
+              const lsv = localStorage.getItem(lsk);
               console.log('[DS-Mini:MAIN] localStorage token candidate:', lsk, '=', lsv ? lsv.substring(0, 30) + '...' : 'empty');
             }
           }
@@ -647,10 +648,10 @@
 
         // 检查 sessionStorage
         try {
-          for (var ssi = 0; ssi < sessionStorage.length; ssi++) {
-            var ssk = sessionStorage.key(ssi);
+          for (let ssi = 0; ssi < sessionStorage.length; ssi++) {
+            const ssk = sessionStorage.key(ssi);
             if (ssk && (ssk.indexOf('token') !== -1 || ssk.indexOf('auth') !== -1)) {
-              var ssv = sessionStorage.getItem(ssk);
+              const ssv = sessionStorage.getItem(ssk);
               console.log('[DS-Mini:MAIN] sessionStorage token candidate:', ssk, '=', ssv ? ssv.substring(0, 30) + '...' : 'empty');
             }
           }
@@ -699,11 +700,11 @@
   // ==========================================================
   window.addEventListener('message', function(event) {
     if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_RENAME_SESSION') {
-      var sid = event.data.sessionId;
-      var newTitle = event.data.title;
+      const sid = event.data.sessionId;
+      const newTitle = event.data.title;
 
-      var headers = { 'Content-Type': 'application/json' };
-      var capturedAuth = window.__DS_DELETE_AUTH__;
+      const headers = { 'Content-Type': 'application/json' };
+      const capturedAuth = window.__DS_DELETE_AUTH__;
       if (capturedAuth) {
         headers['Authorization'] = capturedAuth;
       }

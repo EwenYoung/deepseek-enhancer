@@ -122,13 +122,6 @@ function extractFilename(code: string): string | null {
 }
 
 function findChatContainer(): HTMLElement | null {
-  // 尝试常见的聊天容器选择器
-  const selectors = [
-    '[class*="chat"]',
-    '[class*="message"]',
-    '[class*="conversation"]',
-    '#root',
-  ];
   // 返回 #root 作为根级容器（最通用）
   return document.getElementById('root') || document.body;
 }

@@ -86,7 +86,7 @@ export async function getSkillByName(name: string): Promise<Skill | undefined> {
 export async function toggleSkill(id: string, enabled: boolean): Promise<void> {
   // 内置技能的状态也保存在用户存储中
   const userSkills = await loadUserSkills();
-  let skill = userSkills.find(s => s.id === id);
+  const skill = userSkills.find(s => s.id === id);
 
   if (skill) {
     skill.enabled = enabled;

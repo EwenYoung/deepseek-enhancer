@@ -108,7 +108,6 @@ async function testTavily(): Promise<{ ok: boolean; message: string }> {
       return { ok: true, message: '连接正常 ✅' };
     }
 
-    const errText = await res.text();
     if (res.status === 401 || res.status === 403) {
       return { ok: false, message: `API Key 无效 (HTTP ${res.status})` };
     }
@@ -327,7 +326,6 @@ async function searchViaTavily(apiKey: string, query: string): Promise<string> {
   if (results) {
     for (const r of results) {
       const title = r.title as string || '(无标题)';
-      const url = r.url as string || '';
       const content = r.content as string || '';
       lines.push(`- **${title}**`);
       if (content) lines.push(`  ${content.slice(0, 200)}`);
@@ -380,10 +378,7 @@ async function fetchArXiv(): Promise<string> {
   const xml = await res.text();
 
   const entries: string[] = [];
-  // 提取 <entry> 标签中的标题和摘要
-  const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
-  let match;
-  // 使用字符串切分
+  // 使用字符串切分提取 <entry> 中的标题和摘要
   const parts = xml.split('<entry>');
   for (let i = 1; i < parts.length; i++) {
     const entry = parts[i].split('</entry>')[0];
@@ -423,7 +418,7 @@ async function fetchHackerNews(): Promise<string> {
 
   return items
     .filter(i => i.title)
-    .map((i, idx) => `- ${i.title} [🔥${i.score} 💬${i.descendants}]`)
+    .map((i, _idx) => `- ${i.title} [🔥${i.score} 💬${i.descendants}]`)
     .join('\n');
 }
 
@@ -436,7 +431,7 @@ async function fetchRedditML(): Promise<string> {
 
   if (!children || children.length === 0) return '(无 Reddit 数据)';
 
-  return children.map((child, i) => {
+  return children.map((child, _i) => {
     const post = child?.data as Record<string, unknown>;
     const title = post?.title || '';
     const score = post?.score || 0;

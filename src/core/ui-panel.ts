@@ -6,6 +6,7 @@ import type { AppState, Skill } from './types';
 import { loadSkills, saveSkill, deleteSkill } from './skill-registry';
 import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
+import type { EnhancerConfig } from './enhancer-features';
 import {
   toggleWideScreen, applyTheme, toggleScrollbar,
   toggleAutoHideInput, toggleVoiceInput,
@@ -232,8 +233,6 @@ function buildPanelHTML(): string {
   const boltSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
   const paletteSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.5-4.5-10-10-10Z"/></svg>';
   const keySVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3Z"/></svg>';
-  const gridSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>';
-
   function enhToggle(id: string, label: string) {
     return '<div class="ds-switch-row"><span>' + label + '</span><span class="ds-enh-toggle" data-id="' + id + '" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>';
   }
@@ -712,7 +711,7 @@ function postAgentMode(enabled: boolean) {
 // ============================================================
 // 增强器功能
 // ============================================================
-let enhState: any = { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false };
+let enhState: EnhancerConfig = { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 };
 
 async function loadEnhancerPanel() {
   enhState = await getConfig();

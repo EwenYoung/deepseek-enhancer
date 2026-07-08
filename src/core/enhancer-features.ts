@@ -5,7 +5,7 @@
 
 const ENHANCER_KEY = 'ds_mini_enhancer';
 
-interface EnhancerConfig {
+export interface EnhancerConfig {
   wideScreen: boolean;
   themeIdx: number;       // 0=默认, 1-4 对应各主题
   hideScrollbar: boolean;
@@ -34,19 +34,6 @@ async function saveConfig(cfg: EnhancerConfig) {
 // ============================================================
 // 样式管理
 // ============================================================
-let styleEl: HTMLStyleElement | null = null;
-
-function getStyleEl(): HTMLStyleElement {
-  if (styleEl && document.head.contains(styleEl)) return styleEl;
-  styleEl = document.getElementById('ds-enhancer-styles') as HTMLStyleElement;
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'ds-enhancer-styles';
-    document.head.appendChild(styleEl);
-  }
-  return styleEl;
-}
-
 function applyCSS(id: string, css: string) {
   // 查找或创建 <style data-rule="id"> 标签（挂在 head 下）
   let rule = document.querySelector(`[data-rule="${id}"]`) as HTMLStyleElement | null;
@@ -436,7 +423,7 @@ export async function applyTheme(idx: number) {
   for (let i = 0; i < allEls.length; i++) {
     const el = allEls[i] as HTMLElement;
     const cs = getComputedStyle(el);
-    const bf = cs.backdropFilter || (cs as any).webkitBackdropFilter || '';
+    const bf = cs.backdropFilter || (cs as CSSStyleDeclaration).webkitBackdropFilter || '';
     if (bf && bf !== 'none' && !el.closest('#ds-mini-panel')) {
       el.style.setProperty('opacity', '0', 'important');
       el.setAttribute('data-ds-no-bg', '');
@@ -809,7 +796,7 @@ function toggleRecording(btn: HTMLElement) {
 }
 
 function startRecording(btn: HTMLElement) {
-  const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const SpeechRecognition = window.SpeechRecognition || (window as Record<string, unknown>).webkitSpeechRecognition;
   if (!SpeechRecognition) { alert('浏览器不支持语音识别'); return; }
 
   if (!recognition) {
@@ -830,11 +817,9 @@ function startRecording(btn: HTMLElement) {
 
   recognition.onresult = (event: SpeechRecognitionEvent) => {
     let finalText = '';
-    let interimText = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const t = event.results[i][0].transcript;
       if (event.results[i].isFinal) finalText += t;
-      else interimText += t;
     }
     if (finalText) {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;

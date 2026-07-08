@@ -29,7 +29,7 @@ export function buildContext(
   skill: Skill | null,
 ): InjectionContext {
   // ponytail: 从全局变量读取工具状态（ui-panel.ts 直接设置，避免 postMessage 延迟）
-  // @ts-ignore
+  // @ts-expect-error - window custom property set by ui-panel.ts
   if (window.__DS_TOOLS_STATE__) disabledToolsState = window.__DS_TOOLS_STATE__;
   const baseTools = tools.length > 0 ? tools : TOOL_DESCRIPTORS;
   // 过滤被禁用的工具

@@ -28,12 +28,9 @@ export interface ParsedMessage {
 export function parseSSEChunk(chunk: string): ParsedMessage | null {
   const lines = chunk.split('\n');
   const dataLines: string[] = [];
-  let eventType = 'message';
 
   for (const line of lines) {
-    if (line.startsWith('event:')) {
-      eventType = line.slice(6).trim();
-    } else if (line.startsWith('data:')) {
+    if (line.startsWith('data:')) {
       dataLines.push(line.slice(5).trim());
     }
   }

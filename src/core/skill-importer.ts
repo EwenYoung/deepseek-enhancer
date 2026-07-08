@@ -67,7 +67,7 @@ export function importFromLocal(): Promise<Skill> {
 function openFolderPicker(resolve: (s: Skill) => void, reject: (e: Error) => void) {
   const input = document.createElement('input');
   input.type = 'file';
-  // @ts-ignore
+  // @ts-expect-error - webkitdirectory is a non-standard property
   input.webkitdirectory = true;
 
   input.addEventListener('change', async () => {

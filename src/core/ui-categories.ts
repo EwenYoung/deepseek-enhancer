@@ -16,7 +16,6 @@ import {
   getSortLabel,
   reorderCategory,
   type CategoryState,
-  type SortMode,
 } from "./conversation-store";
 
 let catState: CategoryState = {
@@ -258,7 +257,7 @@ export async function initCategories() {
   try {
     const saved = localStorage.getItem(PENDING_SESSIONS_KEY);
     if (saved) pendingNewSessions = JSON.parse(saved);
-  } catch (e) {}
+  } catch (_e) {}
   // 提前注册监听，避免 await 期间丢失 MAIN world 消息
   setupNewSessionListener();
 
@@ -604,7 +603,7 @@ function buildCategoryListHTML(): string {
       if (!item) return "";
       const open = sessionStorage.getItem("ds_cat_open_" + n) !== "false";
       // 按排序模式渲染会话列表
-      let sessionIds = [...item.sessions];
+      const sessionIds = [...item.sessions];
       if (item.sortBy === "time-asc") sessionIds.reverse();
       return (
         '<div class="ds-cat-item" draggable="true" data-cat-name="' +
@@ -872,9 +871,6 @@ function bindCategoryEvents() {
     saveCategories(catState).then(() => refreshPanel());
   });
 
-  const toggleBtn = panelEl.querySelector("#ds-cat-toggle-all") as HTMLElement;
-  const body2 = panelEl.querySelector("#ds-cat-body") as HTMLElement;
-
   function togglePanel() {
     const b = panelEl?.querySelector("#ds-cat-body");
     const tb = panelEl?.querySelector("#ds-cat-toggle-all");
@@ -883,105 +879,6 @@ function bindCategoryEvents() {
     tb.innerHTML = ex ? chevronDownSVG() : chevronRightSVG();
     tb.title = ex ? "收起" : "展开";
     sessionStorage.setItem(CAT_KEY, String(ex));
-  }
-}
-
-// ============================================================
-// 归类弹出
-// ============================================================
-function showCategorizePopup(anchor: HTMLElement, sessionId: string) {
-  document.querySelector(".ds-cat-menu-popup")?.remove();
-  const r = anchor.getBoundingClientRect();
-  const popup = document.createElement("div");
-  popup.className = "ds-cat-menu-popup";
-  const cats = catState.categories;
-  const cur = catState.categories.sessionCategory[sessionId];
-  let html = "";
-  if (cur)
-    html +=
-      '<div style="padding:4px 10px;font-size:11px;color:var(--panel-text-secondary);border-bottom:1px solid var(--card-border);margin-bottom:2px;">当前：' +
-      escHtml(cur) +
-      "</div>";
-  if (cats.order.length > 0)
-    html += cats.order
-      .map(
-        (n) =>
-          '<button data-action="cat" data-cat="' +
-          escAttr(n) +
-          '"' +
-          (n === cur ? ' style="color:var(--accent);font-weight:500;"' : "") +
-          ">" +
-          (n === cur ? "✓ " : "") +
-          escHtml(n) +
-          "</button>",
-      )
-      .join("");
-  else
-    html +=
-      '<div style="padding:4px 10px;font-size:12px;color:var(--panel-text-secondary);">暂无分类</div>';
-  html +=
-    '<div style="border-top:1px solid var(--card-border);margin-top:2px;padding-top:2px;"><button data-action="new" style="color:var(--accent);">+ 新建分类</button></div>';
-  popup.innerHTML = html;
-  popup.style.cssText +=
-    "left:" +
-    Math.min(r.left, window.innerWidth - 160) +
-    "px;top:" +
-    (r.bottom + 2) +
-    "px;";
-  document.body.appendChild(popup);
-
-  function closePopup() {
-    popup.remove();
-    document.removeEventListener("mousedown", close);
-    closeDeepSeekMenu();
-  }
-  popup.querySelectorAll('[data-action="cat"]').forEach((b) => {
-    b.addEventListener("click", async () => {
-      const cn = (b as HTMLElement).dataset.cat || "";
-      console.log("[Categories] Categorize click:", cn, sessionId);
-      categorizeSession(catState, sessionId, cn);
-      await saveCategories(catState);
-      console.log("[Categories] Saved, removing popup");
-      popup.remove();
-      document.removeEventListener("mousedown", close);
-      applyHiddenSessions();
-      refreshPanel();
-      closeDeepSeekMenu();
-    });
-  });
-  popup.querySelector('[data-action="new"]')?.addEventListener("click", () => {
-    popup.remove();
-    const n = prompt("新建分类名称：");
-    if (n && n.trim()) {
-      const t = n.trim();
-      addCategory(catState, t);
-      categorizeSession(catState, sessionId, t);
-      saveCategories(catState).then(() => {
-        closeDeepSeekMenu();
-        applyHiddenSessions();
-        refreshPanel();
-      });
-    }
-  });
-  const close = (e: MouseEvent) => {
-    if (!popup.contains(e.target as Node)) closePopup();
-  };
-  setTimeout(() => document.addEventListener("mousedown", close), 10);
-}
-
-function closeDeepSeekMenu() {
-  const wrapper = document.querySelector(
-    '[class*="ds-floating-position"]',
-  ) as HTMLElement | null;
-  if (wrapper && wrapper.style.display !== "none") {
-    document.dispatchEvent(
-      new MouseEvent("mousedown", {
-        bubbles: true,
-        cancelable: true,
-        clientX: 0,
-        clientY: 0,
-      }),
-    );
   }
 }
 
@@ -1188,7 +1085,7 @@ function callRenameAPI(sid: string, title: string): Promise<boolean> {
 function createSessionInCategory(catName: string) {
   try {
     localStorage.setItem("ds_mini_pending_category", catName);
-  } catch (e) {}
+  } catch (_e) {}
   location.href = "/chat";
 }
 
@@ -1206,7 +1103,7 @@ function setupNewSessionListener() {
           PENDING_SESSIONS_KEY,
           JSON.stringify(pendingNewSessions),
         );
-      } catch (e) {}
+      } catch (_e) {}
       if (panelEl) {
         const sessionEl = panelEl.querySelector(
           `[data-session-id="${sessionId}"]`,
@@ -1252,7 +1149,7 @@ function processPendingSessions() {
   pendingNewSessions = [];
   try {
     localStorage.removeItem(PENDING_SESSIONS_KEY);
-  } catch (e) {}
+  } catch (_e) {}
   saveCategories(catState).then(() => refreshPanel());
   // 标题已确定的立即隐藏，未确定的保持可见等轮询
   applyHiddenSessions();

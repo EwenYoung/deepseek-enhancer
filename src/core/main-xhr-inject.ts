@@ -12,7 +12,7 @@
 
   // 立即拦截 fetch 以捕获 auth 请求头（放最前面确保不遗漏）
   const __origFetch = window.fetch;
-  window.fetch = function(url, opts) {
+  window.fetch = function (url, opts) {
     if (typeof url === 'string' && url.indexOf('/api/v0/') !== -1 && opts && opts.headers) {
       const h = opts.headers;
       if (h instanceof Headers) {
@@ -29,7 +29,7 @@
   // ==========================================================
   // 模式检测 — 使用 _31a22b0 定位实际激活的模式
   // ==========================================================
-  let currentMode = 'expert';  // 默认专家
+  let currentMode = 'expert'; // 默认专家
 
   function detectMode() {
     // 查找所有模式 span: 快速/专家/识图
@@ -75,11 +75,23 @@
   // 工具定义
   // ==========================================================
   const TOOL_DEFS = [
-    { name: 'web_search',    label: '联网搜索',   params: { query: { desc: '搜索关键词' } } },
-    { name: 'web_fetch',     label: '网页抓取',   params: { url: { desc: '目标网页的完整 URL' } } },
-    { name: 'news_hub',      label: '新闻聚合',   params: { sources: { desc: '搜索源（可选）' } } },
-    { name: 'github_trending', label: 'GitHub热门', params: { language: { desc: '语言' }, since: { desc: '周期' } } },
-    { name: 'doc_generate',  label: '生成文档',   params: { title: { desc: '文件名' }, format: { desc: '格式: md/html' }, content: { desc: '文档内容（Markdown）' } } },
+    { name: 'web_search', label: '联网搜索', params: { query: { desc: '搜索关键词' } } },
+    { name: 'web_fetch', label: '网页抓取', params: { url: { desc: '目标网页的完整 URL' } } },
+    { name: 'news_hub', label: '新闻聚合', params: { sources: { desc: '搜索源（可选）' } } },
+    {
+      name: 'github_trending',
+      label: 'GitHub热门',
+      params: { language: { desc: '语言' }, since: { desc: '周期' } },
+    },
+    {
+      name: 'doc_generate',
+      label: '生成文档',
+      params: {
+        title: { desc: '文件名' },
+        format: { desc: '格式: md/html' },
+        content: { desc: '文档内容（Markdown）' },
+      },
+    },
   ];
   let disabledTools = {}; // 用户禁用的工具列表
 
@@ -101,13 +113,18 @@
   function buildToolDefs(mode) {
     try {
       const ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
-      for (const k in ls) { if (!ls[k]) disabledTools[k] = true; }
-    } catch(e) {}
+      for (const k in ls) {
+        if (!ls[k]) disabledTools[k] = true;
+      }
+    } catch (e) {}
     let avail = [];
     for (var i = 0; i < TOOL_DEFS.length; i++) {
       if (!disabledTools[TOOL_DEFS[i].name]) avail.push(TOOL_DEFS[i]);
     }
-    if (mode === 'fast') avail = avail.filter(function (t) { return t.name === 'web_fetch' || t.name === 'doc_generate'; });
+    if (mode === 'fast')
+      avail = avail.filter(function (t) {
+        return t.name === 'web_fetch' || t.name === 'doc_generate';
+      });
     if (avail.length === 0) return '';
 
     const lines = [];
@@ -123,7 +140,9 @@
         lines.push('例如：<web_search>{"query": "2026年6月24日热点新闻"}</web_search>');
       } else if (t.name === 'web_fetch') {
         lines.push('抓取网页：<web_fetch>{"url": "目标页面完整URL"}</web_fetch>');
-        lines.push('例如：<web_fetch>{"url": "https://github.com/bytedance/deer-flow"}</web_fetch>');
+        lines.push(
+          '例如：<web_fetch>{"url": "https://github.com/bytedance/deer-flow"}</web_fetch>',
+        );
       } else if (t.name === 'news_hub') {
         lines.push('聚合新闻：<news_hub>{"sources": "baidu,weibo,zhihu,36kr"}</news_hub>');
         lines.push('8大实时源：百度热搜|微博热搜|GitHub|知乎|36氪|arXiv|HN|Reddit');
@@ -133,9 +152,13 @@
         lines.push('获取 GitHub 当日最热开源项目');
         lines.push('例如：<github_trending>{"since": "daily"}</github_trending>');
       } else if (t.name === 'doc_generate') {
-        lines.push('生成文档：<doc_generate>{"title": "文件名","format": "md","content": "..."}</doc_generate>');
+        lines.push(
+          '生成文档：<doc_generate>{"title": "文件名","format": "md","content": "..."}</doc_generate>',
+        );
         lines.push('将内容生成为可下载的文件，支持 Markdown 和 HTML');
-        lines.push('例如：<doc_generate>{"title": "报告","format": "md","content": "# 报告标题\\n内容"}</doc_generate>');
+        lines.push(
+          '例如：<doc_generate>{"title": "报告","format": "md","content": "# 报告标题\\n内容"}</doc_generate>',
+        );
       }
       lines.push('');
     }
@@ -161,22 +184,21 @@
   let activeSkill = null;
   let skillInstructions = '';
   let agentModeEnabled = false;
-  const lastCtx = { chat_session_id: '', model_type: '' };  // 用于静默循环
+  const lastCtx = { chat_session_id: '', model_type: '' }; // 用于静默循环
 
-  XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...args: unknown[]) {
+  XMLHttpRequest.prototype.open = function (method, url, ...args) {
     this.__ds_url = String(url);
     this.__ds_method = method;
     return origOpen.call(this, method, url, ...args);
   };
 
   const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.setRequestHeader = function(header: string, value: string, ...rest: unknown[]) {
+  XMLHttpRequest.prototype.setRequestHeader = function (header, value, ...rest) {
     if (header.toLowerCase() === 'authorization' && value) {
       window.__DS_DELETE_AUTH__ = value;
     }
     return origSetHeader.call(this, header, value, ...rest);
   };
-
 
   XMLHttpRequest.prototype.send = function (body) {
     const url = this.__ds_url || '';
@@ -195,14 +217,17 @@
             const pendingCat = localStorage.getItem('ds_mini_pending_category');
             if (pendingCat && parsedCtx.chat_session_id) {
               localStorage.removeItem('ds_mini_pending_category');
-              window.postMessage({
-                source: 'DS_MINI_MAIN',
-                type: 'DS_MINI_NEW_SESSION',
-                sessionId: parsedCtx.chat_session_id,
-                categoryName: pendingCat,
-              }, '*');
+              window.postMessage(
+                {
+                  source: 'DS_MINI_MAIN',
+                  type: 'DS_MINI_NEW_SESSION',
+                  sessionId: parsedCtx.chat_session_id,
+                  categoryName: pendingCat,
+                },
+                '*',
+              );
             }
-          } catch(pendingErr) {}
+          } catch (pendingErr) {}
         }
       } catch (e) {}
 
@@ -219,7 +244,11 @@
   function augmentPrompt(body) {
     if (typeof body !== 'string') return body;
     let parsed;
-    try { parsed = JSON.parse(body); } catch (e) { return body; }
+    try {
+      parsed = JSON.parse(body);
+    } catch (e) {
+      return body;
+    }
     if (!parsed.prompt || typeof parsed.prompt !== 'string') return body;
 
     const userContent = parsed.prompt;
@@ -252,7 +281,12 @@
     }
 
     if (parsed.prompt !== userContent) {
-      console.log('[DS-Mini:MAIN] Mode:', currentMode, '| Injected context, prompt length:', parsed.prompt.length);
+      console.log(
+        '[DS-Mini:MAIN] Mode:',
+        currentMode,
+        '| Injected context, prompt length:',
+        parsed.prompt.length,
+      );
       storeInjectionRecord(prefix, userContent);
     }
     return JSON.stringify(parsed);
@@ -298,8 +332,8 @@
   function getBuf(xhr, name) {
     if (!xhr.__ds_buf) xhr.__ds_buf = { text: '', raw: '', pos: 0 };
     if (name === 'text') return xhr.__ds_buf.text;
-    if (name === 'raw')  return xhr.__ds_buf.raw;
-    if (name === 'pos')  return xhr.__ds_buf.pos;
+    if (name === 'raw') return xhr.__ds_buf.raw;
+    if (name === 'pos') return xhr.__ds_buf.pos;
   }
   function setBuf(xhr, name, val) {
     if (!xhr.__ds_buf) xhr.__ds_buf = { text: '', raw: '', pos: 0 };
@@ -312,7 +346,11 @@
       if (!xhr || !xhr.responseText) return;
 
       // Token 速度: 记录首次响应时间
-      if (!xhr.__ds_start) { xhr.__ds_start = performance.now(); xhr.__ds_chars = 0; xhr.__ds_lastLen = 0; }
+      if (!xhr.__ds_start) {
+        xhr.__ds_start = performance.now();
+        xhr.__ds_chars = 0;
+        xhr.__ds_lastLen = 0;
+      }
 
       var fullText = xhr.responseText;
       const pos = getBuf(xhr, 'pos');
@@ -332,7 +370,11 @@
         if (!dataStr || dataStr === '[DONE]') continue;
 
         var data;
-        try { data = JSON.parse(dataStr); } catch (e) { continue; }
+        try {
+          data = JSON.parse(dataStr);
+        } catch (e) {
+          continue;
+        }
 
         const text = extractTextFromData(data);
         if (text) setBuf(xhr, 'text', getBuf(xhr, 'text') + text);
@@ -348,12 +390,17 @@
 
       // Token 速度: 每 500ms 更新一次
       if (xhr.__ds_start) {
-        xhr.__ds_chars = (xhr.__ds_chars || 0) + (xhr.__ds_lastLen ? getBuf(xhr, 'text').length - xhr.__ds_lastLen : 0);
+        xhr.__ds_chars =
+          (xhr.__ds_chars || 0) +
+          (xhr.__ds_lastLen ? getBuf(xhr, 'text').length - xhr.__ds_lastLen : 0);
         xhr.__ds_lastLen = getBuf(xhr, 'text').length;
         var elapsed = (performance.now() - xhr.__ds_start) / 1000;
         if (elapsed > 0.5) {
           const tokPerSec = ((xhr.__ds_chars || 0) * 0.35) / elapsed;
-          window.postMessage({ type: 'DS_MINI_TOKEN_SPEED', tokPerSec: tokPerSec, finished: false }, '*');
+          window.postMessage(
+            { type: 'DS_MINI_TOKEN_SPEED', tokPerSec: tokPerSec, finished: false },
+            '*',
+          );
         }
       }
 
@@ -362,7 +409,10 @@
           var elapsed = (performance.now() - xhr.__ds_start) / 1000;
           const totalChars = xhr.__ds_chars || 0;
           const finalTokPerSec = totalChars > 0 && elapsed > 0 ? (totalChars * 0.35) / elapsed : 0;
-          window.postMessage({ type: 'DS_MINI_TOKEN_SPEED', tokPerSec: finalTokPerSec, finished: true }, '*');
+          window.postMessage(
+            { type: 'DS_MINI_TOKEN_SPEED', tokPerSec: finalTokPerSec, finished: true },
+            '*',
+          );
         }
         var fullText = getBuf(xhr, 'text');
         if (fullText) saveAssistantResponse(fullText);
@@ -424,7 +474,7 @@
   // ==========================================================
   function checkToolCallsBoth(xhr) {
     let textBuf = getBuf(xhr, 'text');
-    let rawBuf  = getBuf(xhr, 'raw');
+    let rawBuf = getBuf(xhr, 'raw');
 
     // 路径A: 从文本 buffer 中检测
     let calls = extractFromText(textBuf);
@@ -434,7 +484,12 @@
     }
     if (calls.length === 0) return;
 
-    console.log('[DS-Mini:MAIN] Tool calls detected:', calls.map(function (c) { return c.name; }));
+    console.log(
+      '[DS-Mini:MAIN] Tool calls detected:',
+      calls.map(function (c) {
+        return c.name;
+      }),
+    );
     for (let i = 0; i < calls.length; i++) {
       setBuf(xhr, 'text', textBuf.replace(calls[i].raw, ''));
       setBuf(xhr, 'raw', rawBuf.replace(calls[i].raw, ''));
@@ -446,7 +501,8 @@
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
   function extractFromText(text) {
-    const regex = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+    const regex =
+      /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
     const calls = [];
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -461,7 +517,9 @@
         name: name,
         payload: payload,
         raw: match[0],
-        id: crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)),
+        id: crypto.randomUUID
+          ? crypto.randomUUID()
+          : Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       });
     }
     return calls;
@@ -545,19 +603,26 @@
 
           buf.raw += ds;
           var data;
-          try { data = JSON.parse(ds); } catch (e) { continue; }
+          try {
+            data = JSON.parse(ds);
+          } catch (e) {
+            continue;
+          }
 
           const text = extractTextFromData(data);
           if (text) buf.text += text;
 
           if (isStreamFinished(data)) {
             // 检测新工具调用
-            const reg = /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+            const reg =
+              /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
             const calls = [];
             var m;
             while ((m = reg.exec(buf.raw)) !== null) {
               let p = {};
-              try { p = JSON.parse(m[2]); } catch {}
+              try {
+                p = JSON.parse(m[2]);
+              } catch {}
               calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
             }
             if (calls.length > 0) {
@@ -566,11 +631,14 @@
               console.log('[DS-Mini:MAIN] Silent loop continued:', calls.length, 'calls');
             } else if (buf.text.trim()) {
               // 没有新调用 → 最终响应，通知 content script 渲染
-              window.postMessage({
-                source: 'DS_MINI_MAIN_FINAL',
-                type: 'DS_MINI_FINAL_RESPONSE',
-                text: buf.text,
-              }, '*');
+              window.postMessage(
+                {
+                  source: 'DS_MINI_MAIN_FINAL',
+                  type: 'DS_MINI_FINAL_RESPONSE',
+                  text: buf.text,
+                },
+                '*',
+              );
             }
             buf = { text: '', raw: '', pos: 0 };
           }
@@ -579,19 +647,25 @@
 
       xhr.addEventListener('error', function () {
         // 失败时 fallback 到 DOM 模式
-        window.postMessage({
-          source: 'DS_MINI_ISOLATED',
-          type: 'DS_MINI_DOM_FALLBACK',
-          text: resultText,
-        }, '*');
+        window.postMessage(
+          {
+            source: 'DS_MINI_ISOLATED',
+            type: 'DS_MINI_DOM_FALLBACK',
+            text: resultText,
+          },
+          '*',
+        );
         console.warn('[DS-Mini:MAIN] Silent loop XHR failed, fallback to DOM');
       });
 
-      origSend.call(xhr, JSON.stringify({
-        prompt: resultText,
-        chat_session_id: lastCtx.chat_session_id,
-        model_type: lastCtx.model_type,
-      }));
+      origSend.call(
+        xhr,
+        JSON.stringify({
+          prompt: resultText,
+          chat_session_id: lastCtx.chat_session_id,
+          model_type: lastCtx.model_type,
+        }),
+      );
     }, 1500);
   }
 
@@ -601,25 +675,44 @@
   // ==========================================================
   // 分类插件删除请求
   // ==========================================================
-  window.addEventListener('message', function(event) {
-    if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_DELETE_SESSION') {
+  window.addEventListener('message', function (event) {
+    if (
+      event.data &&
+      event.data.source === 'DS_MINI_ISOLATED' &&
+      event.data.type === 'DS_MINI_DELETE_SESSION'
+    ) {
       const sid = event.data.sessionId;
 
       // 从 localStorage 读取 token（DeepSeek 的存储方式）
       let token = '';
       try {
         // 常见的 token 存储 key
-        const keys = ['token', 'accessToken', 'access_token', 'dsToken', 'ds_access_token', 'Authorization', 'userToken'];
+        const keys = [
+          'token',
+          'accessToken',
+          'access_token',
+          'dsToken',
+          'ds_access_token',
+          'Authorization',
+          'userToken',
+        ];
         for (var i = 0; i < keys.length; i++) {
           const val = localStorage.getItem(keys[i]);
-          if (val) { token = val; break; }
+          if (val) {
+            token = val;
+            break;
+          }
         }
         // 如果 localStorage 没找到，尝试从 cookie 读取
         if (!token) {
           const cookies = document.cookie.split(';');
           for (var i = 0; i < cookies.length; i++) {
             const c = cookies[i].trim();
-            if (c.indexOf('token=') === 0 || c.indexOf('access=') === 0 || c.indexOf('auth=') === 0) {
+            if (
+              c.indexOf('token=') === 0 ||
+              c.indexOf('access=') === 0 ||
+              c.indexOf('auth=') === 0
+            ) {
               token = c.substring(c.indexOf('=') + 1);
               break;
             }
@@ -639,12 +732,23 @@
         try {
           for (let lsi = 0; lsi < localStorage.length; lsi++) {
             const lsk = localStorage.key(lsi);
-            if (lsk && (lsk.indexOf('token') !== -1 || lsk.indexOf('auth') !== -1 || lsk.indexOf('Token') !== -1 || lsk.indexOf('Auth') !== -1)) {
+            if (
+              lsk &&
+              (lsk.indexOf('token') !== -1 ||
+                lsk.indexOf('auth') !== -1 ||
+                lsk.indexOf('Token') !== -1 ||
+                lsk.indexOf('Auth') !== -1)
+            ) {
               const lsv = localStorage.getItem(lsk);
-              console.log('[DS-Mini:MAIN] localStorage token candidate:', lsk, '=', lsv ? lsv.substring(0, 30) + '...' : 'empty');
+              console.log(
+                '[DS-Mini:MAIN] localStorage token candidate:',
+                lsk,
+                '=',
+                lsv ? lsv.substring(0, 30) + '...' : 'empty',
+              );
             }
           }
-        } catch(e) {}
+        } catch (e) {}
 
         // 检查 sessionStorage
         try {
@@ -652,88 +756,66 @@
             const ssk = sessionStorage.key(ssi);
             if (ssk && (ssk.indexOf('token') !== -1 || ssk.indexOf('auth') !== -1)) {
               const ssv = sessionStorage.getItem(ssk);
-              console.log('[DS-Mini:MAIN] sessionStorage token candidate:', ssk, '=', ssv ? ssv.substring(0, 30) + '...' : 'empty');
+              console.log(
+                '[DS-Mini:MAIN] sessionStorage token candidate:',
+                ssk,
+                '=',
+                ssv ? ssv.substring(0, 30) + '...' : 'empty',
+              );
             }
           }
-        } catch(e) {}
+        } catch (e) {}
 
         // 读取 cookies（完整输出用于诊断）
         console.log('[DS-Mini:MAIN] Cookies:', document.cookie);
       }
 
-      console.log('[DS-Mini:MAIN] Delete request for', sid, 'auth:', headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE');
+      console.log(
+        '[DS-Mini:MAIN] Delete request for',
+        sid,
+        'auth:',
+        headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE',
+      );
 
       fetch('/api/v0/chat_session/delete', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ chat_session_id: sid }),
       })
-      .then(function(r) { return r.json().catch(function() { return { code: r.status, msg: r.statusText }; }); })
-      .then(function(data) {
-        window.postMessage({
-          source: 'DS_MINI_MAIN',
-          type: 'DS_MINI_DELETE_RESPONSE',
-          sessionId: sid,
-          success: data.code === 0 || data.code === 200 || !data.code,
-          response: data,
-        }, '*');
-        if (data.code === 0 || data.code === 200 || !data.code) {
-          console.log('[DS-Mini:MAIN] Session deleted:', sid);
-        } else {
-          console.warn('[DS-Mini:MAIN] Delete failed:', data);
-        }
-      })
-      .catch(function(err) {
-        window.postMessage({
-          source: 'DS_MINI_MAIN',
-          type: 'DS_MINI_DELETE_RESPONSE',
-          sessionId: sid,
-          success: false,
-          error: err.message,
-        }, '*');
-      });
-    }
-  });
-
-  // ==========================================================
-  // 分类插件重命名请求
-  // ==========================================================
-  window.addEventListener('message', function(event) {
-    if (event.data && event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_RENAME_SESSION') {
-      const sid = event.data.sessionId;
-      const newTitle = event.data.title;
-
-      const headers = { 'Content-Type': 'application/json' };
-      const capturedAuth = window.__DS_DELETE_AUTH__;
-      if (capturedAuth) {
-        headers['Authorization'] = capturedAuth;
-      }
-
-      fetch('/api/v0/chat_session/update_title', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ chat_session_id: sid, title: newTitle }),
-      })
-      .then(function(r) { return r.json().catch(function() { return { code: r.status, msg: r.statusText }; }); })
-      .then(function(data) {
-        window.postMessage({
-          source: 'DS_MINI_MAIN',
-          type: 'DS_MINI_RENAME_RESPONSE',
-          sessionId: sid,
-          title: newTitle,
-          success: data.code === 0 || data.code === 200 || !data.code,
-          response: data,
-        }, '*');
-      })
-      .catch(function(err) {
-        window.postMessage({
-          source: 'DS_MINI_MAIN',
-          type: 'DS_MINI_RENAME_RESPONSE',
-          sessionId: sid,
-          success: false,
-          error: err.message,
-        }, '*');
-      });
+        .then(function (r) {
+          return r.json().catch(function () {
+            return { code: r.status, msg: r.statusText };
+          });
+        })
+        .then(function (data) {
+          window.postMessage(
+            {
+              source: 'DS_MINI_MAIN',
+              type: 'DS_MINI_DELETE_RESPONSE',
+              sessionId: sid,
+              success: data.code === 0 || data.code === 200 || !data.code,
+              response: data,
+            },
+            '*',
+          );
+          if (data.code === 0 || data.code === 200 || !data.code) {
+            console.log('[DS-Mini:MAIN] Session deleted:', sid);
+          } else {
+            console.warn('[DS-Mini:MAIN] Delete failed:', data);
+          }
+        })
+        .catch(function (err) {
+          window.postMessage(
+            {
+              source: 'DS_MINI_MAIN',
+              type: 'DS_MINI_DELETE_RESPONSE',
+              sessionId: sid,
+              success: false,
+              error: err.message,
+            },
+            '*',
+          );
+        });
     }
   });
 })();

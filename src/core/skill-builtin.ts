@@ -12,7 +12,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'ultra-think',
     description: '引导模型进行深度思考和多步骤推理',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个深度思考助手。在回答任何问题时，请遵循以下原则：
 
 1. **分解问题**：将复杂问题拆解为更小的子问题
@@ -31,7 +33,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'code-review',
     description: '专业的代码审查助手，帮助发现 bug 和改进点',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个资深代码审查者。审查代码时请关注以下维度：
 
 1. **正确性**：逻辑是否正确？边界情况是否处理？
@@ -58,7 +62,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'writer',
     description: '专业写作助手，帮助润色、翻译、总结文本',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个专业写作助手。请根据用户需求完成以下任务：
 
 - **润色**：改善文本的流畅度、准确性和表达力，保持原意
@@ -75,7 +81,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'article-writer',
     description: '结构化长文写作，含大纲和参考文献',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个结构化写作专家。写长文时按以下步骤：
 
 1. **确定主题和受众**：明确写给谁看、要达成什么目的
@@ -93,7 +101,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'translator',
     description: '多语翻译，保持原文语气和风格',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个专业翻译助手。遵循以下原则：
 
 1. **忠实原文**：不增不减，保持原意
@@ -110,7 +120,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'researcher',
     description: '深度调研，多源搜索后交叉验证输出综述',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个深度调研助手。按以下流程：
 
 1. **明确问题**：确认调研范围、深度、时间范围
@@ -128,7 +140,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'code-assistant',
     description: '轻量代码助手：生成、解释、调试、重构',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个轻量代码助手。专注于：
 
 1. **代码生成**：按需求生成完整可运行的代码段
@@ -145,7 +159,9 @@ export const BUILTIN_SKILLS: Skill[] = [
     id: uid(),
     name: 'summarizer',
     description: '长文摘要，支持多种风格和详细程度',
-    source: 'builtin', enabled: true, memoryEnabled: false,
+    source: 'builtin',
+    enabled: true,
+    memoryEnabled: false,
     instructions: `你是一个摘要助手。根据用户选择提供不同风格的摘要：
 
 - **一句话摘要**：极度精简，适合速览

@@ -1,0 +1,196 @@
+- generic:
+  - generic [ref=f23e2]:
+    - generic [ref=f23e4]:
+      - generic [ref=f23e5]:
+        - img [ref=f23e7] [cursor=pointer]
+        - generic [ref=f23e19]:
+          - button [ref=f23e20] [cursor=pointer]:
+            - img [ref=f23e24]
+          - button [ref=f23e27] [cursor=pointer]:
+            - img [ref=f23e31]
+      - generic [ref=f23e33] [cursor=pointer]:
+        - img [ref=f23e35]
+        - generic [ref=f23e37]: 开启新对话
+        - text: Ctrl + J
+      - generic [ref=f23e38]:
+        - generic [ref=f23e39] [cursor=pointer]:
+          - generic [ref=f23e40]:
+            - img [ref=f23e41]
+            - text: 分类
+          - generic [ref=f23e43]:
+            - button "收起" [ref=f23e44]:
+              - img [ref=f23e45]
+            - button "新建分类" [ref=f23e47]:
+              - img [ref=f23e48]
+            - button "批量选择" [ref=f23e50]:
+              - img [ref=f23e51]
+        - generic [ref=f23e54]: 暂无分类，点击 + 新建
+      - img [ref=f23e60] [cursor=pointer]
+    - generic [ref=f23e69]:
+      - generic [ref=f23e71]:
+        - img [ref=f23e72]
+        - generic [ref=f23e75]: 使用快速模式开始对话
+      - radiogroup [ref=f23e77]:
+        - radio "快速模式" [checked] [ref=f23e78] [cursor=pointer]:
+          - generic [ref=f23e79]:
+            - img [ref=f23e81]
+            - generic [ref=f23e83]: 快速模式
+        - radio "专家模式" [ref=f23e84] [cursor=pointer]:
+          - generic [ref=f23e85]:
+            - img [ref=f23e87]
+            - generic [ref=f23e89]: 专家模式
+        - radio "识图模式" [ref=f23e90] [cursor=pointer]:
+          - generic [ref=f23e91]:
+            - img [ref=f23e93]
+            - generic [ref=f23e97]: 识图模式
+      - generic [ref=f23e100]:
+        - textbox "给 DeepSeek 发送消息" [active] [ref=f23e102]:
+          - /placeholder: "给 DeepSeek 发送消息 "
+        - generic [ref=f23e103]:
+          - generic [ref=f23e104]:
+            - generic [ref=f23e105] [cursor=pointer]:
+              - img [ref=f23e108]
+              - generic [ref=f23e111]: 深度思考
+            - generic [ref=f23e112] [cursor=pointer]:
+              - img [ref=f23e115]
+              - generic [ref=f23e117]: 智能搜索
+          - generic [ref=f23e118]:
+            - button [ref=f23e119] [cursor=pointer]:
+              - img [ref=f23e123]
+            - button [ref=f23e126]:
+              - img [ref=f23e129]
+  - generic [ref=f23e131]:
+    - generic [ref=f23e132]:
+      - generic [ref=f23e133]: ✦ DeepSeek Enhancer
+      - button "✕" [ref=f23e134] [cursor=pointer]
+    - generic [ref=f23e135]:
+      - generic [ref=f23e136]:
+        - generic [ref=f23e138]:
+          - generic [ref=f23e139]:
+            - generic [ref=f23e140]:
+              - img [ref=f23e141]
+              - generic [ref=f23e143]: Agent 模式
+            - generic [ref=f23e144]: 注入工具定义 + 自动循环
+          - generic [ref=f23e145] [cursor=pointer]:
+            - checkbox
+        - generic [ref=f23e148]:
+          - generic [ref=f23e149]: Tools
+          - generic [ref=f23e150]:
+            - generic [ref=f23e151]:
+              - img [ref=f23e152]
+              - generic [ref=f23e155]: 搜索
+            - generic [ref=f23e158]:
+              - img [ref=f23e159]
+              - generic [ref=f23e162]: 抓取
+            - generic [ref=f23e165]:
+              - img [ref=f23e166]
+              - generic [ref=f23e169]: 新闻
+            - generic [ref=f23e172]:
+              - img [ref=f23e173]
+              - generic [ref=f23e176]: GitHub 趋势
+            - generic [ref=f23e179]:
+              - img [ref=f23e180]
+              - generic [ref=f23e183]: 生成文档
+        - generic [ref=f23e186]:
+          - generic [ref=f23e187]:
+            - generic [ref=f23e188]: Skills
+            - generic [ref=f23e189]:
+              - button "导入" [ref=f23e190] [cursor=pointer]:
+                - img [ref=f23e191]
+                - text: 导入
+              - button "+ 新建" [ref=f23e194] [cursor=pointer]
+          - generic [ref=f23e195]:
+            - generic [ref=f23e196]:
+              - generic [ref=f23e197]:
+                - generic [ref=f23e198]: /article-writer 内置
+                - generic [ref=f23e200] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e203]: 结构化长文写作，含大纲和参考文献
+            - generic [ref=f23e204]:
+              - generic [ref=f23e205]:
+                - generic [ref=f23e206]: /code-assistant 内置
+                - generic [ref=f23e208] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e211]: 轻量代码助手：生成、解释、调试、重构
+            - generic [ref=f23e212]:
+              - generic [ref=f23e213]:
+                - generic [ref=f23e214]: /code-review 内置
+                - generic [ref=f23e216] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e219]: 专业的代码审查助手，帮助发现 bug 和改进点
+            - generic [ref=f23e220]:
+              - generic [ref=f23e221]:
+                - generic [ref=f23e222]: /researcher 内置
+                - generic [ref=f23e224] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e227]: 深度调研，多源搜索后交叉验证输出综述
+            - generic [ref=f23e228]:
+              - generic [ref=f23e229]:
+                - generic [ref=f23e230]: /summarizer 内置
+                - generic [ref=f23e232] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e235]: 长文摘要，支持多种风格和详细程度
+            - generic [ref=f23e236]:
+              - generic [ref=f23e237]:
+                - generic [ref=f23e238]: /translator 内置
+                - generic [ref=f23e240] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e243]: 多语翻译，保持原文语气和风格
+            - generic [ref=f23e244]:
+              - generic [ref=f23e245]:
+                - generic [ref=f23e246]: /ultra-think 内置
+                - generic [ref=f23e248] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e251]: 引导模型进行深度思考和多步骤推理
+            - generic [ref=f23e252]:
+              - generic [ref=f23e253]:
+                - generic [ref=f23e254]: /writer 内置
+                - generic [ref=f23e256] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f23e259]: 专业写作助手，帮助润色、翻译、总结文本
+        - generic [ref=f23e260]:
+          - generic [ref=f23e261]: 导出会话
+          - generic [ref=f23e262]:
+            - button "Markdown" [ref=f23e263] [cursor=pointer]
+            - button "HTML" [ref=f23e264] [cursor=pointer]
+      - generic [ref=f23e265]:
+        - generic [ref=f23e266]:
+          - generic [ref=f23e267]:
+            - img [ref=f23e269]
+            - text: 增强功能
+          - generic [ref=f23e271]:
+            - generic [ref=f23e273]: 宽屏模式
+            - generic [ref=f23e276]:
+              - generic [ref=f23e277]: 背景主题
+              - generic [ref=f23e278]:
+                - button "‹" [ref=f23e279] [cursor=pointer]
+                - generic [ref=f23e280]: Catppuccin
+                - button "›" [ref=f23e281] [cursor=pointer]
+            - generic [ref=f23e283]: 隐藏滚动条
+            - generic [ref=f23e287]: 隐藏输入框
+            - generic [ref=f23e291]: 语音输入
+            - generic [ref=f23e295]: Token 速度
+        - generic [ref=f23e298]:
+          - generic [ref=f23e299]:
+            - img [ref=f23e301]
+            - text: 面板设置
+          - generic [ref=f23e308]:
+            - generic [ref=f23e309]: 面板透明度
+            - generic [ref=f23e310]:
+              - slider [ref=f23e311] [cursor=pointer]: "100"
+              - generic [ref=f23e312]: 100%
+        - generic [ref=f23e313]:
+          - generic [ref=f23e314]:
+            - img [ref=f23e316]
+            - text: API 设置
+          - generic [ref=f23e320]:
+            - generic [ref=f23e321]:
+              - generic [ref=f23e322]: Tavily API Key
+              - generic [ref=f23e323]: 未配置
+            - generic [ref=f23e324]:
+              - textbox "tvly-xxxxxxxx" [ref=f23e325]
+              - button "保存" [ref=f23e326] [cursor=pointer]
+              - button "测试" [ref=f23e327] [cursor=pointer]
+  - generic [ref=f23e328] [cursor=pointer]:
+    - generic [ref=f23e329]: ✦
+    - generic: DeepSeek Enhancer

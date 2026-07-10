@@ -8,10 +8,18 @@ import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
 import type { EnhancerConfig } from './enhancer-features';
 import {
-  toggleWideScreen, applyTheme, toggleScrollbar,
-  toggleAutoHideInput, toggleVoiceInput,
-  getConfig, getThemeCount,
-  applyChatFont, applyChatMonoFont, applyChatFontSize, getFontOptions, preloadFonts,
+  toggleWideScreen,
+  applyTheme,
+  toggleScrollbar,
+  toggleAutoHideInput,
+  toggleVoiceInput,
+  getConfig,
+  getThemeCount,
+  applyChatFont,
+  applyChatMonoFont,
+  applyChatFontSize,
+  getFontOptions,
+  preloadFonts,
 } from './enhancer-features';
 
 // ============================================================
@@ -132,6 +140,13 @@ function createPanel(state: AppState) {
     .ds-skills-body { padding: 4px 12px 10px; }
     #ds-tools-list::-webkit-scrollbar,
     #ds-mini-skill-list::-webkit-scrollbar { display: none; }
+    #ds-font-size-slider { -webkit-appearance: none; appearance: none; }
+    #ds-font-size-slider::-webkit-slider-runnable-track { height: 2px; background: var(--input-border); border-radius: 1px; }
+    #ds-font-size-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); cursor: pointer; margin-top: -3.5px; }
+    #ds-font-size-slider::-moz-range-track { height: 2px; background: var(--input-border); border-radius: 1px; border: none; }
+    #ds-font-size-slider::-moz-range-thumb { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); cursor: pointer; border: none; }
+    #ds-enh-opacity::-webkit-slider-thumb { width: 10px; height: 10px; }
+    #ds-enh-opacity::-moz-range-thumb { width: 10px; height: 10px; }
   `;
   document.head.appendChild(panelVars);
 
@@ -184,12 +199,18 @@ function createPanel(state: AppState) {
   `;
   trigger.addEventListener('mouseenter', () => {
     const label = document.getElementById('ds-mini-trigger-label');
-    if (label) { label.style.maxWidth = '200px'; label.style.marginLeft = '4px'; }
+    if (label) {
+      label.style.maxWidth = '200px';
+      label.style.marginLeft = '4px';
+    }
     trigger.style.padding = '8px 14px';
   });
   trigger.addEventListener('mouseleave', () => {
     const label = document.getElementById('ds-mini-trigger-label');
-    if (label) { label.style.maxWidth = '0'; label.style.marginLeft = '0'; }
+    if (label) {
+      label.style.maxWidth = '0';
+      label.style.marginLeft = '0';
+    }
     trigger.style.padding = '8px 10px';
   });
   trigger.addEventListener('click', () => togglePanel(state));
@@ -211,14 +232,16 @@ function createPanel(state: AppState) {
     const accent = isDark ? '#5E5CE6' : '#007AFF';
     trigger.style.setProperty('--accent', accent);
     // 切换透明度值
-    chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {
-      const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
-      const slider = document.getElementById('ds-enh-opacity') as HTMLInputElement | null;
-      const label = document.getElementById('ds-enh-opacity-val');
-      if (slider) slider.value = val ? String(val) : '100';
-      if (label) label.textContent = val ? val + '%' : '100%';
-      applyOpacity(val || 100);
-    });
+    chrome.storage.local
+      .get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'])
+      .then((r) => {
+        const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
+        const slider = document.getElementById('ds-enh-opacity') as HTMLInputElement | null;
+        const label = document.getElementById('ds-enh-opacity-val');
+        if (slider) slider.value = val ? String(val) : '100';
+        if (label) label.textContent = val ? val + '%' : '100%';
+        applyOpacity(val || 100);
+      });
   });
   darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -230,11 +253,20 @@ function createPanel(state: AppState) {
 // 面板 HTML（固定区 + 滚动区）
 // ============================================================
 function buildPanelHTML(): string {
-  const boltSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-  const paletteSVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.5-4.5-10-10-10Z"/></svg>';
-  const keySVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3Z"/></svg>';
+  const boltSVG =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+  const paletteSVG =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.5-4.5-10-10-10Z"/></svg>';
+  const keySVG =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3Z"/></svg>';
   function enhToggle(id: string, label: string) {
-    return '<div class="ds-switch-row"><span>' + label + '</span><span class="ds-enh-toggle" data-id="' + id + '" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>';
+    return (
+      '<div class="ds-switch-row"><span>' +
+      label +
+      '</span><span class="ds-enh-toggle" data-id="' +
+      id +
+      '" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>'
+    );
   }
 
   return `
@@ -296,7 +328,7 @@ function buildPanelHTML(): string {
         <div class="ds-settings-card">
           <div class="ds-card-header"><span class="ds-card-icon">${boltSVG}</span>增强功能</div>
           <div class="ds-card-body">
-            ${enhToggle('ds-enh-wide','宽屏模式')}
+            ${enhToggle('ds-enh-wide', '宽屏模式')}
             <div class="ds-switch-row"><span>背景主题</span><div style="display:flex;align-items:center;gap:4px;"><button id="ds-enh-theme-prev" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">‹</button><span id="ds-enh-theme-name" style="font-size:11px;color:var(--panel-text);min-width:40px;text-align:center;">默认</span><button id="ds-enh-theme-next" style="padding:1px 5px;border:1px solid var(--panel-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;line-height:1;transition:background 0.15s;">›</button></div></div>
 <!-- 字体设置（可折叠） -->
             <div id="ds-font-toggle" class="ds-switch-row" style="cursor:pointer;">
@@ -321,18 +353,18 @@ function buildPanelHTML(): string {
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
                 <span style="font-size:11px;color:var(--panel-text-secondary);">字号</span>
                 <div style="display:flex;align-items:center;gap:4px;">
-                  <button id="ds-font-size-s" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">小</button>
-                  <button id="ds-font-size-m" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">中</button>
-                  <button id="ds-font-size-l" class="ds-font-size-preset" style="padding:1px 5px;font-size:10px;border:1px solid var(--input-border);border-radius:3px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">大</button>
-                  <input id="ds-font-size-slider" type="range" min="10" max="24" value="16" step="1" style="width:60px;height:3px;cursor:pointer;accent-color:var(--accent);">
-                  <span id="ds-font-size-val" style="font-size:10px;color:var(--panel-text-secondary);min-width:20px;text-align:right;">默认</span>
+                  <button id="ds-font-size-s" class="ds-font-size-preset" style="padding:0px 6px;font-size:9px;border:1px solid var(--input-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">小</button>
+                  <button id="ds-font-size-default" class="ds-font-size-preset" style="padding:0px 6px;font-size:9px;border:1px solid var(--input-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">默认</button>
+                  <button id="ds-font-size-l" class="ds-font-size-preset" style="padding:0px 6px;font-size:9px;border:1px solid var(--input-border);border-radius:4px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;">大</button>
+                  <input id="ds-font-size-slider" type="range" min="12" max="22" value="14" step="1" style="width:50px;cursor:pointer;">
+                  <span id="ds-font-size-val" style="font-size:9px;color:var(--panel-text-secondary);min-width:20px;text-align:right;">默认</span>
                 </div>
               </div>
             </div>
-            ${enhToggle('ds-enh-scrollbar','隐藏滚动条')}
-            ${enhToggle('ds-enh-autohide','隐藏输入框')}
-            ${enhToggle('ds-enh-voice','语音输入')}
-            ${enhToggle('ds-enh-tokenspeed','Token 速度')}
+            ${enhToggle('ds-enh-scrollbar', '隐藏滚动条')}
+            ${enhToggle('ds-enh-autohide', '隐藏输入框')}
+            ${enhToggle('ds-enh-voice', '语音输入')}
+            ${enhToggle('ds-enh-tokenspeed', 'Token 速度')}
           </div>
         </div>
 
@@ -371,14 +403,22 @@ async function bindPanelEvents(state: AppState) {
   if (!panelEl) return;
 
   panelEl.querySelector('#ds-mini-panel-close')?.addEventListener('click', () => closePanel());
-  panelEl.querySelector('#ds-mini-add-skill')?.addEventListener('click', () => showModalEditor(state));
-  panelEl.querySelector('#ds-mini-import-local')?.addEventListener('click', () => handleLocalImport(state));
+  panelEl
+    .querySelector('#ds-mini-add-skill')
+    ?.addEventListener('click', () => showModalEditor(state));
+  panelEl
+    .querySelector('#ds-mini-import-local')
+    ?.addEventListener('click', () => handleLocalImport(state));
 
   // 导出
-  panelEl.querySelector('#ds-mini-export-md')?.addEventListener('click', () => exportChat('markdown'));
-  panelEl.querySelector('#ds-mini-export-html')?.addEventListener('click', () => exportChat('html'));
+  panelEl
+    .querySelector('#ds-mini-export-md')
+    ?.addEventListener('click', () => exportChat('markdown'));
+  panelEl
+    .querySelector('#ds-mini-export-html')
+    ?.addEventListener('click', () => exportChat('html'));
   // 导出按钮 hover（边框高亮 + 背景微变）
-  panelEl.querySelectorAll('#ds-mini-export-md, #ds-mini-export-html').forEach(btn => {
+  panelEl.querySelectorAll('#ds-mini-export-md, #ds-mini-export-html').forEach((btn) => {
     btn.addEventListener('mouseenter', () => {
       (btn as HTMLElement).style.borderColor = 'var(--accent)';
       (btn as HTMLElement).style.color = 'var(--accent)';
@@ -402,7 +442,7 @@ async function bindPanelEvents(state: AppState) {
   loadEnhancerPanel();
 
   // 可折叠卡片
-  panelEl.querySelectorAll('[data-card-toggle]').forEach(el => {
+  panelEl.querySelectorAll('[data-card-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
       const cardId = el.getAttribute('data-card-toggle');
       const card = panelEl?.querySelector('[data-card="' + cardId + '"]');
@@ -415,7 +455,7 @@ async function bindPanelEvents(state: AppState) {
   });
 
   // 增强功能 toggle
-  panelEl.querySelectorAll('.ds-enh-toggle').forEach(el => {
+  panelEl.querySelectorAll('.ds-enh-toggle').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.getAttribute('data-id');
       const funcMap: Record<string, () => void> = {
@@ -447,9 +487,16 @@ async function bindPanelEvents(state: AppState) {
           enhState.tokenSpeed = !enhState.tokenSpeed;
           const cfg = await getConfig();
           cfg.tokenSpeed = enhState.tokenSpeed;
-          await chrome.storage.local.set({ 'ds_mini_enhancer': cfg });
+          await chrome.storage.local.set({ ds_mini_enhancer: cfg });
           updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
-          window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_TOKEN_SPEED_TOGGLE', enabled: enhState.tokenSpeed }, '*');
+          window.postMessage(
+            {
+              source: 'DS_MINI_ISOLATED',
+              type: 'DS_MINI_TOKEN_SPEED_TOGGLE',
+              enabled: enhState.tokenSpeed,
+            },
+            '*',
+          );
           showToast(enhState.tokenSpeed ? 'Token 速度已开启' : 'Token 速度已关闭');
         },
       };
@@ -467,7 +514,9 @@ async function bindPanelEvents(state: AppState) {
       applyOpacity(val);
       // 保存
       const isDark = document.body.classList.contains('dark');
-      chrome.storage.local.set({ [isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']: val });
+      chrome.storage.local.set({
+        [isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']: val,
+      });
     });
   }
 
@@ -504,14 +553,27 @@ async function bindPanelEvents(state: AppState) {
   initCustomSelect('ds-font-mono', getFontOptions('mono'), applyChatMonoFont);
 
   // 字号调节
-  const SIZE_PRESETS: Record<string, number> = { 'ds-font-size-s': 13, 'ds-font-size-m': 16, 'ds-font-size-l': 19 };
+  const SIZE_PRESETS: Record<string, number> = {
+    'ds-font-size-s': 12,
+    'ds-font-size-default': 0,
+    'ds-font-size-l': 18,
+  };
   const sizeSlider = document.getElementById('ds-font-size-slider') as HTMLInputElement | null;
   const sizeVal = document.getElementById('ds-font-size-val');
 
-  panelEl?.querySelectorAll('.ds-font-size-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
+  panelEl?.querySelectorAll('.ds-font-size-preset').forEach((btn) => {
+    btn.addEventListener('click', async () => {
       const size = SIZE_PRESETS[btn.id];
       if (size === undefined) return;
+      if (size === 0) {
+        await applyChatFontSize(0);
+        // 读页面实际默认字号显示在 slider
+        const el = document.querySelector('.ds-markdown') as HTMLElement | null;
+        const real = el ? parseInt(getComputedStyle(el).fontSize) || 16 : 16;
+        if (sizeSlider) sizeSlider.value = String(real);
+        if (sizeVal) sizeVal.textContent = real + 'px';
+        return;
+      }
       if (sizeSlider) sizeSlider.value = String(size);
       if (sizeVal) sizeVal.textContent = size + 'px';
       applyChatFontSize(size);
@@ -533,6 +595,12 @@ async function bindPanelEvents(state: AppState) {
   if (cfg.chatFontSize) {
     if (sizeSlider) sizeSlider.value = String(cfg.chatFontSize);
     if (sizeVal) sizeVal.textContent = cfg.chatFontSize + 'px';
+  } else {
+    // 未设自定义字号时，显示页面实际默认字号
+    const el = document.querySelector('.ds-markdown') as HTMLElement | null;
+    const real = el ? parseInt(getComputedStyle(el).fontSize) || 16 : 16;
+    if (sizeSlider) sizeSlider.value = String(real);
+    if (sizeVal) sizeVal.textContent = real + 'px';
   }
   preloadFonts(cfg.chatFont, cfg.chatMonoFont);
 
@@ -540,12 +608,20 @@ async function bindPanelEvents(state: AppState) {
 }
 
 // 自定义下拉框
-function initCustomSelect(id: string, options: {key: string; label: string}[], onChange: (key: string) => void) {
+function initCustomSelect(
+  id: string,
+  options: { key: string; label: string }[],
+  onChange: (key: string) => void,
+) {
   const trigger = document.getElementById(id + '-trigger') as HTMLElement | null;
   const optsContainer = document.getElementById(id + '-options') as HTMLElement | null;
   if (!trigger || !optsContainer) return;
 
-  optsContainer.innerHTML = '<div class="ds-custom-select-opt" data-val="">默认</div>' + options.map(o => `<div class="ds-custom-select-opt" data-val="${o.key}">${o.label}</div>`).join('');
+  optsContainer.innerHTML =
+    '<div class="ds-custom-select-opt" data-val="">默认</div>' +
+    options
+      .map((o) => `<div class="ds-custom-select-opt" data-val="${o.key}">${o.label}</div>`)
+      .join('');
 
   trigger.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -562,7 +638,7 @@ function initCustomSelect(id: string, options: {key: string; label: string}[], o
     if (label) label.textContent = opt.textContent || '默认';
     optsContainer.style.display = 'none';
     trigger.classList.remove('open');
-    optsContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    optsContainer.querySelectorAll('.selected').forEach((el) => el.classList.remove('selected'));
     opt.classList.add('selected');
     onChange(val);
   });
@@ -580,7 +656,7 @@ function updateCustomSelect(id: string, key: string) {
   if (opt) {
     const label = document.querySelector(`#${id}-trigger .ds-custom-select-label`);
     if (label) label.textContent = opt.textContent || key;
-    optsContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+    optsContainer.querySelectorAll('.selected').forEach((el) => el.classList.remove('selected'));
     opt.classList.add('selected');
   }
 }
@@ -606,7 +682,9 @@ async function loadAPIKey() {
           updateAPIKeyStatus(false);
         }
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -622,13 +700,16 @@ function saveAPIKey() {
   if (!input) return;
 
   const key = input.value.trim();
-  chrome.storage.local.set({ ds_mini_tavily_key: key }).then(() => {
-    chrome.runtime.sendMessage({ type: 'SET_API_KEY', key });
-    updateAPIKeyStatus(!!key);
-    showToast(key ? 'API Key 已保存' : 'API Key 已清除');
-  }).catch(() => {
-    showToast('保存失败');
-  });
+  chrome.storage.local
+    .set({ ds_mini_tavily_key: key })
+    .then(() => {
+      chrome.runtime.sendMessage({ type: 'SET_API_KEY', key });
+      updateAPIKeyStatus(!!key);
+      showToast(key ? 'API Key 已保存' : 'API Key 已清除');
+    })
+    .catch(() => {
+      showToast('保存失败');
+    });
 }
 
 async function testTavilyConnection() {
@@ -678,7 +759,9 @@ async function loadAgentMode() {
     updateAgentSlider(enabled);
     postAgentMode(enabled);
     toggleSkillsSection(enabled);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function toggleAgentMode() {
@@ -695,23 +778,36 @@ function toggleAgentMode() {
 }
 
 function postAgentMode(enabled: boolean) {
-  window.postMessage({
-    source: 'DS_MINI_ISOLATED',
-    type: 'SET_AGENT_MODE',
-    enabled,
-  }, '*');
+  window.postMessage(
+    {
+      source: 'DS_MINI_ISOLATED',
+      type: 'SET_AGENT_MODE',
+      enabled,
+    },
+    '*',
+  );
   console.log('[DS-Mini:UI] Agent mode:', enabled ? 'ON' : 'OFF');
 }
 
-  function toggleSkillsSection(enabled: boolean) {
-    const skillsSection = panelEl?.querySelector('#ds-skills-section') as HTMLElement | null;
-    if (skillsSection) skillsSection.style.display = enabled ? '' : 'none';
-  }
+function toggleSkillsSection(enabled: boolean) {
+  const skillsSection = panelEl?.querySelector('#ds-skills-section') as HTMLElement | null;
+  if (skillsSection) skillsSection.style.display = enabled ? '' : 'none';
+}
 
 // ============================================================
 // 增强器功能
 // ============================================================
-let enhState: EnhancerConfig = { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 };
+let enhState: EnhancerConfig = {
+  wideScreen: false,
+  themeIdx: 0,
+  hideScrollbar: false,
+  autoHideInput: false,
+  voiceInput: false,
+  tokenSpeed: false,
+  chatFont: '',
+  chatMonoFont: '',
+  chatFontSize: 0,
+};
 
 async function loadEnhancerPanel() {
   enhState = await getConfig();
@@ -732,16 +828,20 @@ async function loadEnhancerPanel() {
   }
   // 加载透明度
   const isDark = document.body.classList.contains('dark');
-  chrome.storage.local.get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']).then(r => {
-    const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
-    if (val) {
-      const slider = panelEl?.querySelector('#ds-enh-opacity') as HTMLInputElement | null;
-      const label = panelEl?.querySelector('#ds-enh-opacity-val');
-      if (slider) { slider.value = String(val); }
-      if (label) label.textContent = val + '%';
-      applyOpacity(val);
-    }
-  });
+  chrome.storage.local
+    .get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'])
+    .then((r) => {
+      const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
+      if (val) {
+        const slider = panelEl?.querySelector('#ds-enh-opacity') as HTMLInputElement | null;
+        const label = panelEl?.querySelector('#ds-enh-opacity-val');
+        if (slider) {
+          slider.value = String(val);
+        }
+        if (label) label.textContent = val + '%';
+        applyOpacity(val);
+      }
+    });
 }
 
 function applyOpacity(pct: number) {
@@ -754,7 +854,10 @@ function applyOpacity(pct: number) {
   // 也更新弹窗遮罩透明度
   const modalBg = panelEl?.querySelector('#ds-mini-modal-overlay');
   if (modalBg) {
-    (modalBg as HTMLElement).style.setProperty('--overlay-bg', `rgba(0,0,0,${(pct / 200 + 0.25).toFixed(2)})`);
+    (modalBg as HTMLElement).style.setProperty(
+      '--overlay-bg',
+      `rgba(0,0,0,${(pct / 200 + 0.25).toFixed(2)})`,
+    );
   }
 }
 
@@ -786,8 +889,12 @@ function showToast(msg: string) {
     transition:opacity 0.3s;
   `;
   document.body.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; }, 2000);
-  setTimeout(() => { toast.remove(); }, 2500);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+  }, 2000);
+  setTimeout(() => {
+    toast.remove();
+  }, 2500);
 }
 
 // ============================================================
@@ -824,17 +931,17 @@ async function refreshSkillList(state: AppState) {
   const listEl = panelEl?.querySelector('#ds-mini-skill-list');
   if (!listEl) return;
 
-  listEl.innerHTML = state.skills.map(s => skillCardHTML(s)).join('');
+  listEl.innerHTML = state.skills.map((s) => skillCardHTML(s)).join('');
 
   // 绑定每个卡片的按钮
-  listEl.querySelectorAll('[data-skill-id]').forEach(card => {
+  listEl.querySelectorAll('[data-skill-id]').forEach((card) => {
     const id = card.getAttribute('data-skill-id')!;
     card.querySelector('.ds-mini-edit')?.addEventListener('click', () => {
-      const skill = state.skills.find(s => s.id === id);
+      const skill = state.skills.find((s) => s.id === id);
       if (skill) showModalEditor(state, skill);
     });
     card.querySelector('.ds-mini-delete')?.addEventListener('click', async () => {
-      const skill = state.skills.find(s => s.id === id);
+      const skill = state.skills.find((s) => s.id === id);
       if (skill) showDeleteConfirm(state, id, skill.name);
     });
   });
@@ -850,12 +957,13 @@ function esc(str: string): string {
 }
 
 function skillCardHTML(skill: Skill): string {
-  const sourceLabel = {
-    builtin: '内置',
-    github: 'GitHub',
-    local: '本地',
-    custom: '自定义',
-  }[skill.source] || skill.source;
+  const sourceLabel =
+    {
+      builtin: '内置',
+      github: 'GitHub',
+      local: '本地',
+      custom: '自定义',
+    }[skill.source] || skill.source;
 
   return `
     <div data-skill-id="${esc(skill.id)}" style="
@@ -868,10 +976,14 @@ function skillCardHTML(skill: Skill): string {
           <span style="font-size:11px;color:var(--panel-text-secondary);margin-left:6px;">${esc(sourceLabel)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
-          ${skill.source !== 'builtin' ? `
+          ${
+            skill.source !== 'builtin'
+              ? `
             <button class="ds-mini-edit" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             <button class="ds-mini-delete" style="background:none;border:none;cursor:pointer;color:var(--panel-text-secondary);padding:2px 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
       <div style="font-size:12px;color:var(--panel-text-secondary);margin-top:4px;">${esc(skill.description)}</div>
@@ -900,7 +1012,9 @@ function showModalEditor(state: AppState, skill?: Skill) {
     display:flex;align-items:center;justify-content:center;
     transition:opacity 0.2s;
   `;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
 
   // 弹窗
   const modal = document.createElement('div');
@@ -949,7 +1063,9 @@ function showModalEditor(state: AppState, skill?: Skill) {
   document.body.appendChild(overlay);
 
   // 拖拽移动（标题栏）
-  let isDragging = false, dragOffX = 0, dragOffY = 0;
+  let isDragging = false,
+    dragOffX = 0,
+    dragOffY = 0;
   const titleBar = modal.firstElementChild as HTMLElement | null;
   if (titleBar) {
     titleBar.style.cursor = 'grab';
@@ -972,7 +1088,9 @@ function showModalEditor(state: AppState, skill?: Skill) {
     modal.style.left = Math.max(0, Math.min(e.clientX - dragOffX, window.innerWidth - 480)) + 'px';
     modal.style.top = Math.max(0, Math.min(e.clientY - dragOffY, window.innerHeight - 360)) + 'px';
   });
-  document.addEventListener('mouseup', () => { isDragging = false; });
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
 
   // 拉伸（右下角）
   const resizeHandle = document.createElement('div');
@@ -982,15 +1100,23 @@ function showModalEditor(state: AppState, skill?: Skill) {
   let isResizing = false;
   resizeHandle.addEventListener('mousedown', (e) => {
     isResizing = true;
-    const startW = modal.offsetWidth, startH = modal.offsetHeight;
-    const startX = e.clientX, startY = e.clientY;
+    const startW = modal.offsetWidth,
+      startH = modal.offsetHeight;
+    const startX = e.clientX,
+      startY = e.clientY;
     e.preventDefault();
     const onMove = (ev: MouseEvent) => {
       if (!isResizing) return;
-      modal.style.width = Math.max(480, Math.min(startW + ev.clientX - startX, window.innerWidth * 0.9)) + 'px';
-      modal.style.height = Math.max(360, Math.min(startH + ev.clientY - startY, window.innerHeight * 0.9)) + 'px';
+      modal.style.width =
+        Math.max(480, Math.min(startW + ev.clientX - startX, window.innerWidth * 0.9)) + 'px';
+      modal.style.height =
+        Math.max(360, Math.min(startH + ev.clientY - startY, window.innerHeight * 0.9)) + 'px';
     };
-    const onUp = () => { isResizing = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    const onUp = () => {
+      isResizing = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
@@ -1003,7 +1129,9 @@ function showModalEditor(state: AppState, skill?: Skill) {
   saveBtn?.addEventListener('click', async () => {
     const name = (modal.querySelector('#ds-modal-name') as HTMLInputElement).value.trim();
     const desc = (modal.querySelector('#ds-modal-desc') as HTMLInputElement).value.trim();
-    const instructions = (modal.querySelector('#ds-modal-instructions') as HTMLTextAreaElement).value.trim();
+    const instructions = (
+      modal.querySelector('#ds-modal-instructions') as HTMLTextAreaElement
+    ).value.trim();
 
     if (!name || !instructions) {
       alert('名称和指令内容不能为空');
@@ -1050,7 +1178,9 @@ function showDeleteConfirm(state: AppState, skillId: string, skillName: string) 
     backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;
   `;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
 
   const modal = document.createElement('div');
   modal.style.cssText = `

@@ -49,8 +49,16 @@ export default defineContentScript({
       if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_TOOLS_STATE') {
         setDisabledTools(event.data.tools || {});
       }
-      if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'DS_MINI_TOKEN_SPEED_TOGGLE') {
-        if (!event.data.enabled) { if (speedEl) { speedEl.remove(); speedEl = null; } }
+      if (
+        event.data.source === 'DS_MINI_ISOLATED' &&
+        event.data.type === 'DS_MINI_TOKEN_SPEED_TOGGLE'
+      ) {
+        if (!event.data.enabled) {
+          if (speedEl) {
+            speedEl.remove();
+            speedEl = null;
+          }
+        }
       }
     });
 
@@ -65,10 +73,10 @@ export default defineContentScript({
     initThemeAutoSwitch();
 
     // 同步静默循环标志 + 工具状态初始加载
-    chrome.storage.local.get('ds_mini_agent_mode').then(r => {
+    chrome.storage.local.get('ds_mini_agent_mode').then((r) => {
       if (r.ds_mini_agent_mode) setSilentMode(true);
     });
-    chrome.storage.local.get('ds_mini_tools_state').then(r => {
+    chrome.storage.local.get('ds_mini_tools_state').then((r) => {
       if (r.ds_mini_tools_state) setDisabledTools(r.ds_mini_tools_state);
     });
 
@@ -95,10 +103,13 @@ let speedTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateTokenSpeed(tokPerSec: number, finished: boolean) {
   const ENHANCER_KEY = 'ds_mini_enhancer';
-  chrome.storage.local.get(ENHANCER_KEY).then(r => {
+  chrome.storage.local.get(ENHANCER_KEY).then((r) => {
     const cfg = r[ENHANCER_KEY] || {};
     if (!cfg.tokenSpeed) {
-      if (speedEl) { speedEl.remove(); speedEl = null; }
+      if (speedEl) {
+        speedEl.remove();
+        speedEl = null;
+      }
       return;
     }
     if (!speedEl) {
@@ -142,19 +153,21 @@ document.head.appendChild(voiceStyle);
 async function renderFinalResponse(text: string) {
   if (!text.trim()) return;
   // 把最终响应填入输入框并发送（DOM 模式，但只发送一次）
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 300));
   const ta = document.querySelector('textarea');
   if (!ta) return;
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-  if (setter) setter.call(ta, text); else ta.value = text;
+  if (setter) setter.call(ta, text);
+  else ta.value = text;
   ta.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 200));
   const btns = document.querySelectorAll('button');
   for (const btn of btns) {
     if (btn.disabled) continue;
     const r = btn.getBoundingClientRect();
     if (r.width > 0 && r.width < 45 && r.height > 0 && r.height < 45) {
-      btn.click(); break;
+      btn.click();
+      break;
     }
   }
   console.log('[DS-Mini:UI] Final response rendered');
@@ -162,15 +175,22 @@ async function renderFinalResponse(text: string) {
 
 async function domSubmitFallback(text: string) {
   // Silent loop XHR 失败时的 fallback
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 300));
   const ta = document.querySelector('textarea');
   if (!ta) return;
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-  if (setter) setter.call(ta, text); else ta.value = text;
+  if (setter) setter.call(ta, text);
+  else ta.value = text;
   ta.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise(r => setTimeout(r, 200));
-  ta.dispatchEvent(new KeyboardEvent('keydown', {
-    key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true, cancelable: true,
-  }));
+  await new Promise((r) => setTimeout(r, 200));
+  ta.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   console.log('[DS-Mini:UI] DOM fallback used');
 }

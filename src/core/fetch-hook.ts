@@ -25,7 +25,7 @@ export function hookFetch(state: AppState) {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
-    const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : input.url);
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
     // 只拦截 DeepSeek 聊天 API 请求
     if (!isChatAPI(url) || !init?.body) {
@@ -68,7 +68,7 @@ function augmentRequestBody(body: BodyInit, state: AppState): BodyInit {
   if (!prefix) return body; // 没有需要注入的内容
 
   // 找到最后一条 user 消息
-  const lastUserIdx = findLastIndex(parsed.messages, m => m.role === 'user');
+  const lastUserIdx = findLastIndex(parsed.messages, (m) => m.role === 'user');
   if (lastUserIdx === -1) return body;
 
   // 检测 /skill 命令
@@ -77,7 +77,7 @@ function augmentRequestBody(body: BodyInit, state: AppState): BodyInit {
 
   if (skillCmd) {
     // 匹配 skill 并注入其 instructions
-    const skill = state.skills.find(s => s.name === skillCmd.skillName && s.enabled);
+    const skill = state.skills.find((s) => s.name === skillCmd.skillName && s.enabled);
     if (skill) {
       const skillCtx = buildContext(TOOL_DESCRIPTORS, skill);
       const skillPrefix = buildContextPrefix(skillCtx);
@@ -184,8 +184,10 @@ function checkToolCalls() {
 // 工具函数
 // ============================================================
 function isChatAPI(url: string): boolean {
-  return url.includes('chat.deepseek.com') &&
-    (url.includes('/chat/completions') || url.includes('/v1/chat'));
+  return (
+    url.includes('chat.deepseek.com') &&
+    (url.includes('/chat/completions') || url.includes('/v1/chat'))
+  );
 }
 
 function isStreamRequest(body: BodyInit): boolean {

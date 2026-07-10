@@ -19,13 +19,13 @@ export async function loadSkills(): Promise<Skill[]> {
   const userSkills = await loadUserSkills();
 
   // 将用户保存的状态合并到内置技能上（覆盖 enabled 等）
-  const builtin = BUILTIN_SKILLS.map(b => {
-    const userCopy = userSkills.find(s => s.id === b.id);
+  const builtin = BUILTIN_SKILLS.map((b) => {
+    const userCopy = userSkills.find((s) => s.id === b.id);
     return userCopy ? { ...b, ...userCopy } : b;
   });
 
   // 非内置的用户自定义技能
-  const custom = userSkills.filter(s => s.source !== 'builtin');
+  const custom = userSkills.filter((s) => s.source !== 'builtin');
 
   return [...builtin, ...custom].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -52,7 +52,7 @@ async function saveUserSkills(skills: Skill[]): Promise<void> {
 // ============================================================
 export async function saveSkill(skill: Skill): Promise<void> {
   const skills = await loadUserSkills();
-  const idx = skills.findIndex(s => s.id === skill.id);
+  const idx = skills.findIndex((s) => s.id === skill.id);
 
   if (idx >= 0) {
     skills[idx] = { ...skill, metadata: { ...skill.metadata, updatedAt: Date.now() } };
@@ -66,18 +66,18 @@ export async function saveSkill(skill: Skill): Promise<void> {
 export async function deleteSkill(id: string): Promise<void> {
   const skills = await loadUserSkills();
   // 不能删除内置技能
-  const filtered = skills.filter(s => s.id !== id && s.source !== 'builtin');
+  const filtered = skills.filter((s) => s.id !== id && s.source !== 'builtin');
   await saveUserSkills(filtered);
 }
 
 export async function getSkillById(id: string): Promise<Skill | undefined> {
   const all = await loadSkills();
-  return all.find(s => s.id === id);
+  return all.find((s) => s.id === id);
 }
 
 export async function getSkillByName(name: string): Promise<Skill | undefined> {
   const all = await loadSkills();
-  return all.find(s => s.name === name && s.enabled);
+  return all.find((s) => s.name === name && s.enabled);
 }
 
 // ============================================================
@@ -86,13 +86,13 @@ export async function getSkillByName(name: string): Promise<Skill | undefined> {
 export async function toggleSkill(id: string, enabled: boolean): Promise<void> {
   // 内置技能的状态也保存在用户存储中
   const userSkills = await loadUserSkills();
-  const skill = userSkills.find(s => s.id === id);
+  const skill = userSkills.find((s) => s.id === id);
 
   if (skill) {
     skill.enabled = enabled;
   } else {
     // 可能是内置技能首次 toggle
-    const builtin = BUILTIN_SKILLS.find(s => s.id === id);
+    const builtin = BUILTIN_SKILLS.find((s) => s.id === id);
     if (builtin) {
       userSkills.push({ ...builtin, enabled });
     }
@@ -106,13 +106,12 @@ export async function toggleSkill(id: string, enabled: boolean): Promise<void> {
 // ============================================================
 export async function matchSkills(prefix: string): Promise<Skill[]> {
   const all = await loadSkills();
-  const enabled = all.filter(s => s.enabled);
+  const enabled = all.filter((s) => s.enabled);
 
   if (!prefix) return enabled;
 
   const lower = prefix.toLowerCase();
-  return enabled.filter(s =>
-    s.name.toLowerCase().startsWith(lower) ||
-    s.description.toLowerCase().includes(lower),
+  return enabled.filter(
+    (s) => s.name.toLowerCase().startsWith(lower) || s.description.toLowerCase().includes(lower),
   );
 }

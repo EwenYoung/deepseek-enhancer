@@ -55,7 +55,11 @@ const STORAGE_KEY_TITLES = 'ds_mini_session_titles';
 /** 加载分类数据 */
 export async function loadCategories(): Promise<CategoryState> {
   try {
-    const r = await chrome.storage.local.get([STORAGE_KEY_CATEGORIES, STORAGE_KEY_HIDDEN, STORAGE_KEY_TITLES]);
+    const r = await chrome.storage.local.get([
+      STORAGE_KEY_CATEGORIES,
+      STORAGE_KEY_HIDDEN,
+      STORAGE_KEY_TITLES,
+    ]);
     const categories = r[STORAGE_KEY_CATEGORIES] || emptyCategories();
     const hiddenSessions: string[] = r[STORAGE_KEY_HIDDEN] || [];
     const sessionTitles: Record<string, string> = r[STORAGE_KEY_TITLES] || {};
@@ -134,7 +138,11 @@ export function deleteCategory(state: CategoryState, name: string): boolean {
 // ============================================================
 
 /** 将会话归类到某分类 */
-export function categorizeSession(state: CategoryState, sessionId: string, categoryName: string): boolean {
+export function categorizeSession(
+  state: CategoryState,
+  sessionId: string,
+  categoryName: string,
+): boolean {
   if (!state.categories.items[categoryName]) return false;
 
   // 先移除旧分类

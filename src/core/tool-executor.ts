@@ -34,7 +34,7 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
       toolName: call.name,
       success: true,
       result: response.result,
-      duration: response.duration || (performance.now() - startTime),
+      duration: response.duration || performance.now() - startTime,
     };
   } catch (err) {
     return {

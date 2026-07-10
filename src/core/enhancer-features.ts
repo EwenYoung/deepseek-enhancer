@@ -7,14 +7,14 @@ const ENHANCER_KEY = 'ds_mini_enhancer';
 
 export interface EnhancerConfig {
   wideScreen: boolean;
-  themeIdx: number;       // 0=默认, 1-4 对应各主题
+  themeIdx: number; // 0=默认, 1-4 对应各主题
   hideScrollbar: boolean;
   autoHideInput: boolean;
   voiceInput: boolean;
-  tokenSpeed: boolean;    // token 速度显示
-  chatFont: string;       // '' = 默认, 字体 key
-  chatMonoFont: string;   // '' = 默认, 字体 key
-  chatFontSize: number;   // 0 = 默认, 10-24
+  tokenSpeed: boolean; // token 速度显示
+  chatFont: string; // '' = 默认, 字体 key
+  chatMonoFont: string; // '' = 默认, 字体 key
+  chatFontSize: number; // 0 = 默认, 10-24
 }
 
 // ============================================================
@@ -23,8 +23,32 @@ export interface EnhancerConfig {
 export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
-    return r[ENHANCER_KEY] || { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 };
-  } catch { return { wideScreen: false, themeIdx: 0, hideScrollbar: false, autoHideInput: false, voiceInput: false, tokenSpeed: false, chatFont: '', chatMonoFont: '', chatFontSize: 0 }; }
+    return (
+      r[ENHANCER_KEY] || {
+        wideScreen: false,
+        themeIdx: 0,
+        hideScrollbar: false,
+        autoHideInput: false,
+        voiceInput: false,
+        tokenSpeed: false,
+        chatFont: '',
+        chatMonoFont: '',
+        chatFontSize: 0,
+      }
+    );
+  } catch {
+    return {
+      wideScreen: false,
+      themeIdx: 0,
+      hideScrollbar: false,
+      autoHideInput: false,
+      voiceInput: false,
+      tokenSpeed: false,
+      chatFont: '',
+      chatMonoFont: '',
+      chatFontSize: 0,
+    };
+  }
 }
 
 async function saveConfig(cfg: EnhancerConfig) {
@@ -113,7 +137,9 @@ export async function toggleWideScreen(enabled: boolean) {
     }
 
     // CSS 覆盖 — 只限制消息容器宽度适配剩余空间
-    applyCSS('wide', `
+    applyCSS(
+      'wide',
+      `
       #root [class*="ds-virtual-list-items"] {
         padding-left: 24px !important;
         padding-right: 24px !important;
@@ -139,11 +165,12 @@ export async function toggleWideScreen(enabled: boolean) {
         margin-left: 0 !important;
         padding-left: 0 !important;
       }
-    `);
+    `,
+    );
   } else {
     removeCSS('wide');
     // 恢复聊天面板原始样式
-    document.querySelectorAll('[style*="flex: 1 1 auto"]').forEach(el => {
+    document.querySelectorAll('[style*="flex: 1 1 auto"]').forEach((el) => {
       (el as HTMLElement).style.removeProperty('flex');
       (el as HTMLElement).style.removeProperty('max-width');
       (el as HTMLElement).style.removeProperty('min-width');
@@ -156,19 +183,75 @@ export async function toggleWideScreen(enabled: boolean) {
 // 5.2 背景色主题
 // ============================================================
 const LIGHT_THEMES = [
-  { name: '默认',  bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
-  { name: 'Claude浅', bg: '#f7f0e8', chatBg: '#fcf7f0',  sidebarBg: '#f2e8dc', sidebarHighlight: '#e6dccd', brandColor: '#D98A6A' },
-  { name: 'Catppuccin浅',   bg: '#eef0f0',  chatBg: '#f5f7f6',  sidebarBg: '#e2e6e6', sidebarHighlight: '#d2d6d6', brandColor: '#179299' },
-  { name: 'Dracula浅', bg: '#f5ecec', chatBg: '#fbf4f2',  sidebarBg: '#ebe0de', sidebarHighlight: '#ddd0ce', brandColor: '#bd93f9' },
-  { name: 'OneHalf浅', bg: '#edf0e8', chatBg: '#f4f7f0',  sidebarBg: '#e0e5d8', sidebarHighlight: '#ced4c8', brandColor: '#61afef' },
+  { name: '默认', bg: '', chatBg: '', sidebarBg: '', sidebarHighlight: '', brandColor: '' },
+  {
+    name: 'Claude浅',
+    bg: '#f7f0e8',
+    chatBg: '#fcf7f0',
+    sidebarBg: '#f2e8dc',
+    sidebarHighlight: '#e6dccd',
+    brandColor: '#D98A6A',
+  },
+  {
+    name: 'Catppuccin浅',
+    bg: '#eef0f0',
+    chatBg: '#f5f7f6',
+    sidebarBg: '#e2e6e6',
+    sidebarHighlight: '#d2d6d6',
+    brandColor: '#179299',
+  },
+  {
+    name: 'Dracula浅',
+    bg: '#f5ecec',
+    chatBg: '#fbf4f2',
+    sidebarBg: '#ebe0de',
+    sidebarHighlight: '#ddd0ce',
+    brandColor: '#bd93f9',
+  },
+  {
+    name: 'OneHalf浅',
+    bg: '#edf0e8',
+    chatBg: '#f4f7f0',
+    sidebarBg: '#e0e5d8',
+    sidebarHighlight: '#ced4c8',
+    brandColor: '#61afef',
+  },
 ];
 
 const DARK_THEMES = [
-  { name: '默认',    bg: '',        chatBg: '',        sidebarBg: '',        sidebarHighlight: '', brandColor: '' },
-  { name: 'Claude深', bg: '#1c1a18', chatBg: '#201d1c',  sidebarBg: '#171513', sidebarHighlight: '#292421', brandColor: '#E07850' },
-  { name: 'Catppuccin深',   bg: '#1e1e2e',  chatBg: '#181825',  sidebarBg: '#11111b', sidebarHighlight: '#20203a', brandColor: '#89b4fa' },
-  { name: 'Dracula深', bg: '#282a36', chatBg: '#21222c',  sidebarBg: '#191a21', sidebarHighlight: '#2c2c3e', brandColor: '#bd93f9' },
-  { name: 'OneHalf深', bg: '#282c34', chatBg: '#2c313a',  sidebarBg: '#21252b', sidebarHighlight: '#30353d', brandColor: '#61afef' },
+  { name: '默认', bg: '', chatBg: '', sidebarBg: '', sidebarHighlight: '', brandColor: '' },
+  {
+    name: 'Claude深',
+    bg: '#1c1a18',
+    chatBg: '#201d1c',
+    sidebarBg: '#171513',
+    sidebarHighlight: '#292421',
+    brandColor: '#E07850',
+  },
+  {
+    name: 'Catppuccin深',
+    bg: '#1e1e2e',
+    chatBg: '#181825',
+    sidebarBg: '#11111b',
+    sidebarHighlight: '#20203a',
+    brandColor: '#89b4fa',
+  },
+  {
+    name: 'Dracula深',
+    bg: '#282a36',
+    chatBg: '#21222c',
+    sidebarBg: '#191a21',
+    sidebarHighlight: '#2c2c3e',
+    brandColor: '#bd93f9',
+  },
+  {
+    name: 'OneHalf深',
+    bg: '#282c34',
+    chatBg: '#2c313a',
+    sidebarBg: '#21252b',
+    sidebarHighlight: '#30353d',
+    brandColor: '#61afef',
+  },
 ];
 
 function isDarkMode(): boolean {
@@ -211,11 +294,15 @@ export async function applyTheme(idx: number) {
   if (sidebar) sidebar.setAttribute('data-ds-sidebar', '');
   if (chatPanel) chatPanel.setAttribute('data-ds-chatpanel', '');
 
-  applyCSS('theme', `
+  applyCSS(
+    'theme',
+    `
     html, body, #root {
       background-color: ${theme.bg} !important;
     }
-    ${theme.brandColor ? `
+    ${
+      theme.brandColor
+        ? `
     body { --dsw-alias-brand-primary: ${theme.brandColor} !important; }
     /* 精确着色：仅对标记了蓝色的原生图标位置 */
     /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/
@@ -249,7 +336,9 @@ export async function applyTheme(idx: number) {
     #root .c15ec89f {
       box-shadow: inset 0 0 0 2px ${theme.brandColor}66 !important;
     }
-    ` : ''}
+    `
+        : ''
+    }
     #root [data-ds-sidebar] {
       background-color: ${theme.sidebarBg} !important;
     }
@@ -312,10 +401,11 @@ export async function applyTheme(idx: number) {
       background-color: ${theme.chatBg} !important;
       border-radius: 8px !important;
     }
-  `);
+  `,
+  );
 
   // 标记输入框区域不染色
-  document.querySelectorAll('textarea').forEach(ta => {
+  document.querySelectorAll('textarea').forEach((ta) => {
     let el = ta.parentElement;
     for (let i = 0; i < 5 && el; i++) {
       el.setAttribute('data-ds-no-bg', '');
@@ -325,8 +415,12 @@ export async function applyTheme(idx: number) {
 
   // 标记发送按钮区域不染色（按钮通常不在 textarea 父链上）
   const allBtns = document.querySelectorAll('button');
-  const sendBtn = [...allBtns].find(b =>
-    b.querySelector('svg') && (b.closest('[class*="input"]') || b.closest('[class*="composer"]') || b.closest('[class*="footer"]'))
+  const sendBtn = [...allBtns].find(
+    (b) =>
+      b.querySelector('svg') &&
+      (b.closest('[class*="input"]') ||
+        b.closest('[class*="composer"]') ||
+        b.closest('[class*="footer"]')),
   );
   if (sendBtn) {
     let el = sendBtn.parentElement;
@@ -352,14 +446,19 @@ export async function applyTheme(idx: number) {
     const sbar = document.querySelector('[data-ds-sidebar]');
     if (!sbar || !theme.sidebarHighlight) return;
     // 清除旧的选中标记
-    sbar.querySelectorAll('[data-ds-sidebar-selected]').forEach(el => el.removeAttribute('data-ds-sidebar-selected'));
+    sbar
+      .querySelectorAll('[data-ds-sidebar-selected]')
+      .forEach((el) => el.removeAttribute('data-ds-sidebar-selected'));
     const links = sbar.querySelectorAll('a');
     let selected = null;
     for (const link of links) {
       const r = link.getBoundingClientRect();
       if (r.width < 100) continue;
       const c = getComputedStyle(link).color;
-      if (c === 'rgb(57, 100, 254)' || c === 'rgb(255, 255, 255)') { selected = link; break; }
+      if (c === 'rgb(57, 100, 254)' || c === 'rgb(255, 255, 255)') {
+        selected = link;
+        break;
+      }
     }
     if (!selected) {
       let maxBrightness = 0;
@@ -369,7 +468,10 @@ export async function applyTheme(idx: number) {
         const m = getComputedStyle(link).color.match(/\d+/g);
         if (m) {
           const brightness = Number(m[0]) + Number(m[1]) + Number(m[2]);
-          if (brightness > maxBrightness) { maxBrightness = brightness; selected = link; }
+          if (brightness > maxBrightness) {
+            maxBrightness = brightness;
+            selected = link;
+          }
         }
       }
     }
@@ -402,21 +504,33 @@ export async function applyTheme(idx: number) {
     const observer = new MutationObserver(() => {
       markSelectedSidebarItem();
     });
-    observer.observe(listContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    observer.observe(listContainer, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
 
     // 点击监听：用户点击侧边栏后延迟重标记（React 渲染完成后）
-    sbar.addEventListener('click', () => {
-      setTimeout(markSelectedSidebarItem, 100);
-    }, true);
+    sbar.addEventListener(
+      'click',
+      () => {
+        setTimeout(markSelectedSidebarItem, 100);
+      },
+      true,
+    );
   }
 
   // 禁用磨砂玻璃效果：CSS 全局禁用 backdrop-filter（排除面板）
-  applyCSS('frosted', `
+  applyCSS(
+    'frosted',
+    `
     *:not(#ds-mini-panel):not(#ds-mini-panel *) {
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
-  `);
+  `,
+  );
 
   // JS 兜底：查找带 backdrop-filter 的元素，设为透明（排除面板）
   const allEls = document.querySelectorAll('*');
@@ -434,12 +548,16 @@ export async function applyTheme(idx: number) {
 }
 
 function clearInlineBg() {
-  document.querySelectorAll('[data-ds-sidebar], [data-ds-chatpanel], [data-ds-no-bg], [data-ds-sidebar-selected]').forEach(el => {
-    el.removeAttribute('data-ds-sidebar');
-    el.removeAttribute('data-ds-chatpanel');
-    el.removeAttribute('data-ds-no-bg');
-    el.removeAttribute('data-ds-sidebar-selected');
-  });
+  document
+    .querySelectorAll(
+      '[data-ds-sidebar], [data-ds-chatpanel], [data-ds-no-bg], [data-ds-sidebar-selected]',
+    )
+    .forEach((el) => {
+      el.removeAttribute('data-ds-sidebar');
+      el.removeAttribute('data-ds-chatpanel');
+      el.removeAttribute('data-ds-no-bg');
+      el.removeAttribute('data-ds-sidebar-selected');
+    });
   removeCSS('frosted');
 }
 
@@ -457,13 +575,22 @@ function findLayoutElements(): { sidebar: HTMLElement | null; chatPanel: HTMLEle
     const r = div.getBoundingClientRect();
     if (r.width < window.innerWidth * 0.8) continue;
 
-    const children = Array.from(div.children).filter(c => {
+    const children = Array.from(div.children).filter((c) => {
       const cr = c.getBoundingClientRect();
       return cr.width > 0 && cr.height > 0;
     });
-    const hasNarrow = children.some(c => { const cr = c.getBoundingClientRect(); return cr.width >= 180 && cr.width <= 400 && cr.height > 300; });
-    const hasWide = children.some(c => { const cr = c.getBoundingClientRect(); return cr.width > 500 && cr.height > 300; });
-    if (hasNarrow && hasWide) { flexRow = div as HTMLElement; break; }
+    const hasNarrow = children.some((c) => {
+      const cr = c.getBoundingClientRect();
+      return cr.width >= 180 && cr.width <= 400 && cr.height > 300;
+    });
+    const hasWide = children.some((c) => {
+      const cr = c.getBoundingClientRect();
+      return cr.width > 500 && cr.height > 300;
+    });
+    if (hasNarrow && hasWide) {
+      flexRow = div as HTMLElement;
+      break;
+    }
   }
 
   if (!flexRow) return { sidebar: null, chatPanel: null };
@@ -503,7 +630,9 @@ export async function toggleScrollbar(hidden: boolean) {
   await saveConfig(cfg);
 
   if (hidden) {
-    applyCSS('scrollbar', `
+    applyCSS(
+      'scrollbar',
+      `
       #root [class*="ds-virtual-list"]::-webkit-scrollbar,
       #root [class*="ds-scroll-area"]::-webkit-scrollbar {
         display: none !important;
@@ -519,7 +648,8 @@ export async function toggleScrollbar(hidden: boolean) {
       #root [class*="ds-scroll-area__horizontal-gutter"] {
         display: none !important;
       }
-    `);
+    `,
+    );
   } else {
     removeCSS('scrollbar');
   }
@@ -529,9 +659,9 @@ export async function toggleScrollbar(hidden: boolean) {
 // 5.4 输入框自动隐藏
 // ============================================================
 let inputHideActive = false;
-let inputHideEl: HTMLElement | null = null;  // 要平移的元素（_77cefa5）
-let inputClipEl: HTMLElement | null = null;  // 裁剪溢出的元素（aaff8b8f）
-let inputFocused = false;  // textarea 是否有焦点
+let inputHideEl: HTMLElement | null = null; // 要平移的元素（_77cefa5）
+let inputClipEl: HTMLElement | null = null; // 裁剪溢出的元素（aaff8b8f）
+let inputFocused = false; // textarea 是否有焦点
 let inputCurrentlyHidden = true;
 
 function onMouseMove(e: MouseEvent) {
@@ -704,7 +834,9 @@ export async function toggleVoiceInput(enabled: boolean) {
     voiceObserver?.disconnect();
     voiceObserver = null;
     if (recognition) {
-      try { recognition.stop(); } catch {}
+      try {
+        recognition.stop();
+      } catch {}
       recognition = null;
     }
     isRecording = false;
@@ -725,7 +857,10 @@ function createVoiceButton() {
   // 右组 = toolbar row 中不是左组的那个孩子
   let rightGroup: Element | null = null;
   for (const child of toolbarRow.children) {
-    if (child !== leftGroup) { rightGroup = child; break; }
+    if (child !== leftGroup) {
+      rightGroup = child;
+      break;
+    }
   }
   if (!rightGroup) return;
 
@@ -796,8 +931,12 @@ function toggleRecording(btn: HTMLElement) {
 }
 
 function startRecording(btn: HTMLElement) {
-  const SpeechRecognition = window.SpeechRecognition || (window as Record<string, unknown>).webkitSpeechRecognition;
-  if (!SpeechRecognition) { alert('浏览器不支持语音识别'); return; }
+  const SpeechRecognition =
+    window.SpeechRecognition || (window as Record<string, unknown>).webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('浏览器不支持语音识别');
+    return;
+  }
 
   if (!recognition) {
     recognition = new SpeechRecognition();
@@ -830,11 +969,19 @@ function startRecording(btn: HTMLElement) {
 
   recognition.onerror = () => stopRecording(btn);
   recognition.onend = () => stopRecording(btn);
-  try { recognition.start(); } catch { stopRecording(btn); }
+  try {
+    recognition.start();
+  } catch {
+    stopRecording(btn);
+  }
 }
 
 function stopRecording(btn: HTMLElement) {
-  if (recognition) { try { recognition.stop(); } catch {} }
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch {}
+  }
   btn.style.background = 'rgba(77,107,254,0.1)';
   btn.style.animation = '';
   isRecording = false;
@@ -846,25 +993,91 @@ function stopRecording(btn: HTMLElement) {
 interface FontDef {
   label: string;
   family: string;
-  urls: string[] | null;  // null = system font, no CDN needed
+  urls: string[] | null; // null = system font, no CDN needed
 }
 
 const FONT_PRESETS: Record<string, Record<string, FontDef>> = {
   chat: {
-    'wenkai':    { label: '霞鹜文楷',   family: "'LXGW WenKai', '霞鹜文楷', serif",         urls: 'https://fontsapi.zeoseven.com/292/main/result.css' },
-    'noto-serif':{ label: '思源宋体',   family: "'Noto Serif CJK', '思源宋体', serif",         urls: 'https://fontsapi.zeoseven.com/285/main/result.css' },
-    'noto-sans': { label: '思源黑体',   family: "'Noto Sans CJK', '思源黑体', sans-serif",     urls: 'https://fontsapi.zeoseven.com/69/main/result.css' },
-    'zhuque':    { label: '朱雀仿宋',   family: "'Zhuque Fangsong', '朱雀仿宋', serif",      urls: 'https://fontsapi.zeoseven.com/7/main/result.css' },
-    'hanchan':   { label: '寒蝉活宋体', family: "'ChillHuoSong_F', '寒蝉活宋体', serif",    urls: 'https://fontsapi.zeoseven.com/875/main/result.css' },
-    'chill':     { label: '寒蝉全圆体', family: "'ChillRoundF', '寒蝉全圆体', sans-serif",    urls: 'https://fontsapi.zeoseven.com/3/main/result.css' },
+    wenkai: {
+      label: '霞鹜文楷',
+      family: "'LXGW WenKai', '霞鹜文楷', serif",
+      urls: 'https://fontsapi.zeoseven.com/292/main/result.css',
+    },
+    'noto-serif': {
+      label: '思源宋体',
+      family: "'Noto Serif CJK', '思源宋体', serif",
+      urls: 'https://fontsapi.zeoseven.com/285/main/result.css',
+    },
+    'noto-sans': {
+      label: '思源黑体',
+      family: "'Noto Sans CJK', '思源黑体', sans-serif",
+      urls: 'https://fontsapi.zeoseven.com/69/main/result.css',
+    },
+    zhuque: {
+      label: '朱雀仿宋',
+      family: "'Zhuque Fangsong', '朱雀仿宋', serif",
+      urls: 'https://fontsapi.zeoseven.com/7/main/result.css',
+    },
+    hanchan: {
+      label: '寒蝉活宋体',
+      family: "'ChillHuoSong_F', '寒蝉活宋体', serif",
+      urls: 'https://fontsapi.zeoseven.com/875/main/result.css',
+    },
+    chill: {
+      label: '寒蝉全圆体',
+      family: "'ChillRoundF', '寒蝉全圆体', sans-serif",
+      urls: 'https://fontsapi.zeoseven.com/3/main/result.css',
+    },
   },
   mono: {
-    'jetbrains':  { label: 'JetBrains Mono',  family: "'JetBrains Mono', monospace",   urls: ['https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/700.css'] },
-    'fira':       { label: 'Fira Code',       family: "'Fira Code', monospace",        urls: ['https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/700.css'] },
-    'cascadia':   { label: 'Cascadia Code',   family: "'Cascadia Code', monospace",    urls: ['https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/700.css'] },
-    'source-code':{ label: 'Source Code Pro', family: "'Source Code Pro', monospace",  urls: ['https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/700.css'] },
-    'ibm-plex':   { label: 'IBM Plex Mono',   family: "'IBM Plex Mono', monospace",    urls: ['https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/700.css'] },
-    'roboto':     { label: 'Roboto Mono',     family: "'Roboto Mono', monospace",      urls: ['https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/400.css', 'https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/700.css'] },
+    jetbrains: {
+      label: 'JetBrains Mono',
+      family: "'JetBrains Mono', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.1.0/700.css',
+      ],
+    },
+    fira: {
+      label: 'Fira Code',
+      family: "'Fira Code', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5.1.0/700.css',
+      ],
+    },
+    cascadia: {
+      label: 'Cascadia Code',
+      family: "'Cascadia Code', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/cascadia-code@5.1.0/700.css',
+      ],
+    },
+    'source-code': {
+      label: 'Source Code Pro',
+      family: "'Source Code Pro', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/source-code-pro@5.1.0/700.css',
+      ],
+    },
+    'ibm-plex': {
+      label: 'IBM Plex Mono',
+      family: "'IBM Plex Mono', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.1.0/700.css',
+      ],
+    },
+    roboto: {
+      label: 'Roboto Mono',
+      family: "'Roboto Mono', monospace",
+      urls: [
+        'https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/400.css',
+        'https://cdn.jsdelivr.net/npm/@fontsource/roboto-mono@5.1.0/700.css',
+      ],
+    },
   },
 };
 
@@ -890,17 +1103,25 @@ async function _loadFontCSS(urls: string[] | null) {
 }
 
 function _injectChatFont(family: string) {
-  applyCSS(CHAT_ID, `
+  applyCSS(
+    CHAT_ID,
+    `
     #root { font-family: ${family} !important; }
     #root .ds-markdown, #root .ds-message, #root textarea { font-family: ${family} !important; }
-  `);
+    #ds-category-panel, #ds-category-panel button { font-family: ${family} !important; }
+  `,
+  );
 }
 
 function _injectMonoFont(family: string) {
-  applyCSS(MONO_ID, `
+  applyCSS(
+    MONO_ID,
+    `
     #root code, #root pre, #root [class*="code"],
     #root .ds-markdown code, #root .ds-markdown pre { font-family: ${family} !important; }
-  `);
+    #ds-category-panel code, #ds-category-panel pre { font-family: ${family} !important; }
+  `,
+  );
 }
 
 export async function applyChatFont(key: string) {
@@ -908,7 +1129,10 @@ export async function applyChatFont(key: string) {
   cfg.chatFont = key;
   await saveConfig(cfg);
 
-  if (!key) { removeCSS(CHAT_ID); return; }
+  if (!key) {
+    removeCSS(CHAT_ID);
+    return;
+  }
   const def = FONT_PRESETS.chat[key];
   if (!def) return;
   await _loadFontCSS(def.urls);
@@ -920,7 +1144,10 @@ export async function applyChatMonoFont(key: string) {
   cfg.chatMonoFont = key;
   await saveConfig(cfg);
 
-  if (!key) { removeCSS(MONO_ID); return; }
+  if (!key) {
+    removeCSS(MONO_ID);
+    return;
+  }
   const def = FONT_PRESETS.mono[key];
   if (!def) return;
   await _loadFontCSS(def.urls);
@@ -928,7 +1155,10 @@ export async function applyChatMonoFont(key: string) {
 }
 
 export function preloadFonts(chatKey: string, monoKey: string) {
-  for (const [key, type] of [[chatKey, 'chat'], [monoKey, 'mono']] as const) {
+  for (const [key, type] of [
+    [chatKey, 'chat'],
+    [monoKey, 'mono'],
+  ] as const) {
     if (!key) continue;
     const def = FONT_PRESETS[type][key];
     if (!def?.urls) continue;
@@ -949,11 +1179,16 @@ export async function applyChatFontSize(size: number) {
   cfg.chatFontSize = size;
   await saveConfig(cfg);
 
-  if (!size) { removeCSS(SIZE_ID); return; }
-  applyCSS(SIZE_ID, `
-    #root .ds-markdown, #root .ds-message { font-size: ${size}px !important; }
-    #root textarea { font-size: ${size}px !important; }
-  `);
+  if (!size) {
+    removeCSS(SIZE_ID);
+    return;
+  }
+  applyCSS(
+    SIZE_ID,
+    `
+    #root .ds-markdown, #root .ds-message, #root .ds-message > div { font-size: ${size}px !important; }
+  `,
+  );
 }
 
 // ============================================================
@@ -965,13 +1200,21 @@ export async function loadEnhancerFeatures() {
   if (cfg.themeIdx > 0) await applyTheme(cfg.themeIdx);
   if (cfg.hideScrollbar) await toggleScrollbar(true);
   if (cfg.autoHideInput) await toggleAutoHideInput(true);
-  if (cfg.voiceInput) { setTimeout(() => { createVoiceButton(); setupVoiceObserver(); document.addEventListener('keydown', onVoiceKeydown); }, 1000); }
+  if (cfg.voiceInput) {
+    setTimeout(() => {
+      createVoiceButton();
+      setupVoiceObserver();
+      document.addEventListener('keydown', onVoiceKeydown);
+    }, 1000);
+  }
   if (cfg.chatFont) applyChatFont(cfg.chatFont);
   if (cfg.chatMonoFont) applyChatMonoFont(cfg.chatMonoFont);
   if (cfg.chatFontSize) applyChatFontSize(cfg.chatFontSize);
 
   // 始终应用（不依赖主题）
-  applyCSS('voice-btn', `
+  applyCSS(
+    'voice-btn',
+    `
     #root button[style*="border"][style*="rgba(77"] {
       border-radius: 50% !important;
     }
@@ -979,5 +1222,6 @@ export async function loadEnhancerFeatures() {
     #ds-mini-panel[style*="opacity:0"] {
       pointer-events: none !important;
     }
-  `);
+  `,
+  );
 }

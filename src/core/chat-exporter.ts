@@ -67,7 +67,9 @@ function findScrollContainer(): HTMLElement | null {
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise(function (r) { setTimeout(r, ms); });
+  return new Promise(function (r) {
+    setTimeout(r, ms);
+  });
 }
 
 // ============================================================
@@ -99,7 +101,11 @@ function scrapeMessages(): ChatMessage[] {
       const raw = asstRawTexts[asstIdx];
       const reply = raw ? raw.trim() : replyEl.textContent?.trim();
       if (reply) {
-        messages.push({ role: 'assistant' as const, content: reply, thinking: thinking || undefined });
+        messages.push({
+          role: 'assistant' as const,
+          content: reply,
+          thinking: thinking || undefined,
+        });
       }
       if (raw) asstIdx++;
     } else {
@@ -113,7 +119,10 @@ function scrapeMessages(): ChatMessage[] {
         const childCls = child.className || '';
         if (childCls.includes('ds-markdown') || childCls.includes('ds-think')) continue;
         const t = child.textContent?.trim();
-        if (t && t.length > 2) { text = t; break; }
+        if (t && t.length > 2) {
+          text = t;
+          break;
+        }
       }
       // 兜底
       if (!text) text = el.textContent?.trim() || '';
@@ -230,27 +239,29 @@ function renderMarkdown(messages: ChatMessage[], title: string): string {
 function renderHTML(messages: ChatMessage[], title: string): string {
   const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 
-  const msgHTML = messages.map(msg => {
-    if (msg.role === 'user') {
-      return `<div class="message user">
+  const msgHTML = messages
+    .map((msg) => {
+      if (msg.role === 'user') {
+        return `<div class="message user">
         <div class="msg-label user-label">👤 你</div>
         <div class="msg-body">${renderUserContentHTML(msg.content)}</div>
       </div>`;
-    }
+      }
 
-    let html = `<div class="message assistant">
+      let html = `<div class="message assistant">
       <div class="msg-label ai-label">🤖 DeepSeek</div>`;
 
-    if (msg.thinking) {
-      html += `<details class="think-block" open>
+      if (msg.thinking) {
+        html += `<details class="think-block" open>
         <summary>💭 思考过程</summary>
         <div class="think-content">${escapeHTML(msg.thinking)}</div>
       </details>`;
-    }
+      }
 
-    html += `<div class="msg-body">${renderMarkdownToHTML(msg.content)}</div></div>`;
-    return html;
-  }).join('\n');
+      html += `<div class="msg-body">${renderMarkdownToHTML(msg.content)}</div></div>`;
+      return html;
+    })
+    .join('\n');
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -348,7 +359,11 @@ function renderUserContentHTML(content: string): string {
     }
     // 工具结果部分 → <pre> 包裹，不渲染 markdown
     const raw = match[1].replace(/\n---$/, '');
-    parts.push('<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#374151;">' + escapeHTML(raw) + '</pre>');
+    parts.push(
+      '<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#374151;">' +
+        escapeHTML(raw) +
+        '</pre>',
+    );
     lastIdx = match.index + match[0].length;
   }
   // 剩余部分
@@ -392,9 +407,15 @@ function download(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename; a.style.display = 'none';
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 // ============================================================
@@ -407,11 +428,15 @@ function escapeHTML(s: string): string {
 }
 
 function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9一-鿿]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
 }
 
 function dateStamp(): string {
   const d = new Date();
   const p = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }

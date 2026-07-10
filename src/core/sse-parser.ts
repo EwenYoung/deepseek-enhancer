@@ -150,7 +150,7 @@ let _toolCallRegex: RegExp | null = null;
 function getToolCallRegex(): RegExp {
   if (_toolCallRegex) return _toolCallRegex;
 
-  const names = TOOL_DESCRIPTORS.map(t => t.name).join('|');
+  const names = TOOL_DESCRIPTORS.map((t) => t.name).join('|');
   // 闭合标签可选：DeepSeek 有时会省略 </web_search>
   const pattern = `<(${names})>\\s*(\\{[\\s\\S]*?\\})\\s*(?:<\\/\\1>)?`;
   _toolCallRegex = new RegExp(pattern, 'g');

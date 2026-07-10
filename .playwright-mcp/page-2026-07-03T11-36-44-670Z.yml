@@ -1,0 +1,871 @@
+- generic:
+  - generic [ref=f2e2]:
+    - generic [ref=f2e4]:
+      - generic [ref=f2e5]:
+        - img [ref=f2e7] [cursor=pointer]
+        - generic [ref=f2e19]:
+          - button [ref=f2e20] [cursor=pointer]:
+            - img [ref=f2e24]
+          - button [ref=f2e27] [cursor=pointer]:
+            - img [ref=f2e31]
+      - generic [ref=f2e33] [cursor=pointer]:
+        - img [ref=f2e35]
+        - generic [ref=f2e37]: 开启新对话
+        - text: Ctrl + J
+      - generic [ref=f2e38]:
+        - generic [ref=f2e39] [cursor=pointer]:
+          - generic [ref=f2e40]:
+            - img [ref=f2e41]
+            - text: 分类
+          - generic [ref=f2e43]:
+            - button "收起" [ref=f2e44]:
+              - img [ref=f2e45]
+            - button "新建分类" [ref=f2e47]:
+              - img [ref=f2e48]
+            - button "批量选择" [ref=f2e50]:
+              - img [ref=f2e51]
+        - generic [ref=f2e54]: 暂无分类，点击 + 新建
+      - generic [ref=f2e58]:
+        - generic [ref=f2e59]:
+          - generic [ref=f2e60]: 今天
+          - link "byd网络语含义" [ref=f2e61] [cursor=pointer]:
+            - /url: /a/chat/s/b8651d7c-69c1-48d3-a774-8e9911e33d07
+            - generic [ref=f2e62]: byd网络语含义
+          - link "Codex支持第三方API" [ref=f2e63] [cursor=pointer]:
+            - /url: /a/chat/s/b9f65a72-4340-4da6-baf0-b204f4687f98
+            - generic [ref=f2e64]: Codex支持第三方API
+            - button [ref=f2e65]:
+              - img [ref=f2e69]
+        - generic [ref=f2e73]:
+          - generic [ref=f2e74]: 昨天
+          - link "AI网页自动化工具对比" [ref=f2e75] [cursor=pointer]:
+            - /url: /a/chat/s/3f0f17b9-5afe-420d-9c43-e44fe853e8b9
+            - generic [ref=f2e76]: AI网页自动化工具对比
+        - generic [ref=f2e77]:
+          - generic [ref=f2e78]: 7 天内
+          - link "你好鸭问候" [ref=f2e79] [cursor=pointer]:
+            - /url: /a/chat/s/e76456f2-ee48-4084-8055-354507148937
+            - generic [ref=f2e80]: 你好鸭问候
+          - link "上海今日天气" [ref=f2e81] [cursor=pointer]:
+            - /url: /a/chat/s/d8f1cc8a-8090-4528-a20b-bf6b01b0a8cc
+            - generic [ref=f2e82]: 上海今日天气
+          - link "DeepSeek自我介绍" [ref=f2e83] [cursor=pointer]:
+            - /url: /a/chat/s/f37cf988-a77b-476f-9b32-923533d67a0b
+            - generic [ref=f2e84]: DeepSeek自我介绍
+          - link "XHR定义与用法" [ref=f2e85] [cursor=pointer]:
+            - /url: /a/chat/s/2e439c52-4411-4899-a693-fb2e9112f9fd
+            - generic [ref=f2e86]: XHR定义与用法
+          - link "HOPICO含义解释" [ref=f2e87] [cursor=pointer]:
+            - /url: /a/chat/s/24e4e566-0c4f-4fa5-bb3b-7cb70566aec8
+            - generic [ref=f2e88]: HOPICO含义解释
+          - link "今日新闻日报整理" [ref=f2e89] [cursor=pointer]:
+            - /url: /a/chat/s/a04988e2-fe93-4d8e-b287-486a10193ca1
+            - generic [ref=f2e90]: 今日新闻日报整理
+          - link "Claude Code撤销快捷键" [ref=f2e91] [cursor=pointer]:
+            - /url: /a/chat/s/3b9904e5-c63b-416c-a33b-6606ddb3a5b5
+            - generic [ref=f2e92]: Claude Code撤销快捷键
+          - link "DeepSeek缓存时效" [ref=f2e93] [cursor=pointer]:
+            - /url: /a/chat/s/95e72800-f416-49b5-a7c7-6e63736d0724
+            - generic [ref=f2e94]: DeepSeek缓存时效
+          - link "科幻小说勇气创作" [ref=f2e95] [cursor=pointer]:
+            - /url: /a/chat/s/08501de0-7bea-4ea8-a9ef-3e8f7ced3bea
+            - generic [ref=f2e96]: 科幻小说勇气创作
+          - link "2026年6月29日新闻日报" [ref=f2e97] [cursor=pointer]:
+            - /url: /a/chat/s/216611d5-2c3c-4803-b283-bdea39daa294
+            - generic [ref=f2e98]: 2026年6月29日新闻日报
+          - link "GitHub改名副作用" [ref=f2e99] [cursor=pointer]:
+            - /url: /a/chat/s/7f203e08-35a4-4cb8-8e54-ebdf98667fef
+            - generic [ref=f2e100]: GitHub改名副作用
+          - link "英文名谐音建议" [ref=f2e101] [cursor=pointer]:
+            - /url: /a/chat/s/d3fc073e-7653-498d-85ed-278ccb4fce94
+            - generic [ref=f2e102]: 英文名谐音建议
+          - link "今日新闻日报" [ref=f2e103] [cursor=pointer]:
+            - /url: /a/chat/s/24bf073a-1f5b-42cf-a375-8721f6fc400d
+            - generic [ref=f2e104]: 今日新闻日报
+          - link "编程shipping含义" [ref=f2e105] [cursor=pointer]:
+            - /url: /a/chat/s/01f63861-61e9-4fe7-b1cb-a719ec5ab2ab
+            - generic [ref=f2e106]: 编程shipping含义
+          - link "摆脱Vibe Coding测试困境" [ref=f2e107] [cursor=pointer]:
+            - /url: /a/chat/s/37d387fd-dac5-4b85-a1f7-ab26ed5fbbfb
+            - generic [ref=f2e108]: 摆脱Vibe Coding测试困境
+          - link "GLM-5.2获取途径" [ref=f2e109] [cursor=pointer]:
+            - /url: /a/chat/s/ebf203e9-6d90-4bce-9b7a-1019f872ee0c
+            - generic [ref=f2e110]: GLM-5.2获取途径
+          - link "LeanCTX仓库介绍" [ref=f2e111] [cursor=pointer]:
+            - /url: /a/chat/s/20b62c7e-99af-4dd5-985f-bae3347f4777
+            - generic [ref=f2e112]: LeanCTX仓库介绍
+          - link "DESIGN.md介绍" [ref=f2e113] [cursor=pointer]:
+            - /url: /a/chat/s/20fd38cf-9809-42d4-963e-0e2e1309e9cc
+            - generic [ref=f2e114]: DESIGN.md介绍
+          - link "介绍codebase-memory-mcp" [ref=f2e115] [cursor=pointer]:
+            - /url: /a/chat/s/39346701-83b3-4e69-9883-d658b74ea627
+            - generic [ref=f2e116]: 介绍codebase-memory-mcp
+          - link "DESIGN.md项目介绍" [ref=f2e117] [cursor=pointer]:
+            - /url: /a/chat/s/da3c8b4e-b1cb-424f-bee8-3a9d5e1ed416
+            - generic [ref=f2e118]: DESIGN.md项目介绍
+          - link "今日新闻日报整理" [ref=f2e119] [cursor=pointer]:
+            - /url: /a/chat/s/0a41d268-c815-4fd9-8288-f245c95eb2d0
+            - generic [ref=f2e120]: 今日新闻日报整理
+          - link "宝鸡眼科医院推荐" [ref=f2e121] [cursor=pointer]:
+            - /url: /a/chat/s/1f1196e6-b759-4545-a2d5-0322d0227a62
+            - generic [ref=f2e122]: 宝鸡眼科医院推荐
+          - link "Tau仓库介绍" [ref=f2e123] [cursor=pointer]:
+            - /url: /a/chat/s/2bb7e2e1-7b91-4b9e-b1d3-c0f4a48e2656
+            - generic [ref=f2e124]: Tau仓库介绍
+          - link "今日热点新闻搜索" [ref=f2e125] [cursor=pointer]:
+            - /url: /a/chat/s/c473c7cf-c938-4973-8af6-814cc665f8cc
+            - generic [ref=f2e126]: 今日热点新闻搜索
+          - link "今日GitHub热门项目查询" [ref=f2e127] [cursor=pointer]:
+            - /url: /a/chat/s/6c9ec273-66f9-4781-a9ad-b0877dd46c87
+            - generic [ref=f2e128]: 今日GitHub热门项目查询
+          - link "被动收入获取途径" [ref=f2e129] [cursor=pointer]:
+            - /url: /a/chat/s/be85f2e5-458c-4b83-be21-0af0e43eba9a
+            - generic [ref=f2e130]: 被动收入获取途径
+          - link "数字游民技能指南" [ref=f2e131] [cursor=pointer]:
+            - /url: /a/chat/s/fb654fe3-ceee-412a-a908-a8a37837283d
+            - generic [ref=f2e132]: 数字游民技能指南
+          - link "2026年6月27日新闻日报" [ref=f2e133] [cursor=pointer]:
+            - /url: /a/chat/s/021e74e5-1d48-4ef1-8cca-c3fbb3990486
+            - generic [ref=f2e134]: 2026年6月27日新闻日报
+        - generic [ref=f2e135]:
+          - generic [ref=f2e136]: 30 天内
+          - link "Agent强化学习解析" [ref=f2e137] [cursor=pointer]:
+            - /url: /a/chat/s/5b81d09f-080f-483b-bf8f-3cdcb88d3b27
+            - generic [ref=f2e138]: Agent强化学习解析
+          - link "斜杠英文读法" [ref=f2e139] [cursor=pointer]:
+            - /url: /a/chat/s/6511e81d-e454-4fbe-979f-dcda91c2694c
+            - generic [ref=f2e140]: 斜杠英文读法
+          - link "OpenSpec项目介绍" [ref=f2e141] [cursor=pointer]:
+            - /url: /a/chat/s/2ab4dc7b-6592-4156-8647-e49e0bcec456
+            - generic [ref=f2e142]: OpenSpec项目介绍
+          - link "Spec驱动开发对比" [ref=f2e143] [cursor=pointer]:
+            - /url: /a/chat/s/360b2dfe-9895-4e26-9d7f-6dd3f99fd0a8
+            - generic [ref=f2e144]: Spec驱动开发对比
+          - link "DeepSeek智能搜索实现" [ref=f2e145] [cursor=pointer]:
+            - /url: /a/chat/s/297dd4b8-54b0-41e9-8a29-8698b72c9a7c
+            - generic [ref=f2e146]: DeepSeek智能搜索实现
+          - link "Spec-Driven开发工作流" [ref=f2e147] [cursor=pointer]:
+            - /url: /a/chat/s/67ed5bae-f82e-40c3-9a4c-0a35333f1905
+            - generic [ref=f2e148]: Spec-Driven开发工作流
+          - link "热点新闻搜索请求" [ref=f2e149] [cursor=pointer]:
+            - /url: /a/chat/s/d8fe4d72-56f6-49e4-8992-bbd4faa791ea
+            - generic [ref=f2e150]: 热点新闻搜索请求
+          - link "热点新闻聚合查询" [ref=f2e151] [cursor=pointer]:
+            - /url: /a/chat/s/1f09968e-6689-46da-bbc0-dc74655bc998
+            - generic [ref=f2e152]: 热点新闻聚合查询
+          - link "Qwen Code介绍与优势" [ref=f2e153] [cursor=pointer]:
+            - /url: /a/chat/s/aed6e8b1-ad63-41d0-b9f1-dd81a1e2ce04
+            - generic [ref=f2e154]: Qwen Code介绍与优势
+          - link "今日新闻日报工具调用" [ref=f2e155] [cursor=pointer]:
+            - /url: /a/chat/s/2de6e363-c5b8-42c4-bb6f-1c641d17d97d
+            - generic [ref=f2e156]: 今日新闻日报工具调用
+          - link "新闻日报多路搜索" [ref=f2e157] [cursor=pointer]:
+            - /url: /a/chat/s/2649680c-5602-468c-a18b-c987a54088e1
+            - generic [ref=f2e158]: 新闻日报多路搜索
+          - link "多种驱动开发方法" [ref=f2e159] [cursor=pointer]:
+            - /url: /a/chat/s/d524158b-f670-4bc2-9b91-74aa1489398d
+            - generic [ref=f2e160]: 多种驱动开发方法
+          - link "每日热榜源列表" [ref=f2e161] [cursor=pointer]:
+            - /url: /a/chat/s/28c6190d-65ec-44b4-b4f0-ba9848009f35
+            - generic [ref=f2e162]: 每日热榜源列表
+          - link "2026年6月25日热点新闻" [ref=f2e163] [cursor=pointer]:
+            - /url: /a/chat/s/2594f015-98de-4778-8e15-323c52c45af9
+            - generic [ref=f2e164]: 2026年6月25日热点新闻
+          - link "今日新闻日报整理" [ref=f2e165] [cursor=pointer]:
+            - /url: /a/chat/s/1e8e77d1-7aae-4445-b7d2-926f9910d5d1
+            - generic [ref=f2e166]: 今日新闻日报整理
+          - link "新闻搜索" [ref=f2e167] [cursor=pointer]:
+            - /url: /a/chat/s/ab48a935-b814-4b4a-b595-a0e6416449a4
+            - generic [ref=f2e168]: 新闻搜索
+          - link "搜索多领域新闻" [ref=f2e169] [cursor=pointer]:
+            - /url: /a/chat/s/0f58a767-4504-4750-abb9-ae9dda42d299
+            - generic [ref=f2e170]: 搜索多领域新闻
+          - link "新闻搜索工具调用" [ref=f2e171] [cursor=pointer]:
+            - /url: /a/chat/s/2ef26222-76a6-45b0-acd6-29c3bd3652af
+            - generic [ref=f2e172]: 新闻搜索工具调用
+          - link "hello回应" [ref=f2e173] [cursor=pointer]:
+            - /url: /a/chat/s/f3e65b85-e293-4b9b-ab58-70a22e26e07c
+            - generic [ref=f2e174]: hello回应
+          - link "初次问候" [ref=f2e175] [cursor=pointer]:
+            - /url: /a/chat/s/2f79e630-a1cb-4747-bcfb-2e3aed2a1fc6
+            - generic [ref=f2e176]: 初次问候
+          - link "Claude Code思考强度切换" [ref=f2e177] [cursor=pointer]:
+            - /url: /a/chat/s/d4f5a103-9dfa-4d8b-aa16-ba906afc110a
+            - generic [ref=f2e178]: Claude Code思考强度切换
+          - link "散文创作暮色" [ref=f2e179] [cursor=pointer]:
+            - /url: /a/chat/s/ef906ba8-0625-4af8-892c-012a397f80ae
+            - generic [ref=f2e180]: 散文创作暮色
+          - link "挑剔者中性地道英文翻译" [ref=f2e181] [cursor=pointer]:
+            - /url: /a/chat/s/6988805b-b09d-4f84-9302-019445356d2f
+            - generic [ref=f2e182]: 挑剔者中性地道英文翻译
+          - link "文言文作文显隐辩" [ref=f2e183] [cursor=pointer]:
+            - /url: /a/chat/s/76afdc90-31bd-4fff-ad0f-9f46efa69d5b
+            - generic [ref=f2e184]: 文言文作文显隐辩
+          - link "AI狂想曲作文" [ref=f2e185] [cursor=pointer]:
+            - /url: /a/chat/s/260c7193-12f2-4a2a-9653-bd4f78f015ca
+            - generic [ref=f2e186]: AI狂想曲作文
+          - link "writer指令需明确" [ref=f2e187] [cursor=pointer]:
+            - /url: /a/chat/s/e49b0882-f404-4226-8ef0-009f3b76bc71
+            - generic [ref=f2e188]: writer指令需明确
+          - link "介绍shadcn improve" [ref=f2e189] [cursor=pointer]:
+            - /url: /a/chat/s/ccbd5dfb-6170-40d2-9328-ffc6e067b208
+            - generic [ref=f2e190]: 介绍shadcn improve
+          - link "今日新闻日报" [ref=f2e191] [cursor=pointer]:
+            - /url: /a/chat/s/faffcd8b-0f08-40c4-a822-ccd339ad6518
+            - generic [ref=f2e192]: 今日新闻日报
+          - link "2026年6月24日新闻热点" [ref=f2e193] [cursor=pointer]:
+            - /url: /a/chat/s/c7a04319-bfed-4814-ac14-189f6f0efa88
+            - generic [ref=f2e194]: 2026年6月24日新闻热点
+          - link "今日新闻热点搜索" [ref=f2e195] [cursor=pointer]:
+            - /url: /a/chat/s/edf50c51-2647-4d60-9787-784426271d58
+            - generic [ref=f2e196]: 今日新闻热点搜索
+          - link "今日热点新闻搜索" [ref=f2e197] [cursor=pointer]:
+            - /url: /a/chat/s/e5c6ad5a-6450-4547-b341-b1d6b4c8ec09
+            - generic [ref=f2e198]: 今日热点新闻搜索
+          - link "搜索今日热点新闻" [ref=f2e199] [cursor=pointer]:
+            - /url: /a/chat/s/659b5504-bf65-4521-bd23-036eafc55d7c
+            - generic [ref=f2e200]: 搜索今日热点新闻
+          - link "全球热点新闻搜索" [ref=f2e201] [cursor=pointer]:
+            - /url: /a/chat/s/346f371e-1480-4a0f-a91a-af7dfe0cf8e1
+            - generic [ref=f2e202]: 全球热点新闻搜索
+          - link "今日热点新闻搜索" [ref=f2e203] [cursor=pointer]:
+            - /url: /a/chat/s/5f494b31-fe15-45e5-a72b-5409eed6d76e
+            - generic [ref=f2e204]: 今日热点新闻搜索
+          - link "今日热点新闻搜索" [ref=f2e205] [cursor=pointer]:
+            - /url: /a/chat/s/aaa9d3c8-b16b-4976-bb05-4006192a17c0
+            - generic [ref=f2e206]: 今日热点新闻搜索
+          - link "搜索今日热点新闻" [ref=f2e207] [cursor=pointer]:
+            - /url: /a/chat/s/fc01b815-0b23-45c5-b73b-f018d29be6bb
+            - generic [ref=f2e208]: 搜索今日热点新闻
+          - link "今日热点新闻搜索" [ref=f2e209] [cursor=pointer]:
+            - /url: /a/chat/s/07a092b2-ba44-488b-ab23-abc8c4f04ef1
+            - generic [ref=f2e210]: 今日热点新闻搜索
+          - link "搜索今日热点新闻" [ref=f2e211] [cursor=pointer]:
+            - /url: /a/chat/s/ab8864ba-112d-4d44-b80c-4fd01c3c879c
+            - generic [ref=f2e212]: 搜索今日热点新闻
+          - link "联网搜索结果异常分析" [ref=f2e213] [cursor=pointer]:
+            - /url: /a/chat/s/12650f70-b3be-45c9-aec1-929c7c0a86d9
+            - generic [ref=f2e214]: 联网搜索结果异常分析
+          - link "搜索今日热点新闻" [ref=f2e215] [cursor=pointer]:
+            - /url: /a/chat/s/d0d5fb66-0215-42f8-bbcd-0aa3cf2440c0
+            - generic [ref=f2e216]: 搜索今日热点新闻
+          - link "搜索今日github热门项目" [ref=f2e217] [cursor=pointer]:
+            - /url: /a/chat/s/7b8d384f-e27d-4af4-99bd-bf8389b4994c
+            - generic [ref=f2e218]: 搜索今日github热门项目
+          - link "今日热点新闻摘要" [ref=f2e219] [cursor=pointer]:
+            - /url: /a/chat/s/5494db96-3fa8-4581-b70b-9f097216a818
+            - generic [ref=f2e220]: 今日热点新闻摘要
+          - link "搜索今日热点新闻" [ref=f2e221] [cursor=pointer]:
+            - /url: /a/chat/s/e3de5fde-89b4-4fb0-865c-b84d504e8972
+            - generic [ref=f2e222]: 搜索今日热点新闻
+          - link "搜索今日热点新闻" [ref=f2e223] [cursor=pointer]:
+            - /url: /a/chat/s/48e8c8a8-6a47-4b64-84fc-c2d26a6d642d
+            - generic [ref=f2e224]: 搜索今日热点新闻
+          - link "搜索今日新闻" [ref=f2e225] [cursor=pointer]:
+            - /url: /a/chat/s/26046c91-46dc-4843-9f1e-28424afc5bfa
+            - generic [ref=f2e226]: 搜索今日新闻
+          - link "搜索今日新闻" [ref=f2e227] [cursor=pointer]:
+            - /url: /a/chat/s/fa262a0b-fef6-4ad3-80ac-fb5cb60bd8dd
+            - generic [ref=f2e228]: 搜索今日新闻
+          - link "搜索今日热点新闻" [ref=f2e229] [cursor=pointer]:
+            - /url: /a/chat/s/8093d1f8-9b33-4548-89b5-330121c37d48
+            - generic [ref=f2e230]: 搜索今日热点新闻
+          - link "获取GitHub项目信息" [ref=f2e231] [cursor=pointer]:
+            - /url: /a/chat/s/2e44bffd-8b8b-4961-b43b-109c7f84a90f
+            - generic [ref=f2e232]: 获取GitHub项目信息
+          - link "获取项目信息" [ref=f2e233] [cursor=pointer]:
+            - /url: /a/chat/s/f6ed11f3-ae19-43cf-86cd-28900b7f6d29
+            - generic [ref=f2e234]: 获取项目信息
+          - link "五更琉璃角色识别" [ref=f2e235] [cursor=pointer]:
+            - /url: /a/chat/s/52c81c04-ea69-4630-98dc-1209e8a203d2
+            - generic [ref=f2e236]: 五更琉璃角色识别
+          - link "世界监控项目介绍" [ref=f2e237] [cursor=pointer]:
+            - /url: /a/chat/s/9aaf6433-3418-49b9-9857-45ed698f4b77
+            - generic [ref=f2e238]: 世界监控项目介绍
+          - link "2026年6月24日新闻日报" [ref=f2e239] [cursor=pointer]:
+            - /url: /a/chat/s/24e49582-74ca-46f6-9e1c-498cb0f465b6
+            - generic [ref=f2e240]: 2026年6月24日新闻日报
+          - link "问候与自我介绍" [ref=f2e241] [cursor=pointer]:
+            - /url: /a/chat/s/b4af9e1f-2a40-4cbe-975d-d15096eb7d6c
+            - generic [ref=f2e242]: 问候与自我介绍
+          - link "问候与自我介绍" [ref=f2e243] [cursor=pointer]:
+            - /url: /a/chat/s/47321aa0-365c-4703-b941-d64b26055c2d
+            - generic [ref=f2e244]: 问候与自我介绍
+          - link "初次问候" [ref=f2e245] [cursor=pointer]:
+            - /url: /a/chat/s/485d9ef7-db03-42f8-b913-7bc0812464fc
+            - generic [ref=f2e246]: 初次问候
+          - link "你好" [ref=f2e247] [cursor=pointer]:
+            - /url: /a/chat/s/02fa54fc-5fa4-4d71-98c0-7f2ffd15e875
+            - generic [ref=f2e248]: 你好
+          - link "初次问候" [ref=f2e249] [cursor=pointer]:
+            - /url: /a/chat/s/65fe58ba-2668-43be-9c8b-1abd5e4a1084
+            - generic [ref=f2e250]: 初次问候
+          - link "用户问候回应" [ref=f2e251] [cursor=pointer]:
+            - /url: /a/chat/s/0af5cd01-24b6-4314-9cc2-f89cb2c5ac3d
+            - generic [ref=f2e252]: 用户问候回应
+          - link "初次问候" [ref=f2e253] [cursor=pointer]:
+            - /url: /a/chat/s/ed8d1b90-3797-42af-9d62-93a0a9aaaf4c
+            - generic [ref=f2e254]: 初次问候
+          - link "初次问候" [ref=f2e255] [cursor=pointer]:
+            - /url: /a/chat/s/52aac826-82f5-4739-9084-9bd0eeb38f54
+            - generic [ref=f2e256]: 初次问候
+          - link "介绍codebase-memory-mcp" [ref=f2e257] [cursor=pointer]:
+            - /url: /a/chat/s/e56d52d7-a427-4475-93b5-c8853559f6fc
+            - generic [ref=f2e258]: 介绍codebase-memory-mcp
+          - link "重生诊所科幻小说" [ref=f2e259] [cursor=pointer]:
+            - /url: /a/chat/s/0647d1e6-89fe-42f8-8848-f6e84f1e6b3b
+            - generic [ref=f2e260]: 重生诊所科幻小说
+          - link "代码库记忆MCP仓库介绍" [ref=f2e261] [cursor=pointer]:
+            - /url: /a/chat/s/54b0d991-7cb8-44c6-b3a9-71ac35a9a3ef
+            - generic [ref=f2e262]: 代码库记忆MCP仓库介绍
+          - link "介绍IPTV仓库" [ref=f2e263] [cursor=pointer]:
+            - /url: /a/chat/s/02269924-c296-4d8b-95f3-0eb47d1b6a55
+            - generic [ref=f2e264]: 介绍IPTV仓库
+          - link "今日新闻日报" [ref=f2e265] [cursor=pointer]:
+            - /url: /a/chat/s/a2cf96ba-6b47-4ff6-ad57-8c78d43c7d88
+            - generic [ref=f2e266]: 今日新闻日报
+          - link "搜索今日新闻" [ref=f2e267] [cursor=pointer]:
+            - /url: /a/chat/s/34686517-18a3-446d-9631-ab57edaceb82
+            - generic [ref=f2e268]: 搜索今日新闻
+          - link "获取deepseek-pp工具信息" [ref=f2e269] [cursor=pointer]:
+            - /url: /a/chat/s/03e2ee49-2efc-4477-8880-bc5c8f70c84c
+            - generic [ref=f2e270]: 获取deepseek-pp工具信息
+          - link "查看系统环境" [ref=f2e271] [cursor=pointer]:
+            - /url: /a/chat/s/8baeca23-2165-4ba0-91fa-2063c36d8d63
+            - generic [ref=f2e272]: 查看系统环境
+          - link "FreeClaudeCode仓库介绍" [ref=f2e273] [cursor=pointer]:
+            - /url: /a/chat/s/41f3c5ab-1b60-4d90-adcf-d76ddfdad792
+            - generic [ref=f2e274]: FreeClaudeCode仓库介绍
+      - generic [ref=f2e275] [cursor=pointer]:
+        - generic [ref=f2e277]: Dasein
+        - img [ref=f2e279]
+    - generic [ref=f2e284]:
+      - generic [ref=f2e285]:
+        - generic [ref=f2e287]:
+          - generic [ref=f2e288] [cursor=pointer]: Codex支持第三方API
+          - generic [ref=f2e289]:
+            - img [ref=f2e291]
+            - generic [ref=f2e293]: 快速模式
+        - button [ref=f2e294] [cursor=pointer]:
+          - img [ref=f2e298]
+      - generic [ref=f2e300]:
+        - generic [ref=f2e302]:
+          - generic [ref=f2e303]:
+            - generic [ref=f2e305]: codex目前最新版本支持第三方api接入吗？
+            - generic [ref=f2e308]:
+              - button [ref=f2e309] [cursor=pointer]:
+                - img [ref=f2e313]
+              - button [ref=f2e315] [cursor=pointer]:
+                - img [ref=f2e319]
+          - generic [ref=f2e321]:
+            - generic [ref=f2e322]:
+              - generic [ref=f2e323]:
+                - generic [ref=f2e325] [cursor=pointer]:
+                  - img [ref=f2e327]
+                  - generic [ref=f2e330]: 已思考（用时 2 秒）
+                  - img [ref=f2e332]
+                - paragraph [ref=f2e339]: 用户想知道Codex最新版本是否支持第三方API接入。我需要提供相关信息。为了全面获取信息，我将同时进行多项搜索，涵盖中文和英文资源，并优先考虑官方来源。
+                - generic [ref=f2e340] [cursor=pointer]:
+                  - img [ref=f2e342]
+                  - generic [ref=f2e345]: 搜索到 15 个网页
+                - paragraph [ref=f2e352]: 搜索结果显示了一些相关文章。为了全面了解情况，我需要同时打开这些结果。
+                - generic [ref=f2e353]:
+                  - img [ref=f2e355]
+                  - generic [ref=f2e359]:
+                    - generic [ref=f2e360]: 浏览 5 个页面
+                    - generic [ref=f2e361]:
+                      - link "OpenAI Codex CLI 開放支援第三方模型！DeepSeek、Claude、Gemini、Ollama 都能用 - 電腦王阿達" [ref=f2e362] [cursor=pointer]:
+                        - /url: https://www.koc.com.tw/archives/646263
+                      - img [ref=f2e364]
+                    - generic [ref=f2e366]:
+                      - link "Codex兼容国产开源模型，实测DeepSeek接入：门槛还是太高-36氪" [ref=f2e367] [cursor=pointer]:
+                        - /url: https://36kr.com/p/3859719588838280
+                      - img [ref=f2e369]
+                    - generic [ref=f2e371]:
+                      - link "OpenAI「最开放」一次，Codex不再独宠GPT" [ref=f2e372] [cursor=pointer]:
+                        - /url: https://hub.baai.ac.cn/view/55738
+                      - img [ref=f2e374]
+                    - generic [ref=f2e376]:
+                      - link "Codex兼容国产开源模型！实测DeepSeek接入：门槛还是太高" [ref=f2e377] [cursor=pointer]:
+                        - /url: https://www.leikeji.com/article/77472
+                      - img [ref=f2e379]
+                    - generic [ref=f2e381]:
+                      - link "OpenAI 打破封闭传统？Codex 开放第三方模型接入" [ref=f2e382] [cursor=pointer]:
+                        - /url: https://m.techweb.com.cn/marticle/2026-06-18/2976691.shtml
+                      - img [ref=f2e384]
+                - paragraph [ref=f2e390]: 这些结果提供了相关信息。我的回答将首先给出一个明确的结论，然后详细介绍接入方式、关键前提与限制、示例与注意事项，并最后进行总结。
+              - generic [ref=f2e391]:
+                - paragraph [ref=f2e392]:
+                  - strong [ref=f2e393]: 支持
+                  - text: 。Codex 最新版本（如 v0.140.0
+                  - link "- 1" [ref=f2e394]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e395] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e396]: "1"
+                  - text: ）已开放第三方模型接入
+                  - link "- 8" [ref=f2e397]:
+                    - /url: https://m.techweb.com.cn/marticle/2026-06-18/2976691.shtml
+                    - generic [ref=f2e398] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e399]: "8"
+                  - link "- 5" [ref=f2e400]:
+                    - /url: https://hub.baai.ac.cn/view/55738
+                    - generic [ref=f2e401] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e402]: "5"
+                  - text: ，开发者可通过配置接入 DeepSeek、Claude、Gemini 等模型
+                  - generic [ref=f2e403] [cursor=pointer]:
+                    - text: "-"
+                    - img [ref=f2e405]
+                  - link "- 1" [ref=f2e408]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e409] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e410]: "1"
+                  - text: 。
+                - paragraph [ref=f2e411]:
+                  - text: 接入主要通过
+                  - code [ref=f2e412]: config.toml
+                  - text: 配置文件进行
+                  - link "- 1" [ref=f2e413]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e414] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e415]: "1"
+                  - link "- 5" [ref=f2e416]:
+                    - /url: https://hub.baai.ac.cn/view/55738
+                    - generic [ref=f2e417] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e418]: "5"
+                  - text: ，核心是定义模型提供方（Provider）
+                  - link "- 5" [ref=f2e419]:
+                    - /url: https://hub.baai.ac.cn/view/55738
+                    - generic [ref=f2e420] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e421]: "5"
+                  - text: ，需包含以下字段
+                  - link "- 1" [ref=f2e422]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e423] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e424]: "1"
+                  - link "- 5" [ref=f2e425]:
+                    - /url: https://hub.baai.ac.cn/view/55738
+                    - generic [ref=f2e426] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e427]: "5"
+                  - text: ：
+                - list [ref=f2e428]:
+                  - listitem [ref=f2e429]:
+                    - paragraph [ref=f2e430]:
+                      - strong [ref=f2e431]:
+                        - code [ref=f2e432]: base_url
+                      - text: ：第三方模型的 API 端地址。
+                  - listitem [ref=f2e433]:
+                    - paragraph [ref=f2e434]:
+                      - strong [ref=f2e435]:
+                        - code [ref=f2e436]: env_key
+                      - text: ：API Key 对应的环境变量名。
+                  - listitem [ref=f2e437]:
+                    - paragraph [ref=f2e438]:
+                      - strong [ref=f2e439]:
+                        - code [ref=f2e440]: name
+                      - text: ：模型提供方的显示名称。
+                - paragraph [ref=f2e441]:
+                  - strong [ref=f2e442]: 关键前提与限制
+                - list [ref=f2e443]:
+                  - listitem [ref=f2e444]:
+                    - paragraph [ref=f2e445]:
+                      - strong [ref=f2e446]: 协议要求
+                      - text: ：Codex 自 2026 年 2 月起已
+                      - strong [ref=f2e447]: 不再支持
+                      - text: 旧版的 Chat Completions API
+                      - generic [ref=f2e448] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e450]
+                      - link "- 8" [ref=f2e453]:
+                        - /url: https://m.techweb.com.cn/marticle/2026-06-18/2976691.shtml
+                        - generic [ref=f2e454] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e455]: "8"
+                      - text: 。所有第三方模型必须
+                      - strong [ref=f2e456]: 适配新的 Responses API 规范
+                      - generic [ref=f2e457] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e459]
+                      - link "- 8" [ref=f2e462]:
+                        - /url: https://m.techweb.com.cn/marticle/2026-06-18/2976691.shtml
+                        - generic [ref=f2e463] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e464]: "8"
+                      - text: 。
+                  - listitem [ref=f2e465]:
+                    - paragraph [ref=f2e466]:
+                      - strong [ref=f2e467]: 兼容性风险
+                      - text: ：许多模型（如 DeepSeek）的默认 API 是 Chat Completions 格式，直接连接会因找不到 Responses 接口而报错
+                      - link "- 2" [ref=f2e468]:
+                        - /url: https://36kr.com/p/3859719588838280
+                        - generic [ref=f2e469] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e470]: "2"
+                      - link "- 7" [ref=f2e471]:
+                        - /url: https://www.leikeji.com/article/77472
+                        - generic [ref=f2e472] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e473]: "7"
+                      - text: 。因此，需确认目标模型是否正式提供 Responses API 接口，或使用适配层进行转换
+                      - generic [ref=f2e474] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e476]
+                      - text: 。
+                - paragraph [ref=f2e479]:
+                  - strong [ref=f2e480]: 示例
+                  - text: ：以接入 DeepSeek 为例，在配置文件中添加如下内容即可
+                  - link "- 1" [ref=f2e481]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e482] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e483]: "1"
+                  - text: ：
+                - generic [ref=f2e484]:
+                  - generic [ref=f2e487]:
+                    - generic [ref=f2e488]: toml
+                    - generic [ref=f2e490]:
+                      - button "复制" [ref=f2e491] [cursor=pointer]:
+                        - img [ref=f2e494]
+                        - generic [ref=f2e496]: 复制
+                      - button "下载" [ref=f2e497] [cursor=pointer]:
+                        - img [ref=f2e500]
+                        - generic [ref=f2e502]: 下载
+                  - generic [ref=f2e503]: "[model_providers.deepseek] name = \"DeepSeek\" base_url = \"https://api.deepseek.com/v1\" env_key = \"DEEPSEEK_API_KEY\" wire_api = \"responses\""
+                  - img [ref=f2e504]
+                  - img [ref=f2e506]
+                - paragraph [ref=f2e508]:
+                  - text: 之后便可通过命令行指定使用该模型：
+                  - code [ref=f2e509]: codex --provider deepseek --model deepseek-coder "你的需求"
+                  - link "- 1" [ref=f2e510]:
+                    - /url: https://www.koc.com.tw/archives/646263
+                    - generic [ref=f2e511] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e512]: "1"
+                  - text: 。
+                - paragraph [ref=f2e513]:
+                  - text: 总结来说，Codex 最新版本
+                  - strong [ref=f2e514]: 确实支持
+                  - text: 第三方 API 接入，但其
+                  - strong [ref=f2e515]: 强制性依赖 Responses API
+                  - text: 协议，并非所有宣称“兼容 OpenAI”的模型都能无缝接入。
+              - generic [ref=f2e518] [cursor=pointer]: 15 个网页
+            - generic [ref=f2e520]:
+              - button [ref=f2e521] [cursor=pointer]:
+                - img [ref=f2e525]
+              - button [ref=f2e527] [cursor=pointer]:
+                - img [ref=f2e531]
+              - button [ref=f2e533] [cursor=pointer]:
+                - img [ref=f2e537]
+              - button [ref=f2e539] [cursor=pointer]:
+                - img [ref=f2e543]
+              - button [ref=f2e545] [cursor=pointer]:
+                - img [ref=f2e549]
+          - generic [ref=f2e551]:
+            - generic [ref=f2e553]: deepseek的官方文档中现在支持response api协议吗？
+            - generic [ref=f2e556]:
+              - button [ref=f2e557] [cursor=pointer]:
+                - img [ref=f2e561]
+              - button [ref=f2e563] [cursor=pointer]:
+                - img [ref=f2e567]
+          - generic [ref=f2e569]:
+            - generic [ref=f2e570]:
+              - generic [ref=f2e571]:
+                - generic [ref=f2e573] [cursor=pointer]:
+                  - img [ref=f2e575]
+                  - generic [ref=f2e578]: 已思考（用时 2 秒）
+                  - img [ref=f2e580]
+                - paragraph [ref=f2e587]: 用户想知道DeepSeek官方文档是否支持Response API协议。我需要查找DeepSeek的官方文档，确认是否提到了Response API。为了全面获取信息，我将同时进行多项搜索，涵盖不同关键词和可能的文档位置。
+                - generic [ref=f2e588] [cursor=pointer]:
+                  - img [ref=f2e590]
+                  - generic [ref=f2e593]: 搜索到 29 个网页
+                - paragraph [ref=f2e600]: 搜索结果显示，DeepSeek API 文档似乎主要围绕“chat/completions”端点。为了全面了解是否支持“Response API”，我需要同时打开这些相关的文档页面进行详细查看。
+                - generic [ref=f2e601]:
+                  - img [ref=f2e603]
+                  - generic [ref=f2e607]:
+                    - generic [ref=f2e608]: 浏览 4 个页面
+                    - generic [ref=f2e609]:
+                      - link "Your First API Call | DeepSeek API Docs" [ref=f2e610] [cursor=pointer]:
+                        - /url: https://api-docs.deepseek.com/?utm_source=www.aifire.co&utm_medium=referral&utm_campaign=deepseek-v3-vs-gpt-4-the-ai-battle-no-one-saw-coming
+                      - img [ref=f2e612]
+                    - generic [ref=f2e614]:
+                      - link "Create Chat Completion | DeepSeek API Docs" [ref=f2e615] [cursor=pointer]:
+                        - /url: https://api-docs.deepseek.com/api/create-chat-completion
+                      - img [ref=f2e617]
+                    - generic [ref=f2e619]:
+                      - link "Lists Models | DeepSeek API Docs" [ref=f2e620] [cursor=pointer]:
+                        - /url: https://api-docs.deepseek.com/api/list-models
+                      - img [ref=f2e622]
+                    - generic [ref=f2e624]:
+                      - link "chat_python | DeepSeek API Docs" [ref=f2e625] [cursor=pointer]:
+                        - /url: https://api-docs.deepseek.com/api_samples/chat_python
+                      - img [ref=f2e627]
+                - paragraph [ref=f2e633]: 这些文档都显示DeepSeek API使用的是“chat/completions”端点，而不是“Responses”端点。用户的问题对权威性要求很高，我需要确保答案基于官方文档。我的回答将基于这些发现进行组织。
+              - generic [ref=f2e634]:
+                - paragraph [ref=f2e635]:
+                  - text: 根据DeepSeek目前的官方文档，
+                  - strong [ref=f2e636]: 其API并不支持Codex所需的Responses API协议
+                  - text: 。
+                - paragraph [ref=f2e637]:
+                  - text: DeepSeek的API遵循的是
+                  - strong [ref=f2e638]: OpenAI的Chat Completions格式
+                  - generic [ref=f2e639] [cursor=pointer]:
+                    - text: "-"
+                    - img [ref=f2e641]
+                  - link "- 1" [ref=f2e644]:
+                    - /url: https://api-docs.deepseek.com/?utm_source=www.aifire.co&utm_medium=referral&utm_campaign=deepseek-v3-vs-gpt-4-the-ai-battle-no-one-saw-coming
+                    - generic [ref=f2e645] [cursor=pointer]:
+                      - text: "-"
+                      - generic [ref=f2e646]: "1"
+                  - text: ，与Codex最新版本要求的
+                  - strong [ref=f2e647]: Responses API
+                  - text: 在协议上不兼容。具体体现在：
+                - list [ref=f2e648]:
+                  - listitem [ref=f2e649]:
+                    - paragraph [ref=f2e650]:
+                      - strong [ref=f2e651]: 核心端点不同
+                      - text: ：DeepSeek所有官方示例（如Python、cURL等）的请求地址均为
+                      - code [ref=f2e652]: /chat/completions
+                      - generic [ref=f2e653] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e655]
+                      - link "- 1" [ref=f2e658]:
+                        - /url: https://api-docs.deepseek.com/?utm_source=www.aifire.co&utm_medium=referral&utm_campaign=deepseek-v3-vs-gpt-4-the-ai-battle-no-one-saw-coming
+                        - generic [ref=f2e659] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e660]: "1"
+                      - link "- 2" [ref=f2e661]:
+                        - /url: https://api-docs.deepseek.com/api/create-chat-completion
+                        - generic [ref=f2e662] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e663]: "2"
+                      - link "- 17" [ref=f2e664]:
+                        - /url: https://api-docs.deepseek.com/api_samples/chat_python
+                        - generic [ref=f2e665] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e666]: "17"
+                      - text: ；而Codex要求的Responses API端点是
+                      - code [ref=f2e667]: /responses
+                      - text: 。
+                  - listitem [ref=f2e668]:
+                    - paragraph [ref=f2e669]:
+                      - strong [ref=f2e670]: 官方文档无提及
+                      - text: ：在DeepSeek的API文档中，完全搜索不到关于
+                      - code [ref=f2e671]: responses
+                      - text: 端点或相关参数的说明
+                      - generic [ref=f2e672] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e674]
+                      - text: 。
+                - paragraph [ref=f2e677]:
+                  - text: 这意味着，如果你直接将DeepSeek接入Codex，会因为找不到
+                  - code [ref=f2e678]: /responses
+                  - text: 接口而报错。
+                - heading "💡 如何解决？" [level=3] [ref=f2e679]
+                - paragraph [ref=f2e680]: 虽然原生不兼容，但仍有两种常见的替代方案：
+                - list [ref=f2e681]:
+                  - listitem [ref=f2e682]:
+                    - paragraph [ref=f2e683]:
+                      - strong [ref=f2e684]: 使用中间适配层
+                      - text: ：部署一个协议转换服务（如
+                      - code [ref=f2e685]: openai-proxy
+                      - text: 或
+                      - code [ref=f2e686]: responses-proxy
+                      - text: ），将Codex的Responses API请求实时转换为DeepSeek支持的Chat Completions格式。
+                  - listitem [ref=f2e687]:
+                    - paragraph [ref=f2e688]:
+                      - strong [ref=f2e689]: 选用原生支持的工具
+                      - text: ：DeepSeek官方已确认与
+                      - strong [ref=f2e690]: Claude Code、GitHub Copilot、OpenCode
+                      - text: 等主流AI工具直接集成
+                      - generic [ref=f2e691] [cursor=pointer]:
+                        - text: "-"
+                        - img [ref=f2e693]
+                      - link "- 1" [ref=f2e696]:
+                        - /url: https://api-docs.deepseek.com/?utm_source=www.aifire.co&utm_medium=referral&utm_campaign=deepseek-v3-vs-gpt-4-the-ai-battle-no-one-saw-coming
+                        - generic [ref=f2e697] [cursor=pointer]:
+                          - text: "-"
+                          - generic [ref=f2e698]: "1"
+                      - text: 。如果这些工具能满足你的需求，可以直接将DeepSeek设为后端模型，无需任何适配。
+                - paragraph [ref=f2e699]: 总的来说，虽然DeepSeek本身不支持Responses API，但通过适配层或选用官方集成的工具，仍然可以实现接入。
+              - generic [ref=f2e702] [cursor=pointer]: 29 个网页
+            - generic [ref=f2e704]:
+              - button [ref=f2e705] [cursor=pointer]:
+                - img [ref=f2e709]
+              - button [ref=f2e711] [cursor=pointer]:
+                - img [ref=f2e715]
+              - button [ref=f2e717] [cursor=pointer]:
+                - img [ref=f2e721]
+              - button [ref=f2e723] [cursor=pointer]:
+                - img [ref=f2e727]
+              - button [ref=f2e729] [cursor=pointer]:
+                - img [ref=f2e733]
+        - generic [ref=f2e736]:
+          - generic [ref=f2e739]:
+            - textbox "给 DeepSeek 发送消息" [active] [ref=f2e741]:
+              - /placeholder: "给 DeepSeek 发送消息 "
+            - generic [ref=f2e742]:
+              - generic [ref=f2e743]:
+                - generic [ref=f2e744] [cursor=pointer]:
+                  - img [ref=f2e747]
+                  - generic [ref=f2e750]: 深度思考
+                - generic [ref=f2e751] [cursor=pointer]:
+                  - img [ref=f2e754]
+                  - generic [ref=f2e756]: 智能搜索
+              - generic [ref=f2e757]:
+                - button [ref=f2e758] [cursor=pointer]:
+                  - img [ref=f2e762]
+                - button [ref=f2e765]:
+                  - img [ref=f2e768]
+          - generic [ref=f2e770]: 内容由 AI 生成，请仔细甄别
+      - generic [ref=f2e771]:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic: codex目前最新版本支持第三方api接入吗？
+                - generic:
+                  - generic: deepseek的官方文档中现在支持response api协议吗？
+  - generic [ref=f2e773]:
+    - generic [ref=f2e774]:
+      - generic [ref=f2e775]: ✦ DeepSeek Enhancer
+      - button "✕" [ref=f2e776] [cursor=pointer]
+    - generic [ref=f2e777]:
+      - generic [ref=f2e778]:
+        - generic [ref=f2e780]:
+          - generic [ref=f2e781]:
+            - generic [ref=f2e782]:
+              - img [ref=f2e783]
+              - generic [ref=f2e785]: Agent 模式
+            - generic [ref=f2e786]: 注入工具定义 + 自动循环
+          - generic [ref=f2e787] [cursor=pointer]:
+            - checkbox
+        - generic [ref=f2e790]:
+          - generic [ref=f2e791]: Tools
+          - generic [ref=f2e792]:
+            - generic [ref=f2e793]:
+              - img [ref=f2e794]
+              - generic [ref=f2e797]: 搜索
+            - generic [ref=f2e800]:
+              - img [ref=f2e801]
+              - generic [ref=f2e804]: 抓取
+            - generic [ref=f2e807]:
+              - img [ref=f2e808]
+              - generic [ref=f2e811]: 新闻
+            - generic [ref=f2e814]:
+              - img [ref=f2e815]
+              - generic [ref=f2e818]: GitHub 趋势
+            - generic [ref=f2e821]:
+              - img [ref=f2e822]
+              - generic [ref=f2e825]: 生成文档
+        - generic [ref=f2e828]:
+          - generic [ref=f2e829]:
+            - generic [ref=f2e830]: Skills
+            - generic [ref=f2e831]:
+              - button "导入" [ref=f2e832] [cursor=pointer]:
+                - img [ref=f2e833]
+                - text: 导入
+              - button "+ 新建" [ref=f2e836] [cursor=pointer]
+          - generic [ref=f2e837]:
+            - generic [ref=f2e838]:
+              - generic [ref=f2e839]:
+                - generic [ref=f2e840]: /article-writer 内置
+                - generic [ref=f2e842] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e845]: 结构化长文写作，含大纲和参考文献
+            - generic [ref=f2e846]:
+              - generic [ref=f2e847]:
+                - generic [ref=f2e848]: /code-assistant 内置
+                - generic [ref=f2e850] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e853]: 轻量代码助手：生成、解释、调试、重构
+            - generic [ref=f2e854]:
+              - generic [ref=f2e855]:
+                - generic [ref=f2e856]: /code-review 内置
+                - generic [ref=f2e858] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e861]: 专业的代码审查助手，帮助发现 bug 和改进点
+            - generic [ref=f2e862]:
+              - generic [ref=f2e863]:
+                - generic [ref=f2e864]: /researcher 内置
+                - generic [ref=f2e866] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e869]: 深度调研，多源搜索后交叉验证输出综述
+            - generic [ref=f2e870]:
+              - generic [ref=f2e871]:
+                - generic [ref=f2e872]: /summarizer 内置
+                - generic [ref=f2e874] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e877]: 长文摘要，支持多种风格和详细程度
+            - generic [ref=f2e878]:
+              - generic [ref=f2e879]:
+                - generic [ref=f2e880]: /translator 内置
+                - generic [ref=f2e882] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e885]: 多语翻译，保持原文语气和风格
+            - generic [ref=f2e886]:
+              - generic [ref=f2e887]:
+                - generic [ref=f2e888]: /ultra-think 内置
+                - generic [ref=f2e890] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e893]: 引导模型进行深度思考和多步骤推理
+            - generic [ref=f2e894]:
+              - generic [ref=f2e895]:
+                - generic [ref=f2e896]: /writer 内置
+                - generic [ref=f2e898] [cursor=pointer]:
+                  - checkbox [checked]
+              - generic [ref=f2e901]: 专业写作助手，帮助润色、翻译、总结文本
+        - generic [ref=f2e902]:
+          - generic [ref=f2e903]: 导出会话
+          - generic [ref=f2e904]:
+            - button "Markdown" [ref=f2e905] [cursor=pointer]
+            - button "HTML" [ref=f2e906] [cursor=pointer]
+      - generic [ref=f2e907]:
+        - generic [ref=f2e908]:
+          - generic [ref=f2e909]:
+            - img [ref=f2e911]
+            - text: 增强功能
+          - generic [ref=f2e913]:
+            - generic [ref=f2e915]: 宽屏模式
+            - generic [ref=f2e918]:
+              - generic [ref=f2e919]: 背景主题
+              - generic [ref=f2e920]:
+                - button "‹" [ref=f2e921] [cursor=pointer]
+                - generic [ref=f2e922]: Claude
+                - button "›" [ref=f2e923] [cursor=pointer]
+            - generic [ref=f2e925]: 隐藏滚动条
+            - generic [ref=f2e929]: 隐藏输入框
+            - generic [ref=f2e933]: 语音输入
+            - generic [ref=f2e937]: Token 速度
+        - generic [ref=f2e940]:
+          - generic [ref=f2e941]:
+            - img [ref=f2e943]
+            - text: 面板设置
+          - generic [ref=f2e950]:
+            - generic [ref=f2e951]: 面板透明度
+            - generic [ref=f2e952]:
+              - slider [ref=f2e953] [cursor=pointer]: "100"
+              - generic [ref=f2e954]: 100%
+        - generic [ref=f2e955]:
+          - generic [ref=f2e956]:
+            - img [ref=f2e958]
+            - text: API 设置
+          - generic [ref=f2e962]:
+            - generic [ref=f2e963]:
+              - generic [ref=f2e964]: Tavily API Key
+              - generic [ref=f2e965]: 未配置
+            - generic [ref=f2e966]:
+              - textbox "tvly-xxxxxxxx" [ref=f2e967]
+              - button "保存" [ref=f2e968] [cursor=pointer]
+              - button "测试" [ref=f2e969] [cursor=pointer]
+  - generic [ref=f2e970] [cursor=pointer]:
+    - generic [ref=f2e971]: ✦
+    - generic: DeepSeek Enhancer

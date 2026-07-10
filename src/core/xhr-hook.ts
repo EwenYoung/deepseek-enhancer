@@ -23,19 +23,13 @@ export function hookFetch(state: AppState) {
   const origOpen = XMLHttpRequest.prototype.open;
   const origSend = XMLHttpRequest.prototype.send;
 
-  XMLHttpRequest.prototype.open = function (
-    method: string,
-    url: string | URL,
-    ...rest: unknown[]
-  ) {
+  XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: unknown[]) {
     (this as AugmentedXHR)._ds_url = String(url);
     (this as AugmentedXHR)._ds_method = method;
     return origOpen.apply(this, [method, url, ...rest]);
   };
 
-  XMLHttpRequest.prototype.send = function (
-    body?: Document | XMLHttpRequestBodyInit | null,
-  ) {
+  XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
     const url = (this as AugmentedXHR)._ds_url || '';
     const method = (this as AugmentedXHR)._ds_method || '';
 
@@ -73,7 +67,7 @@ function augmentPrompt(
   const skillCmd = parseSkillCommand(userContent);
 
   if (skillCmd) {
-    const skill = state.skills.find(s => s.name === skillCmd.skillName && s.enabled);
+    const skill = state.skills.find((s) => s.name === skillCmd.skillName && s.enabled);
     if (skill) {
       const skillCtx = buildContext(TOOL_DESCRIPTORS, skill);
       const skillPrefix = buildContextPrefix(skillCtx);
@@ -200,7 +194,10 @@ function extractTextFromDeepSeekData(data: unknown): string {
 function checkToolCalls() {
   const toolCalls = extractToolCalls(sseTextBuffer);
   if (toolCalls.length > 0) {
-    console.log('[DS-Mini] Tool calls detected:', toolCalls.map(c => c.name));
+    console.log(
+      '[DS-Mini] Tool calls detected:',
+      toolCalls.map((c) => c.name),
+    );
     onSSEToolCallDetected(sseTextBuffer, null);
     for (const call of toolCalls) {
       sseTextBuffer = sseTextBuffer.replace(call.raw, '');

@@ -34,10 +34,16 @@ async function applySkillFromText(text: string) {
   }
   if (currentSkillId === skill.id) return;
   currentSkillId = skill.id;
-  window.postMessage({
-    source: 'DS_MINI_ISOLATED', type: 'SET_SKILL',
-    skillName: skill.name, skill, instructions: skill.instructions,
-  }, '*');
+  window.postMessage(
+    {
+      source: 'DS_MINI_ISOLATED',
+      type: 'SET_SKILL',
+      skillName: skill.name,
+      skill,
+      instructions: skill.instructions,
+    },
+    '*',
+  );
 }
 
 export function initAutocomplete(_state: AppState) {
@@ -188,7 +194,10 @@ function buildDropdownItems() {
       </div>
       <span style="margin-left:auto;font-size:12px;color:var(--panel-text-secondary,#9ca3af);">${skill.source}</span>`;
     item.addEventListener('click', () => selectSkill(skill));
-    item.addEventListener('mouseenter', () => { selectedIndex = i; updateSelection(); });
+    item.addEventListener('mouseenter', () => {
+      selectedIndex = i;
+      updateSelection();
+    });
     dropdownEl.appendChild(item);
   });
 }
@@ -196,7 +205,8 @@ function buildDropdownItems() {
 function updateSelection() {
   if (!dropdownEl) return;
   dropdownEl.querySelectorAll('.ds-mini-ac-shadow-item').forEach((item, i) => {
-    (item as HTMLElement).style.background = i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent';
+    (item as HTMLElement).style.background =
+      i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent';
     if (i === selectedIndex) (item as HTMLElement).scrollIntoView({ block: 'nearest' });
   });
 }
@@ -216,7 +226,8 @@ function findInputArea(): HTMLElement | null {
 
 function getInputText(el: HTMLElement): string {
   return el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement
-    ? el.value : el.textContent || '';
+    ? el.value
+    : el.textContent || '';
 }
 
 function setInputText(el: HTMLElement, text: string) {
@@ -225,13 +236,15 @@ function setInputText(el: HTMLElement, text: string) {
     setter?.call(el, text);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   } else {
-    el.textContent = text; el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.textContent = text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 }
 
 function esc(s: string): string {
   const d = document.createElement('div');
-  d.textContent = s; return d.innerHTML;
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 function showToast(msg: string) {
@@ -249,6 +262,10 @@ function showToast(msg: string) {
     transition:opacity 0.3s;
   `;
   document.body.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; }, 2000);
-  setTimeout(() => { toast.remove(); }, 2500);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+  }, 2000);
+  setTimeout(() => {
+    toast.remove();
+  }, 2500);
 }

@@ -14,11 +14,15 @@ export default defineBackground(() => {
       return true;
     }
     if (message.type === 'SET_API_KEY') {
-      chrome.storage.local.set({ [STORAGE_KEY]: message.key }).then(() => sendResponse({ ok: true }));
+      chrome.storage.local
+        .set({ [STORAGE_KEY]: message.key })
+        .then(() => sendResponse({ ok: true }));
       return true;
     }
     if (message.type === 'GET_API_KEY') {
-      chrome.storage.local.get(STORAGE_KEY).then(r => sendResponse({ key: r[STORAGE_KEY] || '' }));
+      chrome.storage.local
+        .get(STORAGE_KEY)
+        .then((r) => sendResponse({ key: r[STORAGE_KEY] || '' }));
       return true;
     }
     if (message.type === 'TEST_TAVILY') {
@@ -130,11 +134,12 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
   const body = JSON.stringify({
     api_key: apiKey,
     query,
-    search_depth: 'advanced',           // advanced 返回质量更高的结果
-    include_answer: true,               // AI 生成的摘要
+    search_depth: 'advanced', // advanced 返回质量更高的结果
+    include_answer: true, // AI 生成的摘要
     include_raw_content: false,
     max_results: 5,
-    exclude_domains: [                  // 排除低质量/成人内容站
+    exclude_domains: [
+      // 排除低质量/成人内容站
       'famosas.vip',
       'pornhub.com',
       'xvideos.com',
@@ -153,7 +158,7 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
     throw new Error(`Tavily 搜索失败: HTTP ${res.status} — ${errText.slice(0, 200)}`);
   }
 
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   const lines: string[] = [`🔍 搜索: "${query}"`, ''];
 
   // AI 生成的答案
@@ -167,9 +172,9 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
   if (results && results.length > 0) {
     lines.push('**来源**:');
     for (const r of results) {
-      const title = r.title as string || '(无标题)';
-      const url = r.url as string || '';
-      const content = r.content as string || '';
+      const title = (r.title as string) || '(无标题)';
+      const url = (r.url as string) || '';
+      const content = (r.content as string) || '';
       const snippet = content.length > 300 ? content.slice(0, 300) + '...' : content;
       lines.push(`- **[${title}](${url})**`);
       if (snippet) lines.push(`  ${snippet}`);
@@ -191,7 +196,10 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
   const url = String(payload.url || '');
   if (!url) throw new Error('web_fetch 缺少 url 参数');
 
-  const urls = url.split(',').map(u => u.trim()).filter(Boolean);
+  const urls = url
+    .split(',')
+    .map((u) => u.trim())
+    .filter(Boolean);
   if (urls.length === 0) throw new Error('web_fetch 缺少有效的 url');
 
   const body = JSON.stringify({
@@ -212,7 +220,7 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
     throw new Error(`Tavily 抓取失败: HTTP ${res.status} — ${errText.slice(0, 200)}`);
   }
 
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   const lines: string[] = [];
 
   const results = data.results as Array<Record<string, unknown>> | undefined;
@@ -220,13 +228,17 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
 
   if (results) {
     for (const r of results) {
-      const rawContent = r.raw_content as string || '';
-      const u = r.url as string || '';
+      const rawContent = (r.raw_content as string) || '';
+      const u = (r.url as string) || '';
       lines.push(`📄 抓取: ${u}`, '');
 
       if (rawContent) {
         const maxLen = 8000;
-        lines.push(rawContent.length > maxLen ? rawContent.slice(0, maxLen) + '\n\n...（已截断）' : rawContent);
+        lines.push(
+          rawContent.length > maxLen
+            ? rawContent.slice(0, maxLen) + '\n\n...（已截断）'
+            : rawContent,
+        );
       } else {
         lines.push('(无内容)');
       }
@@ -249,7 +261,9 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
 // ============================================================
 async function newsHubSearch(payload: Record<string, unknown>, apiKey: string): Promise<string> {
   const defaultSources = 'baidu,weibo,github,zhihu,36kr,hackernews,reddit';
-  const sources: string[] = String(payload.sources || defaultSources).split(',').map(s => s.trim());
+  const sources: string[] = String(payload.sources || defaultSources)
+    .split(',')
+    .map((s) => s.trim());
   const results: Array<{ source: string; content: string }> = [];
 
   for (const src of sources) {
@@ -257,16 +271,28 @@ async function newsHubSearch(payload: Record<string, unknown>, apiKey: string): 
       switch (src) {
         // 中文平台 — 用 Tavily 搜索绕过 CORS
         case 'baidu':
-          results.push({ source: '百度热搜', content: await searchViaTavily(apiKey, '2026年6月 百度热搜榜 实时热点') });
+          results.push({
+            source: '百度热搜',
+            content: await searchViaTavily(apiKey, '2026年6月 百度热搜榜 实时热点'),
+          });
           break;
         case 'weibo':
-          results.push({ source: '微博热搜', content: await searchViaTavily(apiKey, '2026年6月 微博热搜榜 实时') });
+          results.push({
+            source: '微博热搜',
+            content: await searchViaTavily(apiKey, '2026年6月 微博热搜榜 实时'),
+          });
           break;
         case 'zhihu':
-          results.push({ source: '知乎热榜', content: await searchViaTavily(apiKey, '2026年6月 知乎热榜 热点话题') });
+          results.push({
+            source: '知乎热榜',
+            content: await searchViaTavily(apiKey, '2026年6月 知乎热榜 热点话题'),
+          });
           break;
         case '36kr':
-          results.push({ source: '36氪 AI科技', content: await searchViaTavily(apiKey, '2026年6月 36氪 人工智能 科技新闻') });
+          results.push({
+            source: '36氪 AI科技',
+            content: await searchViaTavily(apiKey, '2026年6月 36氪 人工智能 科技新闻'),
+          });
           break;
         // 国际平台 — 直接 API 调用（无 CORS 限制）
         case 'github':
@@ -286,13 +312,18 @@ async function newsHubSearch(payload: Record<string, unknown>, apiKey: string): 
           break;
       }
     } catch (err) {
-      results.push({ source: src, content: `获取失败: ${err instanceof Error ? err.message : '未知错误'}` });
+      results.push({
+        source: src,
+        content: `获取失败: ${err instanceof Error ? err.message : '未知错误'}`,
+      });
     }
   }
 
   if (results.length === 0) return '(无结果)';
 
-  return results.map(r => `${'='.repeat(30)}\n📡 ${r.source}\n${'='.repeat(30)}\n\n${r.content}`).join('\n\n');
+  return results
+    .map((r) => `${'='.repeat(30)}\n📡 ${r.source}\n${'='.repeat(30)}\n\n${r.content}`)
+    .join('\n\n');
 }
 
 // Tavily 搜索封装（用于中文源 CORS fallback）
@@ -316,7 +347,7 @@ async function searchViaTavily(apiKey: string, query: string): Promise<string> {
     return `（Tavily 搜索失败: HTTP ${res.status}）`;
   }
 
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   const lines: string[] = [];
 
   const answer = data.answer as string | undefined;
@@ -325,8 +356,8 @@ async function searchViaTavily(apiKey: string, query: string): Promise<string> {
   const results = data.results as Array<Record<string, unknown>> | undefined;
   if (results) {
     for (const r of results) {
-      const title = r.title as string || '(无标题)';
-      const content = r.content as string || '';
+      const title = (r.title as string) || '(无标题)';
+      const content = (r.content as string) || '';
       lines.push(`- **${title}**`);
       if (content) lines.push(`  ${content.slice(0, 200)}`);
     }
@@ -365,7 +396,10 @@ async function fetchGitHubTrending(url?: string): Promise<string> {
   }
 
   return repos.length > 0
-    ? repos.slice(0, 25).map(r => `- ${r}`).join('\n')
+    ? repos
+        .slice(0, 25)
+        .map((r) => `- ${r}`)
+        .join('\n')
     : '(未能获取 GitHub Trending 数据)';
 }
 
@@ -405,19 +439,21 @@ async function fetchHackerNews(): Promise<string> {
     topIds.map(async (id) => {
       try {
         const res = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
-        const item = await res.json() as Record<string, unknown>;
+        const item = (await res.json()) as Record<string, unknown>;
         return {
-          title: item.title as string || '',
-          url: item.url as string || '',
-          score: item.score as number || 0,
-          descendants: item.descendants as number || 0,
+          title: (item.title as string) || '',
+          url: (item.url as string) || '',
+          score: (item.score as number) || 0,
+          descendants: (item.descendants as number) || 0,
         };
-      } catch { return { title: '', url: '', score: 0, descendants: 0 }; }
+      } catch {
+        return { title: '', url: '', score: 0, descendants: 0 };
+      }
     }),
   );
 
   return items
-    .filter(i => i.title)
+    .filter((i) => i.title)
     .map((i, _idx) => `- ${i.title} [🔥${i.score} 💬${i.descendants}]`)
     .join('\n');
 }
@@ -426,16 +462,18 @@ async function fetchRedditML(): Promise<string> {
   const res = await fetch('https://www.reddit.com/r/MachineLearning/hot.json?limit=15', {
     headers: { 'User-Agent': 'deepseek-enhancer/0.1' },
   });
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   const children = data?.data?.children as Array<Record<string, unknown>> | undefined;
 
   if (!children || children.length === 0) return '(无 Reddit 数据)';
 
-  return children.map((child, _i) => {
-    const post = child?.data as Record<string, unknown>;
-    const title = post?.title || '';
-    const score = post?.score || 0;
-    const numComments = post?.num_comments || 0;
-    return `- ${title} [⬆${score} 💬${numComments}]`;
-  }).join('\n');
+  return children
+    .map((child, _i) => {
+      const post = child?.data as Record<string, unknown>;
+      const title = post?.title || '';
+      const score = post?.score || 0;
+      const numComments = post?.num_comments || 0;
+      return `- ${title} [⬆${score} 💬${numComments}]`;
+    })
+    .join('\n');
 }

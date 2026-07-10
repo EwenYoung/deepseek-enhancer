@@ -1,7 +1,6 @@
 import type { Skill } from './types';
 import { saveSkill } from './skill-registry';
 
-
 // ============================================================
 // SKILL.md 解析
 // ============================================================
@@ -22,13 +21,22 @@ function parseSkillMD(content: string): Skill {
 
   if (!name) {
     const firstLine = instructions.split('\n')[0].replace(/^#\s*/, '').trim();
-    name = firstLine.slice(0, 50).toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-').replace(/^-|-$/g, '');
+    name = firstLine
+      .slice(0, 50)
+      .toLowerCase()
+      .replace(/[^a-z0-9一-鿿]+/g, '-')
+      .replace(/^-|-$/g, '');
     if (!name) name = 'imported-skill';
   }
 
   return {
-    id: '', name, description: description || name, instructions,
-    source: 'custom', enabled: true, memoryEnabled: false,
+    id: '',
+    name,
+    description: description || name,
+    instructions,
+    source: 'custom',
+    enabled: true,
+    memoryEnabled: false,
   };
 }
 
@@ -52,7 +60,9 @@ export function importFromLocal(): Promise<Skill> {
         skill.id = 'local-' + hashStr(file.name + Date.now());
         input.remove();
         resolve(skill);
-      } catch (err) { reject(err); }
+      } catch (err) {
+        reject(err);
+      }
     });
 
     input.addEventListener('cancel', () => {
@@ -72,16 +82,26 @@ function openFolderPicker(resolve: (s: Skill) => void, reject: (e: Error) => voi
 
   input.addEventListener('change', async () => {
     const files = input.files;
-    if (!files || files.length === 0) { reject(new Error('未选择文件')); return; }
+    if (!files || files.length === 0) {
+      reject(new Error('未选择文件'));
+      return;
+    }
 
     try {
       let skillFile: File | null = null;
       const assetFiles: File[] = [];
       for (const file of files) {
         const fn = file.name.toLowerCase();
-        if (fn === 'skill.md' || fn.endsWith('/skill.md')) { skillFile = file; } else { assetFiles.push(file); }
+        if (fn === 'skill.md' || fn.endsWith('/skill.md')) {
+          skillFile = file;
+        } else {
+          assetFiles.push(file);
+        }
       }
-      if (!skillFile) { reject(new Error('未找到 SKILL.md')); return; }
+      if (!skillFile) {
+        reject(new Error('未找到 SKILL.md'));
+        return;
+      }
       const content = await skillFile.text();
       const skill = parseSkillMD(content);
       skill.source = 'local';
@@ -96,16 +116,23 @@ function openFolderPicker(resolve: (s: Skill) => void, reject: (e: Error) => voi
             const rel = file.webkitRelativePath || file.name;
             const ext = file.name.split('.').pop() || '';
             parts.push('### ' + rel, '', '```' + ext, c, '```', '');
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
         skill.instructions += parts.join('\n');
       }
       input.remove();
       resolve(skill);
-    } catch (err) { reject(err); }
+    } catch (err) {
+      reject(err);
+    }
   });
 
-  input.addEventListener('cancel', () => { input.remove(); reject(new Error('已取消')); });
+  input.addEventListener('cancel', () => {
+    input.remove();
+    reject(new Error('已取消'));
+  });
   input.click();
 }
 
@@ -116,6 +143,9 @@ export async function importAndSave(skill: Skill): Promise<Skill> {
 
 function hashStr(str: string): string {
   let hash = 0;
-  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0; }
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
   return Math.abs(hash).toString(36);
 }

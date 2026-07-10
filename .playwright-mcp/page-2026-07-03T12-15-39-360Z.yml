@@ -1,0 +1,76 @@
+- generic [active] [ref=f9e2]:
+  - banner [ref=f9e3]:
+    - generic [ref=f9e4]:
+      - heading "扩展程序" [level=1] [ref=f9e9]
+      - generic [ref=f9e12]:
+        - button [ref=f9e13] [cursor=pointer]
+        - generic [ref=f9e14]:
+          - generic [ref=f9e15]: 搜索扩展程序
+          - searchbox "搜索扩展程序" [ref=f9e16]
+      - generic [ref=f9e19]:
+        - generic [ref=f9e20]: 开发者模式
+        - button "开发者模式" [pressed] [ref=f9e21] [cursor=pointer]
+    - generic [ref=f9e25]:
+      - button "加载未打包的扩展程序" [ref=f9e26] [cursor=pointer]:
+        - generic [ref=f9e27]:
+          - generic: 加载未打包的扩展程序
+      - button "打包扩展程序" [ref=f9e28] [cursor=pointer]:
+        - generic [ref=f9e29]:
+          - generic: 打包扩展程序
+      - button "更新" [ref=f9e30] [cursor=pointer]:
+        - generic [ref=f9e31]:
+          - generic: 更新
+  - generic [ref=f9e32]:
+    - navigation [ref=f9e34]:
+      - menu [ref=f9e35]:
+        - generic:
+          - menuitem "我的扩展程序" [ref=f9e36] [cursor=pointer]:
+            - generic:
+              - img
+            - text: 我的扩展程序
+          - menuitem "键盘快捷键" [ref=f9e37] [cursor=pointer]:
+            - generic:
+              - img
+            - text: 键盘快捷键
+      - generic [ref=f9e40]:
+        - text: 正在开发扩展程序？请参阅 Chrome 扩展程序开发者文档，及时了解
+        - link "最新动态" [ref=f9e41] [cursor=pointer]:
+          - /url: https://developer.chrome.com/docs/extensions/whats-new?utm_source=ext_sidebar&hl=zh-CN
+        - text: 。
+      - generic [ref=f9e43]:
+        - generic:
+          - img
+        - generic [ref=f9e44]:
+          - text: 在
+          - link "Chrome 应用商店" [ref=f9e45] [cursor=pointer]:
+            - /url: https://chromewebstore.google.com/category/extensions?utm_source=ext_sidebar&hl=zh-CN
+          - text: 中发现更多扩展程序和主题
+    - main [ref=f9e46]:
+      - generic [ref=f9e50]:
+        - heading "所有扩展程序" [level=2] [ref=f9e51]
+        - generic [ref=f9e54]:
+          - generic [ref=f9e55]:
+            - generic [ref=f9e56]:
+              - img [ref=f9e57]
+              - img "未打包的扩展程序" [ref=f9e59]:
+                - generic [ref=f9e60]:
+                  - img
+            - generic [ref=f9e61]:
+              - generic [ref=f9e63]:
+                - heading "deepseek-enhancer" [level=3] [ref=f9e64]
+                - generic [ref=f9e65]: 0.1.0
+              - generic [ref=f9e66]: DeepSeek 网页端增强插件
+              - generic [ref=f9e67]: ID：kgcipblhlnacgbkhhnbliagpfllbifdm
+              - generic [ref=f9e69]:
+                - generic [ref=f9e70]: 检查视图：
+                - link "Service Worker" [ref=f9e71] [cursor=pointer]
+          - generic [ref=f9e72]:
+            - generic [ref=f9e73]:
+              - button "详情" [ref=f9e74] [cursor=pointer]:
+                - generic [ref=f9e75]:
+                  - generic: 详情
+              - button "移除" [ref=f9e76] [cursor=pointer]:
+                - generic [ref=f9e77]:
+                  - generic: 移除
+            - button "重新加载" [ref=f9e78] [cursor=pointer]
+            - button "开启，扩展程序已启用" [pressed] [ref=f9e79] [cursor=pointer]

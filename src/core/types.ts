@@ -54,9 +54,9 @@ export type SkillSource = 'builtin' | 'github' | 'local' | 'custom';
 
 export interface Skill {
   id: string;
-  name: string;           // kebab-case, 唯一
-  description: string;    // 一行描述
-  instructions: string;   // 系统指令内容
+  name: string; // kebab-case, 唯一
+  description: string; // 一行描述
+  instructions: string; // 系统指令内容
   source: SkillSource;
   /** GitHub URL（source === 'github' 时） */
   githubUrl?: string;

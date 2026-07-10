@@ -27,8 +27,8 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[]) {
   if (!toolCalls || toolCalls.length === 0) return;
 
   // doc_generate 直接在 isolated world 中处理（不需要 background worker）
-  const docCalls = toolCalls.filter(c => c.name === 'doc_generate');
-  const otherCalls = toolCalls.filter(c => c.name !== 'doc_generate');
+  const docCalls = toolCalls.filter((c) => c.name === 'doc_generate');
+  const otherCalls = toolCalls.filter((c) => c.name !== 'doc_generate');
 
   for (const call of docCalls) {
     handleDocGenerate(call);
@@ -60,16 +60,19 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[]) {
     block.replaceWith(createResultBlock(call, result));
   }
 
-  const ok = results.filter(r => r.success);
+  const ok = results.filter((r) => r.success);
   if (ok.length > 0) {
     const resultText = formatResults(ok);
     if (silentModeEnabled) {
       // 静默循环：通过 MAIN world XHR 发送，不经过 DOM
-      window.postMessage({
-        source: 'DS_MINI_ISOLATED',
-        type: 'DS_MINI_SILENT_RESULT',
-        text: resultText,
-      }, '*');
+      window.postMessage(
+        {
+          source: 'DS_MINI_ISOLATED',
+          type: 'DS_MINI_SILENT_RESULT',
+          text: resultText,
+        },
+        '*',
+      );
       console.log('[DS-Mini:UI] Silent loop: result sent to MAIN world');
     } else {
       await domSubmitText(resultText);
@@ -153,10 +156,12 @@ function markLastAssistantProcessed(container: HTMLElement) {
 }
 
 function formatResults(results: ToolResult[]): string {
-  return results.map(r => {
-    const label = r.toolName === 'web_search' ? '联网搜索' : '网页抓取';
-    return `[工具执行结果]\n工具: ${label}\n结果:\n${r.result}`;
-  }).join('\n\n---\n\n');
+  return results
+    .map((r) => {
+      const label = r.toolName === 'web_search' ? '联网搜索' : '网页抓取';
+      return `[工具执行结果]\n工具: ${label}\n结果:\n${r.result}`;
+    })
+    .join('\n\n---\n\n');
 }
 
 function handleDocGenerate(call: import('./types').ToolCall) {
@@ -170,9 +175,15 @@ function handleDocGenerate(call: import('./types').ToolCall) {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = fn; a.style.display = 'none';
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  a.href = url;
+  a.download = fn;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
   console.log('[DS-Mini:UI] doc_generate:', fn);
 }
 
@@ -182,10 +193,14 @@ function handleDocGenerate(call: import('./types').ToolCall) {
 async function domSubmitText(text: string) {
   await delay(400);
   const ta = document.querySelector('textarea');
-  if (!ta) { console.warn('[DS-Mini:UI] domSubmit: no textarea'); return; }
+  if (!ta) {
+    console.warn('[DS-Mini:UI] domSubmit: no textarea');
+    return;
+  }
 
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-  if (setter) setter.call(ta, text); else ta.value = text;
+  if (setter) setter.call(ta, text);
+  else ta.value = text;
   ta.dispatchEvent(new Event('input', { bubbles: true }));
 
   await delay(200);
@@ -205,9 +220,15 @@ async function domSubmitText(text: string) {
     }
   }
   if (!found) {
-    ta.dispatchEvent(new KeyboardEvent('keydown', {
-      key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true, cancelable: true,
-    }));
+    ta.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        keyCode: 13,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
     console.log('[DS-Mini:UI] domSubmit: Enter fallback');
   }
 }
@@ -232,7 +253,7 @@ function createResultBlock(call: ToolCall, result: ToolResult): HTMLElement {
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', ok ? 'done' : 'error');
-  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-family:-apple-system,sans-serif;font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:#374151;font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'▶':'▼'"><div style="display:flex;align-items:center;gap:8px"><span>${ok?'✅':'❌'}</span><span>${getLabel(call.name)} ${ok?'已完成':'失败'}</span><span style="color:#9ca3af;font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:#9ca3af">▼</span></div><div id="${id}" style="padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:#374151;line-height:1.6">${c}</div></div>`;
+  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-family:-apple-system,sans-serif;font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:#374151;font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'▶':'▼'"><div style="display:flex;align-items:center;gap:8px"><span>${ok ? '✅' : '❌'}</span><span>${getLabel(call.name)} ${ok ? '已完成' : '失败'}</span><span style="color:#9ca3af;font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:#9ca3af">▼</span></div><div id="${id}" style="padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:#374151;line-height:1.6">${c}</div></div>`;
   return w;
 }
 
@@ -273,7 +294,7 @@ function escapeHTML(s: string): string {
 }
 
 function delay(ms: number): Promise<void> {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 // 遗留导出保持兼容（不被调用，保留以防 import 错误）

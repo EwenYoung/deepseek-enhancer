@@ -1,0 +1,9 @@
+dist
+node_modules
+.wxt
+.output
+graphify-out
+.openspec
+.scratch
+*LOCKFILE*
+package-lock.json

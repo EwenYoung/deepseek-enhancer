@@ -6,10 +6,16 @@ import type { Skill, InjectionContext, ToolDescriptor } from './types';
 import { TOOL_DESCRIPTORS } from './tool-descriptors';
 
 function buildToolDefinitionsXML(tools: ToolDescriptor[]): string {
-  return tools.map(t => {
-    const params = t.parameters ? Object.entries(t.parameters).map(([k, v]) => `      ${k}: ${v.description}`).join('\n') : '';
-    return `<${t.name}>\n${params ? `  params:\n${params}` : ''}</${t.name}>`;
-  }).join('\n');
+  return tools
+    .map((t) => {
+      const params = t.parameters
+        ? Object.entries(t.parameters)
+            .map(([k, v]) => `      ${k}: ${v.description}`)
+            .join('\n')
+        : '';
+      return `<${t.name}>\n${params ? `  params:\n${params}` : ''}</${t.name}>`;
+    })
+    .join('\n');
 }
 
 // 用户禁用的工具缓存（由 content.ts 更新）
@@ -24,16 +30,13 @@ export function setDisabledTools(tools: Record<string, boolean>) {
  * - toolDefinitions: 工具定义的 XML 文本，告诉模型哪些工具可用
  * - skillInstructions: 激活的 skill 指令
  */
-export function buildContext(
-  tools: ToolDescriptor[],
-  skill: Skill | null,
-): InjectionContext {
+export function buildContext(tools: ToolDescriptor[], skill: Skill | null): InjectionContext {
   // ponytail: 从全局变量读取工具状态（ui-panel.ts 直接设置，避免 postMessage 延迟）
   // @ts-expect-error - window custom property set by ui-panel.ts
   if (window.__DS_TOOLS_STATE__) disabledToolsState = window.__DS_TOOLS_STATE__;
   const baseTools = tools.length > 0 ? tools : TOOL_DESCRIPTORS;
   // 过滤被禁用的工具
-  const enabledTools = baseTools.filter(t => disabledToolsState[t.name] !== false);
+  const enabledTools = baseTools.filter((t) => disabledToolsState[t.name] !== false);
   const toolDefinitions = buildToolDefinitionsXML(enabledTools);
 
   let skillInstructions = '';
@@ -69,9 +72,7 @@ export function buildContextPrefix(ctx: InjectionContext): string {
  * 检测用户输入是否包含 /skill 命令
  * @returns { skillName, args } 或 null
  */
-export function parseSkillCommand(
-  text: string,
-): { skillName: string; args: string } | null {
+export function parseSkillCommand(text: string): { skillName: string; args: string } | null {
   const match = text.match(/^\/([\w-]+)\s*(.*)/s);
   if (!match) return null;
   return { skillName: match[1], args: match[2].trim() };

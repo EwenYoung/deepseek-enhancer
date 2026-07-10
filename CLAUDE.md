@@ -2,7 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build & Development
+## 流程性规则（Skills）
+
+以下操作规则已独立为 skill，按需调用：
+
+| Skill | 触发 | 用途 |
+|-------|------|------|
+| network-proxy | `/network-proxy` | 网络命令前配置代理 127.0.0.1:7897 |
+| dev-workflow | `/dev-workflow` | 测试分工 + Chrome 扩展部署 |
+| graphify | `/graphify` | 知识图谱构建/查询 |
+
+## 行动原则
+
+- **脚本优先**：能用脚本自动化执行的重复性任务，优先写脚本执行，避免逐步手动操作。多步骤、批处理、文件操作等场景先考虑脚本化。
+- **Commit 前检查**：执行 `git commit` 前，按序运行 `npm run typecheck`、`npm run lint`、`npm run format:check`。typecheck/lint 失败需修复；format 失败则 `npm run format` 后重新 add。三项全部通过后方可提交。
+- **Review 委托**：用户要求 review 代码时，主 agent 不要亲自 review，必须分派 subagent（Agent tool, subagent_type="general-purpose"）执行。简要 review 用 caveman-review skill，标准+规格 review 用 code-review skill。
+- **危险 Git 操作**：`git reset --hard`、`git clean -fd`、`git branch -D`、`git push --force` 等不可逆操作，执行前必须向用户确认，并展示会丢失的内容。
+
+## Build Commands
 
 ```bash
 npm run build              # Build Chrome MV3 production extension
@@ -12,25 +29,7 @@ npm run zip                # Package extension for distribution
 npm run test               # Run tests (vitest)
 ```
 
-Built artifacts go to `dist/chrome-mv3/`. Deploy target: `D:\deepseek-enhancer\` (Windows desktop via WSL2 mount at `/mnt/d/deepseek-enhancer/`).
-
-To test in Chrome: `chrome://extensions` → "Load unpacked" → point to the deploy directory.
-
-## 测试
-
-每次代码改动后按以下分工验证：
-
-**Claude 测试**（确定性/可自动化）：
-- 纯函数逻辑（SSE 解析、导出、技能合并、类型定义）
-- CSS 选择器正确性
-- 数据转换/格式化
-- 方法：内联 `assert` 或 `npm run test`（vitest）
-
-**用户手动测试**（需在 chat.deepseek.com 浏览器中验证）：
-- 各主题下视觉颜色、按钮、高亮
-- Agent 模式端到端工具调用
-- React 条件渲染后的 UI 状态
-- SPA 导航后的状态保持
+Built artifacts go to `dist/chrome-mv3/`. Deploy target: `D:\deepseek-enhancer\`.
 
 ## Architecture
 
@@ -69,12 +68,20 @@ Communication: MAIN ↔ Isolated via `window.postMessage` with `source: 'DS_MINI
 - **SSE buffer isolation**: Data is stored on `xhr.__ds_buf` per-instance to avoid concurrent request pollution
 - **Mode detection**: Reads active mode class `_31a22b0` from DOM to decide which tools to inject (fast=only web_fetch, expert/web=both)
 
-## graphify
+## Knowledge Graph
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships. See `.claude/skills/graphify/SKILL.md` for usage.
 
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+## Agent Skills
+
+### Issue tracker
+
+Issues live as local markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+All five canonical triage roles use default label names (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo — one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

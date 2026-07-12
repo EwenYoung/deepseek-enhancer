@@ -22,9 +22,19 @@ export function setSilentMode(enabled: boolean) {
 // ============================================================
 // 来自主世界（Main World）的工具调用入口
 // ============================================================
-export async function handleMainWorldToolCalls(toolCalls: ToolCall[]) {
-  if (toolExecutionInProgress) return;
+export async function handleMainWorldToolCalls(toolCalls: ToolCall[], silentDepth?: number) {
+  if (toolExecutionInProgress) {
+    console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
+    return;
+  }
   if (!toolCalls || toolCalls.length === 0) return;
+
+  // 新用户消息触发的首次工具调用 → 重置 loop 计数器
+  if (silentDepth === 0 || silentDepth === undefined) {
+    if (loopDepth > 0)
+      console.log('[DS-Mini:UI] New flow detected, reset loopDepth (was ' + loopDepth + ')');
+    loopDepth = 0;
+  }
 
   // doc_generate 直接在 isolated world 中处理（不需要 background worker）
   const docCalls = toolCalls.filter((c) => c.name === 'doc_generate');
@@ -61,22 +71,12 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[]) {
   }
 
   const ok = results.filter((r) => r.success);
+  console.log('[DS-Mini:UI] Tool results:', results.length + ' total, ' + ok.length + ' OK');
   if (ok.length > 0) {
-    const resultText = formatResults(ok);
-    if (silentModeEnabled) {
-      // 静默循环：通过 MAIN world XHR 发送，不经过 DOM
-      window.postMessage(
-        {
-          source: 'DS_MINI_ISOLATED',
-          type: 'DS_MINI_SILENT_RESULT',
-          text: resultText,
-        },
-        '*',
-      );
-      console.log('[DS-Mini:UI] Silent loop: result sent to MAIN world');
-    } else {
-      await domSubmitText(resultText);
-    }
+    // ponytail: 静默 fetch 因 PoW 挂在 XHR 上（非 fetch），暂不可用，统一走 DOM
+    await domSubmitText(formatResults(ok));
+    // 虚拟列表有渲染副本，rAF 多帧扫描所有含 [工具执行结果] 的可见元素
+    scanAndHideToolResults();
   }
 
   await delay(800);
@@ -205,18 +205,30 @@ async function domSubmitText(text: string) {
 
   await delay(200);
 
-  // 找发送按钮：在 textarea 附近找第一个可见的 SVG 按钮
+  // 找发送按钮：遍历可见非禁用的按钮，优先中尺寸（20-80px）
   const root = ta.closest('form, div, section') || document.body;
   const btns = root.querySelectorAll('button');
   let found = false;
+  // 第一优先：中等尺寸按钮
   for (const btn of btns) {
     if (btn.disabled) continue;
     const r = btn.getBoundingClientRect();
-    if (r.width > 0 && r.width < 45 && r.height > 0 && r.height < 45) {
+    if (r.width >= 20 && r.width <= 80 && r.height >= 20 && r.height <= 80) {
       btn.click();
       found = true;
-      console.log('[DS-Mini:UI] domSubmit: sent');
       break;
+    }
+  }
+  // 第二优先：任意尺寸可见按钮
+  if (!found) {
+    for (const btn of btns) {
+      if (btn.disabled) continue;
+      const r = btn.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        btn.click();
+        found = true;
+        break;
+      }
     }
   }
   if (!found) {
@@ -285,6 +297,54 @@ function getLabel(name: string): string {
 
 function findChatContainer(): HTMLElement | null {
   return document.getElementById('root') || document.body;
+}
+
+// 多帧扫描隐藏 [工具执行结果] 消息（应对虚拟列表渲染副本）
+function scanAndHideToolResults() {
+  var frames = 0;
+  var maxFrames = 30;
+  // 识别消息级组件：hash class 格式如 _9663006, b13855df（7-8位字母数字）
+  function isMsgComponent(el) {
+    var cls = el.className;
+    if (!cls || typeof cls !== 'string') return false;
+    var parts = cls.split(/\s+/);
+    for (var i = 0; i < parts.length; i++) {
+      if (/^[_a-zA-Z][a-zA-Z0-9]{5,9}$/.test(parts[i])) return true;
+    }
+    return false;
+  }
+
+  function scan() {
+    frames++;
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    var textNode;
+    var found = false;
+    while ((textNode = walker.nextNode())) {
+      if (textNode.textContent && textNode.textContent.indexOf('[工具执行结果]') === 0) {
+        // 从文本节点向上找 hash class 消息容器（限步 8 层）
+        var p = textNode.parentElement;
+        var steps = 0;
+        while (p && p !== document.body && p !== document.documentElement && steps < 8) {
+          steps++;
+          var pCls = String(p.className || '');
+          // 跳过虚拟列表容器
+          if (pCls.indexOf('virtual-list') !== -1) break;
+          if (isMsgComponent(p) && !p.hasAttribute('data-ds-hidden')) {
+            p.setAttribute('data-ds-hidden', '');
+            found = true;
+            break;
+          }
+          p = p.parentElement;
+        }
+      }
+    }
+    if (frames < maxFrames && (found || frames < 5)) {
+      requestAnimationFrame(scan);
+    } else {
+      console.log('[DS-Mini:UI] Tool result scan done, frames=' + frames);
+    }
+  }
+  requestAnimationFrame(scan);
 }
 
 function escapeHTML(s: string): string {

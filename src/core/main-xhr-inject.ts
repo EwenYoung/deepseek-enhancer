@@ -184,7 +184,12 @@
   let activeSkill = null;
   let skillInstructions = '';
   let agentModeEnabled = false;
-  const lastCtx = { chat_session_id: '', model_type: '' }; // 用于静默循环
+  const lastCtx = {
+    chat_session_id: '',
+    model_type: '',
+    lastBody: null,
+    reqHeaders: null,
+  }; // 用于静默循环
 
   XMLHttpRequest.prototype.open = function (method, url, ...args) {
     this.__ds_url = String(url);
@@ -194,6 +199,9 @@
 
   const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
   XMLHttpRequest.prototype.setRequestHeader = function (header, value, ...rest) {
+    // 保存所有 headers 到 XHR 实例，供静默循环回放
+    if (!this.__ds_headers) this.__ds_headers = {};
+    this.__ds_headers[header] = value;
     if (header.toLowerCase() === 'authorization' && value) {
       window.__DS_DELETE_AUTH__ = value;
     }
@@ -211,6 +219,20 @@
         if (parsedCtx.chat_session_id) {
           lastCtx.chat_session_id = parsedCtx.chat_session_id;
           lastCtx.model_type = parsedCtx.model_type || 'default';
+          lastCtx.lastBody = parsedCtx; // 保存完整请求体供静默循环复用
+          // 保存所有请求 headers 供静默循环回放（解决 MISSING_HEADER 403）
+          if (this.__ds_headers) {
+            lastCtx.reqHeaders = {};
+            var hkeys = Object.keys(this.__ds_headers);
+            for (var hi = 0; hi < hkeys.length; hi++) {
+              lastCtx.reqHeaders[hkeys[hi]] = this.__ds_headers[hkeys[hi]];
+            }
+          }
+
+          // 新用户消息（非工具结果回注）→ 重置静默循环计数器
+          if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
+            silentDepth = 0;
+          }
 
           // 检查是否有待归类的新会话
           try {
@@ -253,15 +275,13 @@
 
     const userContent = parsed.prompt;
 
-    // 工具结果回注 → 不注入，直接放行
-    if (userContent.indexOf('[工具执行结果]') === 0) {
-      return JSON.stringify(parsed);
-    }
-
     // Agent 模式关闭 → 不注入任何内容
     if (!agentModeEnabled) {
       return JSON.stringify(parsed);
     }
+
+    // Agent 模式开启时，即使是工具结果回注也注入工具定义（支持多轮循环）
+    // ponytail: 静默 XHR 因 PoW 防重放不可用，改用 DOM 纯循环，需每轮注入工具定义
 
     const toolDefs = getToolDefs(currentMode);
     let prefix = '';
@@ -504,7 +524,7 @@
       textBuf = getBuf(xhr, 'text');
       rawBuf = getBuf(xhr, 'raw');
     }
-    window.postMessage({ type: 'DS_MINI_TOOL_CALLS', toolCalls: calls }, '*');
+    window.postMessage({ type: 'DS_MINI_TOOL_CALLS', toolCalls: calls, silentDepth: 0 }, '*');
   }
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
@@ -587,94 +607,130 @@
     console.log('[DS-Mini:MAIN] Silent loop #' + silentDepth);
 
     // 延迟 1.5s 防 429
-    setTimeout(function () {
-      const xhr = new XMLHttpRequest();
-      origOpen.call(xhr, 'POST', '/api/v0/chat/completion');
-      xhr.setRequestHeader('Content-Type', 'application/json');
-
-      // 解析 SSE 响应
-      let buf = { text: '', raw: '', pos: 0 };
-
-      xhr.addEventListener('progress', function () {
-        if (!xhr.responseText) return;
-        const fullText = xhr.responseText;
-        if (fullText.length <= buf.pos) return;
-        const part = fullText.slice(buf.pos);
-        buf.pos = fullText.length;
-
-        const lines = part.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line.startsWith('data:')) continue;
-          const ds = line.slice(5).trim();
-          if (!ds || ds === '[DONE]') continue;
-
-          buf.raw += ds;
-          var data;
-          try {
-            data = JSON.parse(ds);
-          } catch (e) {
-            continue;
-          }
-
-          const text = extractTextFromData(data);
-          if (text) buf.text += text;
-
-          if (isStreamFinished(data)) {
-            // 检测新工具调用
-            const reg =
-              /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
-            const calls = [];
-            var m;
-            while ((m = reg.exec(buf.raw)) !== null) {
-              let p = {};
-              try {
-                p = JSON.parse(m[2]);
-              } catch {}
-              calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
-            }
-            if (calls.length > 0) {
-              // 有新工具调用 → 继续循环
-              window.postMessage({ type: 'DS_MINI_TOOL_CALLS', toolCalls: calls }, '*');
-              console.log('[DS-Mini:MAIN] Silent loop continued:', calls.length, 'calls');
-            } else if (buf.text.trim()) {
-              // 没有新调用 → 最终响应，通知 content script 渲染
-              window.postMessage(
-                {
-                  source: 'DS_MINI_MAIN_FINAL',
-                  type: 'DS_MINI_FINAL_RESPONSE',
-                  text: buf.text,
-                },
-                '*',
-              );
-            }
-            buf = { text: '', raw: '', pos: 0 };
-          }
-        }
-      });
-
-      xhr.addEventListener('error', function () {
-        // 失败时 fallback 到 DOM 模式
-        window.postMessage(
-          {
-            source: 'DS_MINI_ISOLATED',
-            type: 'DS_MINI_DOM_FALLBACK',
-            text: resultText,
-          },
-          '*',
-        );
-        console.warn('[DS-Mini:MAIN] Silent loop XHR failed, fallback to DOM');
-      });
-
-      origSend.call(
-        xhr,
-        JSON.stringify({
-          prompt: resultText,
+    setTimeout(async function () {
+      // 复用完整请求体，保留所有 API 参数（stream、model、parent_message_id 等）
+      var bodyObj;
+      if (lastCtx.lastBody) {
+        bodyObj = JSON.parse(JSON.stringify(lastCtx.lastBody)); // 深拷贝
+      } else {
+        bodyObj = {
           chat_session_id: lastCtx.chat_session_id,
           model_type: lastCtx.model_type,
-        }),
+        };
+      }
+      // 注入工具定义 + 工具结果，让模型知道可继续调工具
+      var toolDefs = getToolDefs(currentMode);
+      bodyObj.prompt = toolDefs ? toolDefs + '\n---\n' + resultText : resultText;
+
+      // 使用 __origFetch（DeepSeek 的 fetch 包装器，自动附加 PoW headers）
+      var headersObj = {};
+      if (lastCtx.reqHeaders) {
+        var hkeys = Object.keys(lastCtx.reqHeaders);
+        for (var hi = 0; hi < hkeys.length; hi++) {
+          headersObj[hkeys[hi]] = lastCtx.reqHeaders[hkeys[hi]];
+        }
+      }
+      console.log(
+        '[DS-Mini:MAIN] Silent fetch sending, prompt len=' +
+          (bodyObj.prompt ? bodyObj.prompt.length : 0),
       );
+
+      try {
+        var response = await __origFetch('/api/v0/chat/completion', {
+          method: 'POST',
+          headers: headersObj,
+          body: JSON.stringify(bodyObj),
+        });
+        console.log('[DS-Mini:MAIN] Silent fetch response: status=' + response.status);
+
+        if (!response.ok || !response.body) {
+          // fetch 失败 → fallback DOM
+          console.warn('[DS-Mini:MAIN] Silent fetch failed, status=' + response.status);
+          window.postMessage(
+            { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
+            '*',
+          );
+          return;
+        }
+
+        // 流式读取 SSE 响应
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buf = { text: '', raw: '', pos: 0 };
+
+        while (true) {
+          var readResult = await reader.read();
+          if (readResult.done) {
+            // 流结束 — loadend 兜底
+            if (buf.text.trim()) {
+              checkSilentBuf(buf);
+            }
+            console.log(
+              '[DS-Mini:MAIN] Silent fetch stream ended, buf.text=' +
+                (buf.text ? buf.text.length : 0),
+            );
+            break;
+          }
+          var chunk = decoder.decode(readResult.value, { stream: true });
+          var lines = chunk.split('\n');
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line.startsWith('data:')) continue;
+            var ds = line.slice(5).trim();
+            if (!ds || ds === '[DONE]') continue;
+
+            buf.raw += ds;
+            var data;
+            try {
+              data = JSON.parse(ds);
+            } catch (e) {
+              continue;
+            }
+
+            var text = extractTextFromData(data);
+            if (text) buf.text += text;
+
+            if (isStreamFinished(data)) {
+              checkSilentBuf(buf);
+              buf = { text: '', raw: '', pos: 0 };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[DS-Mini:MAIN] Silent fetch error:', err);
+        window.postMessage(
+          { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
+          '*',
+        );
+      }
     }, 1500);
+  }
+
+  function checkSilentBuf(buf) {
+    var reg =
+      /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+    var calls = [];
+    var m;
+    while ((m = reg.exec(buf.raw)) !== null) {
+      var p = {};
+      try {
+        p = JSON.parse(m[2]);
+      } catch (e) {}
+      calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
+    }
+    if (calls.length > 0) {
+      window.postMessage(
+        { type: 'DS_MINI_TOOL_CALLS', toolCalls: calls, silentDepth: silentDepth },
+        '*',
+      );
+      console.log('[DS-Mini:MAIN] Silent loop continued:', calls.length, 'calls');
+    } else if (buf.text.trim()) {
+      window.postMessage(
+        { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
+        '*',
+      );
+      console.log('[DS-Mini:MAIN] Silent loop final');
+    }
   }
 
   window.__DS_MINI_MODE = currentMode;

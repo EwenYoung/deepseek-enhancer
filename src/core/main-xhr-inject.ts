@@ -424,6 +424,7 @@
   // ==========================================================
   // 文本提取（支持 DeepSeek SSE 格式）
   // ==========================================================
+  // ponytail: duplicates sse-parser.ts extractContent(). Keep in sync.
   function extractTextFromData(data) {
     if (!data || typeof data !== 'object') return '';
 
@@ -452,10 +453,17 @@
       const op = frag.o || frag.op;
       const val = frag.v;
       if ((op === 'APPEND' || op === 'append') && typeof val === 'string') {
-        text += val;
+        if (_isTextPath(frag.path)) text += val;
       }
     }
     return text;
+  }
+
+  function _isTextPath(path) {
+    if (typeof path !== 'string') return false;
+    return (
+      path.indexOf('content') !== -1 || path.indexOf('text') !== -1 || path.indexOf('delta') !== -1
+    );
   }
 
   function isStreamFinished(data) {
@@ -500,9 +508,9 @@
   }
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
+  // ponytail: regex built from TOOL_DESCRIPTORS, injected at build time by main-world.content.ts
   function extractFromText(text) {
-    const regex =
-      /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
+    const regex = __DS_TOOL_NAMES_REGEX__;
     const calls = [];
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -511,7 +519,7 @@
       let payload = {};
       try {
         const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === 'object') payload = parsed;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) payload = parsed;
       } catch (e) {}
       calls.push({
         name: name,

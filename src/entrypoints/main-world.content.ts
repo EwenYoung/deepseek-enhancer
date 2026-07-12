@@ -5,15 +5,21 @@
 // 只能使用原生浏览器 API 和 window.postMessage 通信
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import mainXHRCode from '../core/main-xhr-inject?raw';
+import { TOOL_DESCRIPTORS } from '../core/tool-descriptors';
+
+function buildToolRegex(): string {
+  const names = TOOL_DESCRIPTORS.map((t) => t.name).join('|');
+  return `/<(${names})>\\s*(\\{[\\s\\S]*?\\})\\s*(?:<\\/\\1>)?/g`;
+}
 
 export default defineContentScript({
   matches: ['https://chat.deepseek.com/*'],
   world: 'MAIN',
 
   main() {
-    // ponytail: eval the raw code string so it runs in main world as an IIFE
+    const code = mainXHRCode.replace('__DS_TOOL_NAMES_REGEX__', buildToolRegex());
     const script = document.createElement('script');
-    script.textContent = mainXHRCode;
+    script.textContent = code;
     (document.head || document.documentElement).appendChild(script);
     script.remove(); // 执行后移除
   },

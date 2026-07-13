@@ -46,6 +46,14 @@ export interface ToolResult {
   error?: string;
   /** 耗时 ms */
   duration: number;
+  /** 单行摘要，≤100 字符 */
+  summary: string;
+  /** 详细结果，截断 4000 字符 */
+  detail: string;
+  /** 原始结构化输出 */
+  output: unknown;
+  /** 是否有字段被截断 */
+  truncated: boolean;
 }
 
 // --- Skill 相关 ---

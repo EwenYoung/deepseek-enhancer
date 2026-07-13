@@ -197,6 +197,32 @@ export function stripToolCalls(text: string): string {
   return text.replace(getToolCallRegex(), '').trim();
 }
 
+// ============================================================
+// 任务完成标记（FR-5）
+// ============================================================
+const TASK_COMPLETE_REGEX = /<task_complete>\s*(\{[\s\S]*?\})\s*<\/task_complete>/;
+
+/**
+ * 从文本中检测 task_complete 标记，提取 summary
+ */
+export function extractTaskComplete(text: string): { found: boolean; summary: string } {
+  const match = TASK_COMPLETE_REGEX.exec(text);
+  if (!match) return { found: false, summary: '' };
+  try {
+    const parsed = JSON.parse(match[1]);
+    return { found: true, summary: parsed.summary || '任务完成' };
+  } catch {
+    return { found: true, summary: '任务完成' };
+  }
+}
+
+/**
+ * 从文本中移除 task_complete 标记
+ */
+export function stripTaskComplete(text: string): string {
+  return text.replace(/<task_complete>\s*\{[\s\S]*?\}\s*<\/task_complete>/g, '').trim();
+}
+
 /**
  * 收集完整文本并检测工具调用
  */

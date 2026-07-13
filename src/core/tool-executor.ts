@@ -26,6 +26,10 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
         success: false,
         error: response?.error || 'Unknown error',
         duration: performance.now() - startTime,
+        summary: response?.summary || '',
+        detail: response?.detail || '',
+        output: response?.output || null,
+        truncated: response?.truncated || false,
       };
     }
 
@@ -35,6 +39,10 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
       success: true,
       result: response.result,
       duration: response.duration || performance.now() - startTime,
+      summary: response.summary || '',
+      detail: response.detail || '',
+      output: response.output || null,
+      truncated: response.truncated || false,
     };
   } catch (err) {
     return {
@@ -43,6 +51,10 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
       success: false,
       error: err instanceof Error ? err.message : String(err),
       duration: performance.now() - startTime,
+      summary: '',
+      detail: '',
+      output: null,
+      truncated: false,
     };
   }
 }

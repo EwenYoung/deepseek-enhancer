@@ -2,9 +2,9 @@
 // deepseek-enhancer — 工具调用折叠块 UI
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
-import { extractToolCalls } from './sse-parser';
+import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-parser';
 import { executeToolCall } from './tool-executor';
-
+import wasmUrl from '../../public/deepseek/sha3_wasm_bg.wasm?url';
 // ============================================================
 // 状态
 // ============================================================
@@ -13,6 +13,7 @@ let loopDepth = 0;
 const MAX_LOOP = 10;
 let toolBlocksInited = false;
 let silentModeEnabled = false; // Agent 模式开启时使用静默循环
+let savedReqHeaders: Record<string, string> | null = null; // PoW 请求用
 
 // 由 content.ts 调用
 export function setSilentMode(enabled: boolean) {
@@ -22,7 +23,13 @@ export function setSilentMode(enabled: boolean) {
 // ============================================================
 // 来自主世界（Main World）的工具调用入口
 // ============================================================
-export async function handleMainWorldToolCalls(toolCalls: ToolCall[], silentDepth?: number) {
+export async function handleMainWorldToolCalls(
+  toolCalls: ToolCall[],
+  silentDepth?: number,
+  reqHeaders?: Record<string, string> | null,
+) {
+  // 必须在 toolExecutionInProgress 检查之前存储（消息路径因锁被跳过）
+  if (reqHeaders) savedReqHeaders = reqHeaders;
   if (toolExecutionInProgress) {
     console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
     return;
@@ -73,10 +80,29 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[], silentDept
   const ok = results.filter((r) => r.success);
   console.log('[DS-Mini:UI] Tool results:', results.length + ' total, ' + ok.length + ' OK');
   if (ok.length > 0) {
-    // ponytail: 静默 fetch 因 PoW 挂在 XHR 上（非 fetch），暂不可用，统一走 DOM
-    await domSubmitText(formatResults(ok));
-    // 虚拟列表有渲染副本，rAF 多帧扫描所有含 [工具执行结果] 的可见元素
-    scanAndHideToolResults();
+    if (silentModeEnabled) {
+      // 方案 A：静默循环 — 计算 PoW 后直发 XHR
+      try {
+        const powHeader = await computePowHeader();
+        window.postMessage(
+          {
+            source: 'DS_MINI_ISOLATED',
+            type: 'DS_MINI_SILENT_RESULT',
+            text: formatResults(ok),
+            powHeader: powHeader,
+          },
+          '*',
+        );
+        console.log('[DS-Mini:UI] Silent loop: result + PoW sent to MAIN world');
+      } catch (powErr) {
+        console.warn('[DS-Mini:UI] PoW failed, fallback to DOM', powErr);
+        await domSubmitText(formatResults(ok));
+        scanAndHideToolResults();
+      }
+    } else {
+      await domSubmitText(formatResults(ok));
+      scanAndHideToolResults();
+    }
   }
 
   await delay(800);
@@ -90,13 +116,30 @@ export function initToolBlocks(_state: AppState) {
   if (toolBlocksInited) return;
   toolBlocksInited = true;
 
+  // 注入 hover 样式
+  const style = document.createElement('style');
+  style.textContent = `.ds-mini-tool-block > div:first-child > div[onclick]:hover { background: rgba(0,0,0,0.04); }`;
+  document.head.appendChild(style);
+
   const container = findChatContainer();
   if (!container) return;
 
   new MutationObserver((mutations) => {
     for (const mut of mutations) {
       for (const node of mut.addedNodes) {
-        if (node instanceof HTMLElement) processNewContent(node);
+        if (node instanceof HTMLElement) {
+          processNewContent(node);
+          // 新消息出现时，多次尝试重排序（等待渲染完成）
+          if (node.classList?.contains('ds-message') && !toolExecutionInProgress) {
+            let attempts = 0;
+            const tryReorder = () => {
+              reorderToolBlocks();
+              attempts++;
+              if (attempts < 5) setTimeout(tryReorder, 500);
+            };
+            setTimeout(tryReorder, 300);
+          }
+        }
       }
     }
   }).observe(container, { childList: true, subtree: true });
@@ -117,6 +160,15 @@ function processNewContent(node: HTMLElement) {
   if (node.closest('.ds-message') !== asstMsgs[asstMsgs.length - 1]) return;
 
   const text = node.textContent || '';
+
+  // FR-5: 检查 task_complete 标记
+  const complete = extractTaskComplete(text);
+  if (complete.found) {
+    console.log('[DS-Mini:UI] Task complete marker detected, summary:', complete.summary);
+    // 从可见文本移除标记
+    hideRawTaskComplete(node, complete);
+  }
+
   const calls = extractToolCalls(text);
   if (!calls.length) return;
 
@@ -146,6 +198,25 @@ function hideRawToolCalls(container: HTMLElement, toolCalls: ToolCall[]) {
   }
 }
 
+/**
+ * FR-5: 从可见 DOM 文本中移除 task_complete 标记
+ */
+function hideRawTaskComplete(container: HTMLElement, taskComplete: { found: boolean; summary: string }) {
+  if (!taskComplete.found) return;
+  const asstMsgs = container.querySelectorAll('.ds-message:not(.d29f3d7d)');
+  if (!asstMsgs.length) return;
+  const target = asstMsgs[asstMsgs.length - 1];
+
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+  let n: Text | null;
+  while ((n = walker.nextNode() as Text | null)) {
+    const stripped = stripTaskComplete(n.textContent || '');
+    if (stripped !== n.textContent) {
+      n.textContent = stripped;
+    }
+  }
+}
+
 // ============================================================
 // 辅助
 // ============================================================
@@ -156,12 +227,52 @@ function markLastAssistantProcessed(container: HTMLElement) {
 }
 
 function formatResults(results: ToolResult[]): string {
-  return results
-    .map((r) => {
-      const label = r.toolName === 'web_search' ? '联网搜索' : '网页抓取';
-      return `[工具执行结果]\n工具: ${label}\n结果:\n${r.result}`;
-    })
-    .join('\n\n---\n\n');
+  const structured = results.map((r) => {
+    const label =
+      r.toolName === 'web_search'
+        ? '联网搜索'
+        : r.toolName === 'web_fetch'
+          ? '网页抓取'
+          : r.toolName;
+    return {
+      tool: label,
+      ok: r.success,
+      summary: r.summary || '',
+      detail: clampText(r.detail || r.result || '', 4000),
+      output: r.output ?? null,
+      error: r.error || undefined,
+      truncated: r.truncated || false,
+    };
+  });
+
+  let originalTask = '';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    originalTask = (window as any).__DS_ORIGINAL_PROMPT__ || '';
+  } catch {
+    /* cross-world access may fail, that's ok */
+  }
+
+  let task = originalTask || '';
+  if (task.length > 8000) task = task.slice(0, 8000);
+
+  return [
+    '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
+    '如果结果已经足够，请输出最终结论；只有确实需要更多信息时才继续调用工具。',
+    '',
+    '<original_task>',
+    task,
+    '</original_task>',
+    '',
+    '<tool_results>',
+    JSON.stringify(structured, null, 2),
+    '</tool_results>',
+  ].join('\n');
+}
+
+function clampText(text: string, maxLen: number): string {
+  if (!text || text.length <= maxLen) return text || '';
+  return text.slice(0, maxLen) + '...（已截断）';
 }
 
 function handleDocGenerate(call: import('./types').ToolCall) {
@@ -252,38 +363,29 @@ function createLoadingBlock(call: ToolCall, _c: HTMLElement): HTMLElement {
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', 'loading');
-  w.innerHTML = `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin:8px 0;background:#f9fafb;font-family:-apple-system,sans-serif;font-size:14px"><div style="display:flex;align-items:center;gap:8px;color:#6b7280"><span>🔧</span><span>正在执行 ${getLabel(call.name)}...</span></div></div>`;
+  w.innerHTML = `<div style="border:1px solid rgba(0,0,0,0.06);border-radius:8px;padding:12px 16px;margin:8px 0;background:rgba(0,0,0,0.02);font-size:14px"><div style="display:flex;align-items:center;gap:8px;color:#86909c"><span style="color:#86909c">---</span><span>正在执行 ${getLabel(call.name)}...</span></div></div>`;
   return w;
 }
 
 function createResultBlock(call: ToolCall, result: ToolResult): HTMLElement {
   const ok = result.success;
-  const bc = ok ? '#d1d5db' : '#fca5a5';
-  const bg = ok ? '#f9fafb' : '#fef2f2';
+  const bc = ok ? 'rgba(0,0,0,0.06)' : 'rgba(245,63,63,0.2)';
+  const bg = ok ? 'rgba(0,0,0,0.02)' : 'rgba(245,63,63,0.04)';
   const id = `ds-tool-${call.id.slice(0, 8)}`;
-  const c = ok ? escapeHTML(result.result || '(空)') : `❌ ${escapeHTML(result.error || '')}`;
+  const c = ok ? escapeHTML(result.result || '(空)') : `ERR: ${escapeHTML(result.error || '')}`;
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', ok ? 'done' : 'error');
-  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-family:-apple-system,sans-serif;font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:#374151;font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'▶':'▼'"><div style="display:flex;align-items:center;gap:8px"><span>${ok ? '✅' : '❌'}</span><span>${getLabel(call.name)} ${ok ? '已完成' : '失败'}</span><span style="color:#9ca3af;font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:#9ca3af">▼</span></div><div id="${id}" style="padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:#374151;line-height:1.6">${c}</div></div>`;
+  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:#1d2129;font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'[+]':'[-]'"><div style="display:flex;align-items:center;gap:8px"><span style="color:${ok ? '#86909c' : '#f53f3f'}">[${ok ? 'OK' : 'ERR'}]</span><span>${getLabel(call.name)} ${ok ? '已完成' : '失败'}</span><span style="color:#86909c;font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:#86909c">[+]</span></div><div id="${id}" style="display:none;padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:#1d2129;line-height:1.6">${c}</div></div>`;
   return w;
 }
 
 function insertBlockIntoChat(block: HTMLElement, container: HTMLElement) {
-  // 在最后一个助理消息之后插入
+  // 在最后一个助理消息之后插入（工具参数消息）
   const msgs = container.querySelectorAll('.ds-message');
   const lastMsg = msgs[msgs.length - 1];
   if (lastMsg) {
-    const nextEl = lastMsg.nextElementSibling;
-    if (nextEl && nextEl.closest('.ds-mini-tool-block')) {
-      // 如果有之前的 tool block，在其后追加
-      const toolBlocks = container.querySelectorAll('.ds-mini-tool-block');
-      const lastBlock = toolBlocks[toolBlocks.length - 1];
-      if (lastBlock && lastBlock.parentNode === container) {
-        lastBlock.after(block);
-        return;
-      }
-    }
+    // 直接在最后一个消息后面插入，不管后面有什么
     lastMsg.after(block);
   } else {
     container.appendChild(block);
@@ -355,6 +457,142 @@ function escapeHTML(s: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// 重排序：把工具结果块移到最终答复前面
+function reorderToolBlocks() {
+  const container = findChatContainer();
+  if (!container) return;
+  const toolBlocks = container.querySelectorAll('.ds-mini-tool-block');
+  const msgs = container.querySelectorAll('.ds-message');
+  if (toolBlocks.length === 0 || msgs.length < 2) return;
+
+  // 找到最后一个助理消息（最终答复）
+  const lastMsg = msgs[msgs.length - 1];
+  // 把所有工具结果块移到最终答复前面
+  toolBlocks.forEach((block) => {
+    if (block.parentNode === container && lastMsg.parentNode === container) {
+      container.insertBefore(block, lastMsg);
+    }
+  });
+}
+
+// ============================================================
+// DeepSeek PoW 求解 — 加载真实 WASM 模块 (sha3_wasm_bg.wasm)
+// ============================================================
+
+interface PowWasmExports {
+  memory: WebAssembly.Memory;
+  wasm_solve(
+    retPtr: number,
+    challengePtr: number,
+    challengeLen: number,
+    prefixPtr: number,
+    prefixLen: number,
+    difficulty: number,
+  ): void;
+  __wbindgen_add_to_stack_pointer(offset: number): number;
+  __wbindgen_export_0(size: number, align: number): number;
+}
+
+let powWasmPromise: Promise<PowWasmExports> | null = null;
+const textEncoder = new TextEncoder();
+
+async function loadPowWasm(): Promise<PowWasmExports> {
+  if (powWasmPromise) return powWasmPromise;
+  powWasmPromise = (async () => {
+    const resp = await fetch(wasmUrl);
+    if (!resp.ok) throw new Error(`WASM fetch failed: ${resp.status}`);
+    const { instance } = await WebAssembly.instantiate(await resp.arrayBuffer(), {});
+    return instance.exports as unknown as PowWasmExports;
+  })();
+  return powWasmPromise;
+}
+
+function writeWasmString(wasm: PowWasmExports, value: string): { ptr: number; len: number } {
+  const bytes = textEncoder.encode(value);
+  const ptr = wasm.__wbindgen_export_0(bytes.length, 1);
+  new Uint8Array(wasm.memory.buffer).set(bytes, ptr);
+  return { ptr, len: bytes.length };
+}
+
+async function computePowHeader(): Promise<string> {
+  // 1. 从服务器获取 challenge（需认证 headers）
+  let reqHeaders: Record<string, string> | null = savedReqHeaders;
+  if (!reqHeaders) {
+    try {
+      const stored = localStorage.getItem('__ds_req_headers');
+      if (stored) reqHeaders = JSON.parse(stored);
+    } catch {}
+  }
+  const fetchHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (reqHeaders) {
+    if (reqHeaders['authorization']) fetchHeaders['authorization'] = reqHeaders['authorization'];
+    if (reqHeaders['Authorization']) fetchHeaders['Authorization'] = reqHeaders['Authorization'];
+    if (reqHeaders['x-client-platform'])
+      fetchHeaders['x-client-platform'] = reqHeaders['x-client-platform'];
+    if (reqHeaders['x-client-version'])
+      fetchHeaders['x-client-version'] = reqHeaders['x-client-version'];
+    if (reqHeaders['x-client-locale'])
+      fetchHeaders['x-client-locale'] = reqHeaders['x-client-locale'];
+  }
+  const resp = await fetch('/api/v0/chat/create_pow_challenge', {
+    method: 'POST',
+    headers: fetchHeaders,
+    body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
+  });
+  if (!resp.ok) throw new Error(`PoW challenge failed: ${resp.status}`);
+  const data = await resp.json();
+  const challenge =
+    data.data?.biz_data?.challenge ||
+    data.biz_data?.challenge ||
+    data.data?.challenge ||
+    data.challenge;
+  if (!challenge || !challenge.algorithm) throw new Error('No challenge in PoW response');
+
+  // 2. WASM 求解
+  const prefix = `${challenge.salt}_${challenge.expire_at || challenge.expireAt}_`;
+  const wasm = await loadPowWasm();
+  const retPtr = wasm.__wbindgen_add_to_stack_pointer(-16);
+  const challengeAlloc = writeWasmString(wasm, challenge.challenge.toLowerCase());
+  const prefixAlloc = writeWasmString(wasm, prefix);
+
+  console.log('[DS-Mini:UI] PoW wasm_solve: difficulty=' + challenge.difficulty);
+  try {
+    wasm.wasm_solve(
+      retPtr,
+      challengeAlloc.ptr,
+      challengeAlloc.len,
+      prefixAlloc.ptr,
+      prefixAlloc.len,
+      challenge.difficulty,
+    );
+    const view = new DataView(wasm.memory.buffer);
+    const status = view.getInt32(retPtr, true);
+    const answer = view.getFloat64(retPtr + 8, true);
+    if (status !== 1 || !Number.isSafeInteger(answer) || answer < 0) {
+      throw new Error(`PoW solve failed: status=${status}, answer=${answer}`);
+    }
+    console.log('[DS-Mini:UI] PoW solved: answer=' + answer);
+
+    // 3. 打包
+    const powResponse = {
+      algorithm: challenge.algorithm,
+      challenge: challenge.challenge,
+      salt: challenge.salt,
+      answer: answer,
+      signature: challenge.signature,
+      target_path: '/api/v0/chat/completion',
+    };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(powResponse))));
+  } finally {
+    wasm.__wbindgen_add_to_stack_pointer(16);
+  }
+}
+
+// 重新启用静默模式
+export function enableSilentMode() {
+  silentModeEnabled = true;
 }
 
 // 遗留导出保持兼容（不被调用，保留以防 import 错误）

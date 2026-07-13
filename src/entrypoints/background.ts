@@ -40,28 +40,36 @@ interface ToolExecRequest {
   payload: Record<string, unknown>;
 }
 
+interface ToolOutput {
+  result: string;
+  summary: string;
+  detail: string;
+  output: unknown;
+  truncated: boolean;
+}
+
 async function handleToolExecution(req: ToolExecRequest) {
   const startTime = performance.now();
 
   try {
     const apiKey = await getAPIKey();
 
-    let result: string;
+    let toolOutput: ToolOutput;
 
     switch (req.name) {
       case 'web_search':
         if (!apiKey) return { success: false, error: '未设置 Tavily API Key', duration: 0 };
-        result = await tavilySearch(apiKey, req.payload);
+        toolOutput = await tavilySearch(apiKey, req.payload);
         break;
       case 'web_fetch':
         if (!apiKey) return { success: false, error: '未设置 Tavily API Key', duration: 0 };
-        result = await tavilyExtract(apiKey, req.payload);
+        toolOutput = await tavilyExtract(apiKey, req.payload);
         break;
       case 'news_hub':
-        result = await newsHubSearch(req.payload, apiKey);
+        toolOutput = await newsHubSearch(req.payload, apiKey);
         break;
       case 'github_trending':
-        result = await githubTrendingSearch(req.payload);
+        toolOutput = await githubTrendingSearch(req.payload);
         break;
       default:
         return { success: false, error: `Unknown tool: ${req.name}`, duration: 0 };
@@ -69,8 +77,12 @@ async function handleToolExecution(req: ToolExecRequest) {
 
     return {
       success: true,
-      result,
+      result: toolOutput.result,
       duration: performance.now() - startTime,
+      summary: toolOutput.summary,
+      detail: toolOutput.detail,
+      output: toolOutput.output,
+      truncated: toolOutput.truncated,
     };
   } catch (err) {
     return {
@@ -127,7 +139,7 @@ async function testTavily(): Promise<{ ok: boolean; message: string }> {
 // API: POST https://api.tavily.com/search
 // Docs: https://docs.tavily.com/api-reference/endpoint/search
 
-async function tavilySearch(apiKey: string, payload: Record<string, unknown>): Promise<string> {
+async function tavilySearch(apiKey: string, payload: Record<string, unknown>): Promise<ToolOutput> {
   const query = String(payload.query || payload.q || '');
   if (!query) throw new Error('web_search 缺少 query 参数');
 
@@ -169,6 +181,7 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
 
   // 搜索结果
   const results = data.results as Array<Record<string, unknown>> | undefined;
+  const resultCount = results ? results.length : 0;
   if (results && results.length > 0) {
     lines.push('**来源**:');
     for (const r of results) {
@@ -183,7 +196,14 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
 
   if (lines.length <= 2) lines.push('未找到相关结果。');
 
-  return lines.join('\n');
+  const result = lines.join('\n');
+  return {
+    result,
+    summary: `找到 ${resultCount} 条结果`,
+    detail: result.length > 4000 ? result.slice(0, 4000) : result,
+    output: data,
+    truncated: result.length > 4000,
+  };
 }
 
 // ============================================================
@@ -192,7 +212,10 @@ async function tavilySearch(apiKey: string, payload: Record<string, unknown>): P
 // API: POST https://api.tavily.com/extract
 // Docs: https://docs.tavily.com/api-reference/endpoint/extract
 
-async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): Promise<string> {
+async function tavilyExtract(
+  apiKey: string,
+  payload: Record<string, unknown>,
+): Promise<ToolOutput> {
   const url = String(payload.url || '');
   if (!url) throw new Error('web_fetch 缺少 url 参数');
 
@@ -226,10 +249,12 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
   const results = data.results as Array<Record<string, unknown>> | undefined;
   const failed = data.failed_results as Array<Record<string, unknown>> | undefined;
 
+  let totalLen = 0;
   if (results) {
     for (const r of results) {
       const rawContent = (r.raw_content as string) || '';
       const u = (r.url as string) || '';
+      totalLen += rawContent.length;
       lines.push(`📄 抓取: ${u}`, '');
 
       if (rawContent) {
@@ -253,13 +278,23 @@ async function tavilyExtract(apiKey: string, payload: Record<string, unknown>): 
     }
   }
 
-  return lines.join('\n') || '(无结果)';
+  const result = lines.join('\n') || '(无结果)';
+  return {
+    result,
+    summary: `抓取成功，内容长度 ${totalLen}`,
+    detail: result.length > 4000 ? result.slice(0, 4000) : result,
+    output: data,
+    truncated: result.length > 4000,
+  };
 }
 
 // ============================================================
 // 多源新闻聚合（百度热搜 + 微博热搜 + Tavily）
 // ============================================================
-async function newsHubSearch(payload: Record<string, unknown>, apiKey: string): Promise<string> {
+async function newsHubSearch(
+  payload: Record<string, unknown>,
+  apiKey: string,
+): Promise<ToolOutput> {
   const defaultSources = 'baidu,weibo,github,zhihu,36kr,hackernews,reddit';
   const sources: string[] = String(payload.sources || defaultSources)
     .split(',')
@@ -319,11 +354,28 @@ async function newsHubSearch(payload: Record<string, unknown>, apiKey: string): 
     }
   }
 
-  if (results.length === 0) return '(无结果)';
+  if (results.length === 0) {
+    return {
+      result: '(无结果)',
+      summary: '聚合 0 条新闻',
+      detail: '(无结果)',
+      output: [],
+      truncated: false,
+    };
+  }
 
-  return results
+  const result = results
     .map((r) => `${'='.repeat(30)}\n📡 ${r.source}\n${'='.repeat(30)}\n\n${r.content}`)
     .join('\n\n');
+
+  const okCount = results.filter((r) => !r.content.startsWith('获取失败')).length;
+  return {
+    result,
+    summary: `聚合 ${okCount} 条新闻`,
+    detail: result.length > 4000 ? result.slice(0, 4000) : result,
+    output: results,
+    truncated: result.length > 4000,
+  };
 }
 
 // Tavily 搜索封装（用于中文源 CORS fallback）
@@ -369,14 +421,25 @@ async function searchViaTavily(apiKey: string, query: string): Promise<string> {
 // ============================================================
 // GitHub Trending
 // ============================================================
-async function githubTrendingSearch(payload: Record<string, unknown>): Promise<string> {
+async function githubTrendingSearch(payload: Record<string, unknown>): Promise<ToolOutput> {
   const lang = String(payload.language || '');
   const since = String(payload.since || 'daily');
   const url = lang
     ? `https://github.com/trending/${encodeURIComponent(lang)}?since=${since}`
     : `https://github.com/trending?since=${since}`;
 
-  return fetchGitHubTrending(url);
+  const result = await fetchGitHubTrending(url);
+  const repos = result
+    .split('\n')
+    .filter((l) => l.startsWith('- '))
+    .map((l) => l.slice(2).trim());
+  return {
+    result,
+    summary: `获取 ${repos.length} 个热门项目`,
+    detail: result.length > 4000 ? result.slice(0, 4000) : result,
+    output: repos,
+    truncated: result.length > 4000,
+  };
 }
 
 // ---- 实现 ----

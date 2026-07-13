@@ -167,6 +167,9 @@
     lines.push('- 必须替换 query/url 为真实内容，不要使用占位符');
     lines.push('- 一次只输出一个 XML 标签，放到回复末尾');
     lines.push('- 收到工具结果后，如有需要可以再次调用工具，直到完成全部需求后再回复用户');
+    lines.push(
+      '- 任务完成后请输出 <task_complete>{"summary": "完成总结"}</task_complete> 标记结束',
+    );
     return lines.join('\n');
   }
 
@@ -184,11 +187,13 @@
   let activeSkill = null;
   let skillInstructions = '';
   let agentModeEnabled = false;
+  var originalUserPrompt = '';
   const lastCtx = {
     chat_session_id: '',
     model_type: '',
     lastBody: null,
     reqHeaders: null,
+    parentMessageId: null,
   }; // 用于静默循环
 
   XMLHttpRequest.prototype.open = function (method, url, ...args) {
@@ -227,11 +232,17 @@
             for (var hi = 0; hi < hkeys.length; hi++) {
               lastCtx.reqHeaders[hkeys[hi]] = this.__ds_headers[hkeys[hi]];
             }
+            // 跨 world 共享：localStorage 是 DOM API，隔离 world 可读
+            try {
+              localStorage.setItem('__ds_req_headers', JSON.stringify(lastCtx.reqHeaders));
+            } catch (e) {}
           }
 
           // 新用户消息（非工具结果回注）→ 重置静默循环计数器
           if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
             silentDepth = 0;
+            nudgeCount = 0;
+            lastCtx.parentMessageId = null;
           }
 
           // 检查是否有待归类的新会话
@@ -274,6 +285,15 @@
     if (!parsed.prompt || typeof parsed.prompt !== 'string') return body;
 
     const userContent = parsed.prompt;
+
+    // 保存原始用户提示（非工具回注）
+    if (
+      userContent.indexOf('[工具执行结果]') !== 0 &&
+      userContent.indexOf('以下是工具执行结果') !== 0
+    ) {
+      originalUserPrompt = userContent;
+      window.__DS_ORIGINAL_PROMPT__ = userContent;
+    }
 
     // Agent 模式关闭 → 不注入任何内容
     if (!agentModeEnabled) {
@@ -504,6 +524,52 @@
     let textBuf = getBuf(xhr, 'text');
     let rawBuf = getBuf(xhr, 'raw');
 
+    // FR-5: 先检测 task_complete 标记
+    var taskCompleteRe =
+      /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
+    var tcMatchText = taskCompleteRe.exec(textBuf);
+    var tcMatchRaw = taskCompleteRe.exec(rawBuf);
+    if (tcMatchText || tcMatchRaw) {
+      var tcMatch = tcMatchText || tcMatchRaw;
+      taskCompleteRe.lastIndex = 0;
+      var summary = '任务完成';
+      try {
+        var parsedSummary = JSON.parse(tcMatch[1]);
+        if (parsedSummary.summary) summary = parsedSummary.summary;
+      } catch (e) {}
+      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
+
+      // 移除标记
+      setBuf(
+        xhr,
+        'text',
+        textBuf.replace(
+          /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
+          '',
+        ),
+      );
+      setBuf(
+        xhr,
+        'raw',
+        rawBuf.replace(
+          /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
+          '',
+        ),
+      );
+
+      // 发送最终响应，不触发工具调用
+      window.postMessage(
+        {
+          source: 'DS_MINI_MAIN_FINAL',
+          type: 'DS_MINI_FINAL_RESPONSE',
+          text: getBuf(xhr, 'text'),
+          taskSummary: summary,
+        },
+        '*',
+      );
+      return;
+    }
+
     // 路径A: 从文本 buffer 中检测
     let calls = extractFromText(textBuf);
     if (calls.length === 0) {
@@ -524,7 +590,15 @@
       textBuf = getBuf(xhr, 'text');
       rawBuf = getBuf(xhr, 'raw');
     }
-    window.postMessage({ type: 'DS_MINI_TOOL_CALLS', toolCalls: calls, silentDepth: 0 }, '*');
+    window.postMessage(
+      {
+        type: 'DS_MINI_TOOL_CALLS',
+        toolCalls: calls,
+        silentDepth: 0,
+        reqHeaders: lastCtx.reqHeaders,
+      },
+      '*',
+    );
   }
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
@@ -580,7 +654,7 @@
         console.log('[DS-Mini:MAIN] Agent mode:', agentModeEnabled ? 'ON' : 'OFF');
         break;
       case 'DS_MINI_SILENT_RESULT':
-        handleSilentLoop(event.data.text);
+        handleSilentLoop(event.data.text, event.data.powHeader);
         break;
     }
   });
@@ -590,123 +664,207 @@
   // ==========================================================
   let silentDepth = 0;
   const MAX_SILENT = 10;
+  var nudgeCount = 0;
+  var MAX_NUDGES = 8;
 
-  function handleSilentLoop(resultText) {
+  function buildContinuationPrompt(originalTask, resultText) {
+    var task = originalTask || '';
+    if (task.length > 8000) task = task.slice(0, 8000);
+    return [
+      '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
+      '如果结果已经足够，请输出最终结论；只有确实需要更多信息时才继续调用工具。',
+      '',
+      '<original_task>',
+      task,
+      '</original_task>',
+      '',
+      '<tool_results>',
+      resultText,
+      '</tool_results>',
+    ].join('\n');
+  }
+
+  function handleSilentLoop(resultText, powHeader) {
     if (!lastCtx.chat_session_id) {
       console.warn('[DS-Mini:MAIN] No chat context for silent loop');
       return;
     }
 
-    silentDepth++;
-    if (silentDepth > MAX_SILENT) {
-      silentDepth = 0;
-      console.warn('[DS-Mini:MAIN] Silent loop limit');
-      return;
+    // FR-6: nudge 时不增加 silentDepth（nudge 不算新一轮工具调用迭代）
+    var isNudge = powHeader === null;
+    if (!isNudge) {
+      silentDepth++;
+      if (silentDepth > MAX_SILENT) {
+        silentDepth = 0;
+        console.warn('[DS-Mini:MAIN] Silent loop limit');
+        return;
+      }
     }
 
-    console.log('[DS-Mini:MAIN] Silent loop #' + silentDepth);
+    console.log('[DS-Mini:MAIN] Silent loop #' + silentDepth + (isNudge ? ' (nudge)' : ''));
 
-    // 延迟 1.5s 防 429
-    setTimeout(async function () {
-      // 复用完整请求体，保留所有 API 参数（stream、model、parent_message_id 等）
+    // 随机延迟 2.5-6.5s 防速率限制
+    var delay = 2500 + Math.random() * 4000;
+    console.log('[DS-Mini:MAIN] Silent loop delay=' + Math.round(delay) + 'ms');
+    setTimeout(function () {
       var bodyObj;
       if (lastCtx.lastBody) {
-        bodyObj = JSON.parse(JSON.stringify(lastCtx.lastBody)); // 深拷贝
+        bodyObj = JSON.parse(JSON.stringify(lastCtx.lastBody));
       } else {
         bodyObj = {
           chat_session_id: lastCtx.chat_session_id,
           model_type: lastCtx.model_type,
         };
       }
-      // 注入工具定义 + 工具结果，让模型知道可继续调工具
+      if (lastCtx.parentMessageId) {
+        bodyObj.parentMessageId = lastCtx.parentMessageId;
+      }
       var toolDefs = getToolDefs(currentMode);
-      bodyObj.prompt = toolDefs ? toolDefs + '\n---\n' + resultText : resultText;
+      var contPrompt = buildContinuationPrompt(originalUserPrompt, resultText);
+      bodyObj.prompt = toolDefs ? toolDefs + '\n---\n' + contPrompt : contPrompt;
 
-      // 使用 __origFetch（DeepSeek 的 fetch 包装器，自动附加 PoW headers）
-      var headersObj = {};
+      var xhr = new XMLHttpRequest();
+      origOpen.call(xhr, 'POST', '/api/v0/chat/completion');
+      // 回放原始 headers，但替换 PoW（nudge 跳过 PoW）
       if (lastCtx.reqHeaders) {
         var hkeys = Object.keys(lastCtx.reqHeaders);
         for (var hi = 0; hi < hkeys.length; hi++) {
-          headersObj[hkeys[hi]] = lastCtx.reqHeaders[hkeys[hi]];
+          var hName = hkeys[hi];
+          var hVal = lastCtx.reqHeaders[hName];
+          if (hName.toLowerCase() === 'x-ds-pow-response' && powHeader) {
+            hVal = powHeader;
+          }
+          origSetHeader.call(xhr, hName, hVal);
         }
+      } else if (powHeader) {
+        origSetHeader.call(xhr, 'x-ds-pow-response', powHeader);
+        origSetHeader.call(xhr, 'Content-Type', 'application/json');
       }
       console.log(
-        '[DS-Mini:MAIN] Silent fetch sending, prompt len=' +
+        '[DS-Mini:MAIN] Silent XHR sending, prompt len=' +
           (bodyObj.prompt ? bodyObj.prompt.length : 0),
       );
 
-      try {
-        var response = await __origFetch('/api/v0/chat/completion', {
-          method: 'POST',
-          headers: headersObj,
-          body: JSON.stringify(bodyObj),
-        });
-        console.log('[DS-Mini:MAIN] Silent fetch response: status=' + response.status);
+      var buf = { text: '', raw: '', pos: 0 };
 
-        if (!response.ok || !response.body) {
-          // fetch 失败 → fallback DOM
-          console.warn('[DS-Mini:MAIN] Silent fetch failed, status=' + response.status);
+      xhr.addEventListener('progress', function () {
+        if (!xhr.responseText) return;
+        var fullText = xhr.responseText;
+        if (fullText.length <= buf.pos) return;
+        var part = fullText.slice(buf.pos);
+        console.log(
+          '[DS-Mini:MAIN] Silent XHR chunk +' + part.length + ' bytes, total=' + fullText.length,
+        );
+        buf.pos = fullText.length;
+
+        var lines = part.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line.startsWith('data:')) continue;
+          var ds = line.slice(5).trim();
+          if (!ds || ds === '[DONE]') continue;
+
+          buf.raw += ds;
+          var data;
+          try {
+            data = JSON.parse(ds);
+          } catch (e) {
+            continue;
+          }
+
+          var text = extractTextFromData(data);
+          if (text) buf.text += text;
+
+          // 检测 SSE ready 事件（有 response_message_id 但无 choices 且无 v 字段）
+          if (data.response_message_id && !data.choices && !data.v) {
+            lastCtx.parentMessageId = data.response_message_id;
+            console.log('[DS-Mini:MAIN] Updated parentMessageId:', data.response_message_id);
+          }
+
+          if (isStreamFinished(data)) {
+            console.log(
+              '[DS-Mini:MAIN] Silent XHR finished, buf.text=' +
+                buf.text.length +
+                ', buf.raw=' +
+                buf.raw.length,
+            );
+            checkSilentBuf(buf);
+            buf = { text: '', raw: '', pos: 0 };
+          }
+        }
+      });
+
+      xhr.addEventListener('loadend', function () {
+        console.log(
+          '[DS-Mini:MAIN] Silent XHR loadend: status=' +
+            xhr.status +
+            ', buf.text=' +
+            buf.text.length +
+            ', buf.raw=' +
+            buf.raw.length,
+        );
+        if (buf.text.trim()) checkSilentBuf(buf);
+        else if (xhr.status !== 200) {
+          console.warn('[DS-Mini:MAIN] Silent XHR failed, status=' + xhr.status);
           window.postMessage(
             { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
             '*',
           );
-          return;
         }
+      });
 
-        // 流式读取 SSE 响应
-        var reader = response.body.getReader();
-        var decoder = new TextDecoder();
-        var buf = { text: '', raw: '', pos: 0 };
-
-        while (true) {
-          var readResult = await reader.read();
-          if (readResult.done) {
-            // 流结束 — loadend 兜底
-            if (buf.text.trim()) {
-              checkSilentBuf(buf);
-            }
-            console.log(
-              '[DS-Mini:MAIN] Silent fetch stream ended, buf.text=' +
-                (buf.text ? buf.text.length : 0),
-            );
-            break;
-          }
-          var chunk = decoder.decode(readResult.value, { stream: true });
-          var lines = chunk.split('\n');
-          for (var i = 0; i < lines.length; i++) {
-            var line = lines[i].trim();
-            if (!line.startsWith('data:')) continue;
-            var ds = line.slice(5).trim();
-            if (!ds || ds === '[DONE]') continue;
-
-            buf.raw += ds;
-            var data;
-            try {
-              data = JSON.parse(ds);
-            } catch (e) {
-              continue;
-            }
-
-            var text = extractTextFromData(data);
-            if (text) buf.text += text;
-
-            if (isStreamFinished(data)) {
-              checkSilentBuf(buf);
-              buf = { text: '', raw: '', pos: 0 };
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[DS-Mini:MAIN] Silent fetch error:', err);
+      xhr.addEventListener('error', function () {
         window.postMessage(
           { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
           '*',
         );
-      }
-    }, 1500);
+      });
+
+      origSend.call(xhr, JSON.stringify(bodyObj));
+    }, delay);
+  }
+
+  // FR-6: nudge 检测 — 续行意图但未输出工具调用
+  function needsNudge(text) {
+    var intentRe =
+      /(?:我将|我会|接下来|下一步|i'll|let me|next).{0,64}(?:调用|搜索|获取|执行|call|search|fetch|run)/gi;
+    var hasIntent = intentRe.test(text);
+    intentRe.lastIndex = 0;
+    return hasIntent && text.length < 200;
   }
 
   function checkSilentBuf(buf) {
+    // FR-5: 先检测 task_complete 标记
+    var taskCompleteRe =
+      /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
+    var tcMatch = taskCompleteRe.exec(buf.text) || taskCompleteRe.exec(buf.raw);
+    if (tcMatch) {
+      taskCompleteRe.lastIndex = 0;
+      var summary = '任务完成';
+      try {
+        var parsedSummary = JSON.parse(tcMatch[1]);
+        if (parsedSummary.summary) summary = parsedSummary.summary;
+      } catch (e) {}
+      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
+
+      // 移除标记后的文本
+      var cleanText = buf.text.replace(
+        /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
+        '',
+      ).trim();
+
+      window.postMessage(
+        {
+          source: 'DS_MINI_MAIN_FINAL',
+          type: 'DS_MINI_FINAL_RESPONSE',
+          text: cleanText,
+          taskSummary: summary,
+        },
+        '*',
+      );
+      return;
+    }
+
     var reg =
       /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
     var calls = [];
@@ -718,18 +876,65 @@
       } catch (e) {}
       calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
     }
+
+    // 从 raw buffer 中扫描 SSE ready 事件更新 parentMessageId
+    var readyReg = /"response_message_id"\s*:\s*"([^"]+)"/gm;
+    var rm;
+    var lastReady = null;
+    while ((rm = readyReg.exec(buf.raw)) !== null) {
+      try {
+        var candidate = JSON.parse(rm.input);
+        if (candidate.response_message_id && !candidate.choices && !candidate.v) {
+          lastReady = candidate.response_message_id;
+        }
+      } catch (e) {
+        // raw buffer chunk may not be valid JSON, use regex capture as fallback
+        lastReady = rm[1];
+      }
+    }
+    if (lastReady) {
+      lastCtx.parentMessageId = lastReady;
+      console.log('[DS-Mini:MAIN] Updated parentMessageId from silent buf:', lastReady);
+    }
+
     if (calls.length > 0) {
       window.postMessage(
-        { type: 'DS_MINI_TOOL_CALLS', toolCalls: calls, silentDepth: silentDepth },
+        {
+          type: 'DS_MINI_TOOL_CALLS',
+          toolCalls: calls,
+          silentDepth: silentDepth,
+          reqHeaders: lastCtx.reqHeaders,
+        },
         '*',
       );
       console.log('[DS-Mini:MAIN] Silent loop continued:', calls.length, 'calls');
     } else if (buf.text.trim()) {
-      window.postMessage(
-        { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
-        '*',
-      );
-      console.log('[DS-Mini:MAIN] Silent loop final');
+      // FR-6: 没有工具调用也没有 task_complete → 检查是否需要 nudge
+      if (needsNudge(buf.text) && nudgeCount < MAX_NUDGES) {
+        nudgeCount++;
+        console.log('[DS-Mini:MAIN] Nudge #' + nudgeCount + ' triggered');
+
+        // 构建 nudge prompt
+        var nudgePrompt =
+          '你刚才提到了要继续行动但未输出工具调用。如果需要执行工具，请输出 XML 工具标签；如果任务已完成，请输出 <task_complete>{"summary": "..."}</task_complete> 标记。不要输出其他内容。';
+
+        // 通过 handleSilentLoop 发送 nudge（null powHeader = 跳过 PoW）
+        handleSilentLoop(nudgePrompt, null);
+      } else if (nudgeCount >= MAX_NUDGES) {
+        console.warn('[DS-Mini:MAIN] Max nudges reached, forcing end');
+        nudgeCount = 0;
+        window.postMessage(
+          { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
+          '*',
+        );
+        console.log('[DS-Mini:MAIN] Silent loop final (max nudge)');
+      } else {
+        window.postMessage(
+          { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
+          '*',
+        );
+        console.log('[DS-Mini:MAIN] Silent loop final');
+      }
     }
   }
 

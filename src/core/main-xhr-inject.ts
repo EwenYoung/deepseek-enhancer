@@ -238,11 +238,8 @@
             } catch (e) {}
           }
 
-          // 新用户消息（非工具结果回注）→ 重置静默循环计数器
+          // 新用户消息（非工具结果回注）→ 重置 parentMessageId
           if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
-            silentDepth = 0;
-            nudgeCount = 0;
-            activeLoopId = null;
             lastCtx.parentMessageId = null;
           }
 
@@ -540,7 +537,7 @@
       } catch (e) {}
       console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
 
-      // 移除标记
+      // 移除标记（DOM submit 下页面自己渲染最终回复，不额外注入）
       setBuf(
         xhr,
         'text',
@@ -556,17 +553,6 @@
           /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
           '',
         ),
-      );
-
-      // 发送最终响应，不触发工具调用
-      window.postMessage(
-        {
-          source: 'DS_MINI_MAIN_FINAL',
-          type: 'DS_MINI_FINAL_RESPONSE',
-          text: getBuf(xhr, 'text'),
-          taskSummary: summary,
-        },
-        '*',
       );
       return;
     }
@@ -595,7 +581,7 @@
       {
         type: 'DS_MINI_TOOL_CALLS',
         toolCalls: calls,
-        silentDepth: 0,
+        silentDepth: 0, // legacy field kept for compatibility
         reqHeaders: lastCtx.reqHeaders,
       },
       '*',
@@ -654,374 +640,11 @@
         agentModeEnabled = event.data.enabled;
         console.log('[DS-Mini:MAIN] Agent mode:', agentModeEnabled ? 'ON' : 'OFF');
         break;
+      // DS_MINI_SILENT_RESULT — removed. Continuation now via DOM submit path.
       case 'DS_MINI_SILENT_RESULT':
-        if (event.data.loopId) activeLoopId = event.data.loopId;
-        handleSilentLoop(event.data.text, event.data.powHeader);
         break;
     }
   });
-
-  // ==========================================================
-  // 静默循环 — 直接 XHR 发送工具结果，不经过 DOM
-  // ==========================================================
-  let silentDepth = 0;
-  const MAX_SILENT = 10;
-  var nudgeCount = 0;
-  var MAX_NUDGES = 8;
-  var activeLoopId = null; // 从 isolated world 传递的 loopId
-
-  function buildContinuationPrompt(originalTask, resultText) {
-    var task = originalTask || '';
-    if (task.length > 8000) task = task.slice(0, 8000);
-    return [
-      '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
-      '如果结果已经足够，请输出最终结论；只有确实需要更多信息时才继续调用工具。',
-      '',
-      '<original_task>',
-      task,
-      '</original_task>',
-      '',
-      '<tool_results>',
-      resultText,
-      '</tool_results>',
-    ].join('\n');
-  }
-
-  function handleSilentLoop(resultText, powHeader) {
-    if (!lastCtx.chat_session_id) {
-      console.warn('[DS-Mini:MAIN] No chat context for silent loop');
-      return;
-    }
-
-    // FR-6: nudge 时不增加 silentDepth（nudge 不算新一轮工具调用迭代）
-    var isNudge = powHeader === null;
-    if (!isNudge) {
-      silentDepth++;
-      if (silentDepth > MAX_SILENT) {
-        silentDepth = 0;
-        console.warn('[DS-Mini:MAIN] Silent loop limit');
-        return;
-      }
-    }
-
-    console.log('[DS-Mini:MAIN] Silent loop #' + silentDepth + (isNudge ? ' (nudge)' : ''));
-
-    // Agent Panel: 通知 isolated world 新 step 开始
-    var loopId = activeLoopId;
-    if (loopId && !isNudge) {
-      window.postMessage(
-        {
-          source: 'DS_MINI_MAIN',
-          type: 'DS_MINI_AGENT_STEP_STARTED',
-          loopId: loopId,
-          stepIndex: silentDepth,
-        },
-        '*',
-      );
-      console.log('[DS-Mini:MAIN] Agent step started, loopId=' + loopId + ', step=' + silentDepth);
-    } else if (!loopId) {
-      console.log('[DS-Mini:MAIN] Agent step skipped — no loopId on window');
-    }
-
-    // 随机延迟 2.5-6.5s 防速率限制
-    var delay = 2500 + Math.random() * 4000;
-    console.log('[DS-Mini:MAIN] Silent loop delay=' + Math.round(delay) + 'ms');
-    setTimeout(function () {
-      var bodyObj;
-      if (lastCtx.lastBody) {
-        bodyObj = JSON.parse(JSON.stringify(lastCtx.lastBody));
-      } else {
-        bodyObj = {
-          chat_session_id: lastCtx.chat_session_id,
-          model_type: lastCtx.model_type,
-        };
-      }
-      if (lastCtx.parentMessageId) {
-        bodyObj.parentMessageId = lastCtx.parentMessageId;
-      }
-      var toolDefs = getToolDefs(currentMode);
-      var contPrompt = buildContinuationPrompt(originalUserPrompt, resultText);
-      bodyObj.prompt = toolDefs ? toolDefs + '\n---\n' + contPrompt : contPrompt;
-
-      var xhr = new XMLHttpRequest();
-      origOpen.call(xhr, 'POST', '/api/v0/chat/completion');
-      // 回放原始 headers，但替换 PoW（nudge 跳过 PoW）
-      if (lastCtx.reqHeaders) {
-        var hkeys = Object.keys(lastCtx.reqHeaders);
-        for (var hi = 0; hi < hkeys.length; hi++) {
-          var hName = hkeys[hi];
-          var hVal = lastCtx.reqHeaders[hName];
-          if (hName.toLowerCase() === 'x-ds-pow-response' && powHeader) {
-            hVal = powHeader;
-          }
-          origSetHeader.call(xhr, hName, hVal);
-        }
-      } else if (powHeader) {
-        origSetHeader.call(xhr, 'x-ds-pow-response', powHeader);
-        origSetHeader.call(xhr, 'Content-Type', 'application/json');
-      }
-      console.log(
-        '[DS-Mini:MAIN] Silent XHR sending, prompt len=' +
-          (bodyObj.prompt ? bodyObj.prompt.length : 0),
-      );
-
-      var buf = { text: '', raw: '', pos: 0 };
-
-      xhr.addEventListener('progress', function () {
-        if (!xhr.responseText) return;
-        var fullText = xhr.responseText;
-        if (fullText.length <= buf.pos) return;
-        var part = fullText.slice(buf.pos);
-        console.log(
-          '[DS-Mini:MAIN] Silent XHR chunk +' + part.length + ' bytes, total=' + fullText.length,
-        );
-        buf.pos = fullText.length;
-
-        var lines = part.split('\n');
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (!line.startsWith('data:')) continue;
-          var ds = line.slice(5).trim();
-          if (!ds || ds === '[DONE]') continue;
-
-          buf.raw += ds;
-          var data;
-          try {
-            data = JSON.parse(ds);
-          } catch (e) {
-            continue;
-          }
-
-          var text = extractTextFromData(data);
-          if (text) {
-            buf.text += text;
-
-            // Agent Panel: throttled stream chunk (every ~100ms)
-            if (!xhr.__ds_last_chunk_ts) xhr.__ds_last_chunk_ts = 0;
-            var now = Date.now();
-            if (now - xhr.__ds_last_chunk_ts > 100) {
-              xhr.__ds_last_chunk_ts = now;
-              var sid = silentDepth;
-              var lid = activeLoopId;
-              if (lid) {
-                window.postMessage(
-                  {
-                    source: 'DS_MINI_MAIN',
-                    type: 'DS_MINI_AGENT_STREAM_CHUNK',
-                    loopId: lid,
-                    stepIndex: sid,
-                    fullText: buf.text,
-                  },
-                  '*',
-                );
-              }
-            }
-          }
-
-          // 检测 SSE ready 事件（有 response_message_id 但无 choices 且无 v 字段）
-          if (data.response_message_id && !data.choices && !data.v) {
-            lastCtx.parentMessageId = data.response_message_id;
-            console.log('[DS-Mini:MAIN] Updated parentMessageId:', data.response_message_id);
-          }
-
-          if (isStreamFinished(data)) {
-            console.log(
-              '[DS-Mini:MAIN] Silent XHR finished, buf.text=' +
-                buf.text.length +
-                ', buf.raw=' +
-                buf.raw.length,
-            );
-            // Final flush of stream text to agent panel
-            var sidF = silentDepth;
-            var lidF = activeLoopId;
-            if (lidF) {
-              window.postMessage(
-                {
-                  source: 'DS_MINI_MAIN',
-                  type: 'DS_MINI_AGENT_STREAM_CHUNK',
-                  loopId: lidF,
-                  stepIndex: sidF,
-                  fullText: buf.text,
-                },
-                '*',
-              );
-            }
-            checkSilentBuf(buf);
-            buf = { text: '', raw: '', pos: 0 };
-          }
-        }
-      });
-
-      xhr.addEventListener('loadend', function () {
-        console.log(
-          '[DS-Mini:MAIN] Silent XHR loadend: status=' +
-            xhr.status +
-            ', buf.text=' +
-            buf.text.length +
-            ', buf.raw=' +
-            buf.raw.length,
-        );
-        if (buf.text.trim()) checkSilentBuf(buf);
-        else if (xhr.status !== 200) {
-          console.warn('[DS-Mini:MAIN] Silent XHR failed, status=' + xhr.status);
-          window.postMessage(
-            { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
-            '*',
-          );
-        }
-      });
-
-      xhr.addEventListener('error', function () {
-        window.postMessage(
-          { source: 'DS_MINI_ISOLATED', type: 'DS_MINI_DOM_FALLBACK', text: resultText },
-          '*',
-        );
-      });
-
-      origSend.call(xhr, JSON.stringify(bodyObj));
-    }, delay);
-  }
-
-  // FR-6: nudge 检测 — 续行意图但未输出工具调用
-  function needsNudge(text) {
-    var intentRe =
-      /(?:我将|我会|接下来|下一步|i'll|let me|next).{0,64}(?:调用|搜索|获取|执行|call|search|fetch|run)/gi;
-    var hasIntent = intentRe.test(text);
-    intentRe.lastIndex = 0;
-    return hasIntent && text.length < 200;
-  }
-
-  function checkSilentBuf(buf) {
-    // FR-5: 先检测 task_complete 标记
-    var taskCompleteRe =
-      /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
-    var tcMatch = taskCompleteRe.exec(buf.text) || taskCompleteRe.exec(buf.raw);
-    if (tcMatch) {
-      taskCompleteRe.lastIndex = 0;
-      var summary = '任务完成';
-      try {
-        var parsedSummary = JSON.parse(tcMatch[1]);
-        if (parsedSummary.summary) summary = parsedSummary.summary;
-      } catch (e) {}
-      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
-
-      // 移除标记后的文本
-      var cleanText = buf.text.replace(
-        /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
-        '',
-      ).trim();
-
-      window.postMessage(
-        {
-          source: 'DS_MINI_MAIN_FINAL',
-          type: 'DS_MINI_FINAL_RESPONSE',
-          text: cleanText,
-          taskSummary: summary,
-        },
-        '*',
-      );
-      // Agent Panel: loop complete
-      var loopId2 = activeLoopId;
-      if (loopId2) {
-        window.postMessage(
-          {
-            source: 'DS_MINI_MAIN',
-            type: 'DS_MINI_AGENT_LOOP_COMPLETE',
-            loopId: loopId2,
-            stepIndex: silentDepth,
-          },
-          '*',
-        );
-      }
-      return;
-    }
-
-    var reg =
-      /<(web_search|web_fetch|news_hub|github_trending|doc_generate)>\s*(\{[\s\S]*?\})\s*(?:<\/\1>)?/g;
-    var calls = [];
-    var m;
-    while ((m = reg.exec(buf.raw)) !== null) {
-      var p = {};
-      try {
-        p = JSON.parse(m[2]);
-      } catch (e) {}
-      calls.push({ name: m[1], payload: p, raw: m[0], id: crypto.randomUUID() });
-    }
-
-    // 从 raw buffer 中扫描 SSE ready 事件更新 parentMessageId
-    var readyReg = /"response_message_id"\s*:\s*"([^"]+)"/gm;
-    var rm;
-    var lastReady = null;
-    while ((rm = readyReg.exec(buf.raw)) !== null) {
-      try {
-        var candidate = JSON.parse(rm.input);
-        if (candidate.response_message_id && !candidate.choices && !candidate.v) {
-          lastReady = candidate.response_message_id;
-        }
-      } catch (e) {
-        // raw buffer chunk may not be valid JSON, use regex capture as fallback
-        lastReady = rm[1];
-      }
-    }
-    if (lastReady) {
-      lastCtx.parentMessageId = lastReady;
-      console.log('[DS-Mini:MAIN] Updated parentMessageId from silent buf:', lastReady);
-    }
-
-    if (calls.length > 0) {
-      window.postMessage(
-        {
-          type: 'DS_MINI_TOOL_CALLS',
-          toolCalls: calls,
-          silentDepth: silentDepth,
-          reqHeaders: lastCtx.reqHeaders,
-        },
-        '*',
-      );
-      console.log('[DS-Mini:MAIN] Silent loop continued:', calls.length, 'calls');
-    } else if (buf.text.trim()) {
-      // FR-6: 没有工具调用也没有 task_complete → 检查是否需要 nudge
-      if (needsNudge(buf.text) && nudgeCount < MAX_NUDGES) {
-        nudgeCount++;
-        console.log('[DS-Mini:MAIN] Nudge #' + nudgeCount + ' triggered');
-
-        // 构建 nudge prompt
-        var nudgePrompt =
-          '你刚才提到了要继续行动但未输出工具调用。如果需要执行工具，请输出 XML 工具标签；如果任务已完成，请输出 <task_complete>{"summary": "..."}</task_complete> 标记。不要输出其他内容。';
-
-        // 通过 handleSilentLoop 发送 nudge（null powHeader = 跳过 PoW）
-        handleSilentLoop(nudgePrompt, null);
-      } else if (nudgeCount >= MAX_NUDGES) {
-        console.warn('[DS-Mini:MAIN] Max nudges reached, forcing end');
-        nudgeCount = 0;
-        window.postMessage(
-          { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
-          '*',
-        );
-        var loopIdM = activeLoopId;
-        if (loopIdM) {
-          window.postMessage(
-            { source: 'DS_MINI_MAIN', type: 'DS_MINI_AGENT_LOOP_COMPLETE', loopId: loopIdM, stepIndex: silentDepth },
-            '*',
-          );
-        }
-        console.log('[DS-Mini:MAIN] Silent loop final (max nudge)');
-      } else {
-        window.postMessage(
-          { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
-          '*',
-        );
-        var loopIdN = activeLoopId;
-        if (loopIdN) {
-          window.postMessage(
-            { source: 'DS_MINI_MAIN', type: 'DS_MINI_AGENT_LOOP_COMPLETE', loopId: loopIdN, stepIndex: silentDepth },
-            '*',
-          );
-        }
-        console.log('[DS-Mini:MAIN] Silent loop final');
-      }
-    }
-  }
 
   window.__DS_MINI_MODE = currentMode;
   console.log('[DS-Mini:MAIN] Ready, mode:', currentMode);

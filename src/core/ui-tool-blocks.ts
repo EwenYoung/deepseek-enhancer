@@ -5,7 +5,6 @@ import type { AppState, ToolCall, ToolResult } from './types';
 import { extractToolCalls, extractTaskComplete, stripTaskComplete, stripToolCalls } from './sse-parser';
 import { executeToolCall } from './tool-executor';
 import { renderInlineMarkdown } from './markdown';
-import wasmUrl from '../../public/deepseek/sha3_wasm_bg.wasm?url';
 // ============================================================
 // 状态
 // ============================================================
@@ -13,8 +12,7 @@ let toolExecutionInProgress = false;
 let loopDepth = 0;
 const MAX_LOOP = 10;
 let toolBlocksInited = false;
-let silentModeEnabled = false; // Agent 模式开启时使用静默循环
-let savedReqHeaders: Record<string, string> | null = null; // PoW 请求用
+let silentModeEnabled = false; // Agent 模式开关（保留给 content.ts 调用）
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
 let agentLoopRunning = false; // 并发防护
 
@@ -287,30 +285,9 @@ export async function handleMainWorldToolCalls(
   const ok = results.filter((r) => r.success);
   console.log('[DS-Mini:UI] Tool results:', results.length + ' total, ' + ok.length + ' OK');
   if (ok.length > 0) {
-    if (silentModeEnabled) {
-      // 方案 A：静默循环 — 计算 PoW 后直发 XHR
-      try {
-        const powHeader = await computePowHeader();
-        window.postMessage(
-          {
-            source: 'DS_MINI_ISOLATED',
-            type: 'DS_MINI_SILENT_RESULT',
-            text: formatResults(ok),
-            powHeader: powHeader,
-            loopId: agentPanel ? agentPanel.loopId : null,
-          },
-          '*',
-        );
-        console.log('[DS-Mini:UI] Silent loop: result + PoW sent to MAIN world');
-      } catch (powErr) {
-        console.warn('[DS-Mini:UI] PoW failed, fallback to DOM', powErr);
-        await domSubmitText(formatResults(ok));
-        scanAndHideToolResults();
-      }
-    } else {
-      await domSubmitText(formatResults(ok));
-      scanAndHideToolResults();
-    }
+    // 续接 prompt 通过 DOM submit 发送 → 页面自然渲染 → 消息链完整可见
+    await domSubmitText(formatResults(ok));
+    scanAndHideToolResults();
   }
 
   await delay(800);
@@ -396,6 +373,20 @@ export function initToolBlocks(_state: AppState) {
     for (const mut of mutations) {
       for (const node of mut.addedNodes) {
         if (node instanceof HTMLElement) {
+          // 续接消息隐藏：在任何新增元素中检测（不限 .ds-message）
+          if (isContinuationMessage(node.textContent || '')) {
+            node.setAttribute('data-ds-continuation', 'true');
+            node.style.display = 'none';
+            console.log('[DS-Mini:UI] Continuation message hidden');
+            continue; // 已隐藏，跳过后续处理
+          }
+
+          // 虚拟列表重渲染：恢复隐藏已标记的续接消息
+          if (node.hasAttribute && node.hasAttribute('data-ds-continuation')) {
+            node.style.display = 'none';
+            continue;
+          }
+
           processNewContent(node);
           // 新消息出现时，多次尝试重排序（等待渲染完成）
           if (node.classList?.contains('ds-message') && !toolExecutionInProgress) {
@@ -416,8 +407,20 @@ export function initToolBlocks(_state: AppState) {
 // ============================================================
 // DOM 扫描 — 只处理最后一轮的最新流式消息
 // ============================================================
+function isContinuationMessage(text: string): boolean {
+  if (!text) return false;
+  // 检测续接 prompt 的两种形式：原始 XML 或被 HTML 转义
+  return (
+    (text.includes('<original_task>') && text.includes('<tool_results>')) ||
+    (text.includes('&lt;original_task&gt;') && text.includes('&lt;tool_results&gt;')) ||
+    (text.includes('以下是工具执行结果') && text.includes('original_task'))
+  );
+}
+
 function processNewContent(node: HTMLElement) {
   if (toolExecutionInProgress) return;
+  // 跳过续接消息（已被隐藏）
+  if (node.hasAttribute && node.hasAttribute('data-ds-continuation')) return;
   if (node.closest && node.closest('[data-ds-tool-processed]')) return;
   if (!node.closest || !node.closest('.ds-message')) return;
 
@@ -743,124 +746,6 @@ function reorderToolBlocks() {
       container.insertBefore(block, lastMsg);
     }
   });
-}
-
-// ============================================================
-// DeepSeek PoW 求解 — 加载真实 WASM 模块 (sha3_wasm_bg.wasm)
-// ============================================================
-
-interface PowWasmExports {
-  memory: WebAssembly.Memory;
-  wasm_solve(
-    retPtr: number,
-    challengePtr: number,
-    challengeLen: number,
-    prefixPtr: number,
-    prefixLen: number,
-    difficulty: number,
-  ): void;
-  __wbindgen_add_to_stack_pointer(offset: number): number;
-  __wbindgen_export_0(size: number, align: number): number;
-}
-
-let powWasmPromise: Promise<PowWasmExports> | null = null;
-const textEncoder = new TextEncoder();
-
-async function loadPowWasm(): Promise<PowWasmExports> {
-  if (powWasmPromise) return powWasmPromise;
-  powWasmPromise = (async () => {
-    const resp = await fetch(wasmUrl);
-    if (!resp.ok) throw new Error(`WASM fetch failed: ${resp.status}`);
-    const { instance } = await WebAssembly.instantiate(await resp.arrayBuffer(), {});
-    return instance.exports as unknown as PowWasmExports;
-  })();
-  return powWasmPromise;
-}
-
-function writeWasmString(wasm: PowWasmExports, value: string): { ptr: number; len: number } {
-  const bytes = textEncoder.encode(value);
-  const ptr = wasm.__wbindgen_export_0(bytes.length, 1);
-  new Uint8Array(wasm.memory.buffer).set(bytes, ptr);
-  return { ptr, len: bytes.length };
-}
-
-async function computePowHeader(): Promise<string> {
-  // 1. 从服务器获取 challenge（需认证 headers）
-  let reqHeaders: Record<string, string> | null = savedReqHeaders;
-  if (!reqHeaders) {
-    try {
-      const stored = localStorage.getItem('__ds_req_headers');
-      if (stored) reqHeaders = JSON.parse(stored);
-    } catch {}
-  }
-  const fetchHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (reqHeaders) {
-    if (reqHeaders['authorization']) fetchHeaders['authorization'] = reqHeaders['authorization'];
-    if (reqHeaders['Authorization']) fetchHeaders['Authorization'] = reqHeaders['Authorization'];
-    if (reqHeaders['x-client-platform'])
-      fetchHeaders['x-client-platform'] = reqHeaders['x-client-platform'];
-    if (reqHeaders['x-client-version'])
-      fetchHeaders['x-client-version'] = reqHeaders['x-client-version'];
-    if (reqHeaders['x-client-locale'])
-      fetchHeaders['x-client-locale'] = reqHeaders['x-client-locale'];
-  }
-  const resp = await fetch('/api/v0/chat/create_pow_challenge', {
-    method: 'POST',
-    headers: fetchHeaders,
-    body: JSON.stringify({ target_path: '/api/v0/chat/completion' }),
-  });
-  if (!resp.ok) throw new Error(`PoW challenge failed: ${resp.status}`);
-  const data = await resp.json();
-  const challenge =
-    data.data?.biz_data?.challenge ||
-    data.biz_data?.challenge ||
-    data.data?.challenge ||
-    data.challenge;
-  if (!challenge || !challenge.algorithm) throw new Error('No challenge in PoW response');
-
-  // 2. WASM 求解
-  const prefix = `${challenge.salt}_${challenge.expire_at || challenge.expireAt}_`;
-  const wasm = await loadPowWasm();
-  const retPtr = wasm.__wbindgen_add_to_stack_pointer(-16);
-  const challengeAlloc = writeWasmString(wasm, challenge.challenge.toLowerCase());
-  const prefixAlloc = writeWasmString(wasm, prefix);
-
-  console.log('[DS-Mini:UI] PoW wasm_solve: difficulty=' + challenge.difficulty);
-  try {
-    wasm.wasm_solve(
-      retPtr,
-      challengeAlloc.ptr,
-      challengeAlloc.len,
-      prefixAlloc.ptr,
-      prefixAlloc.len,
-      challenge.difficulty,
-    );
-    const view = new DataView(wasm.memory.buffer);
-    const status = view.getInt32(retPtr, true);
-    const answer = view.getFloat64(retPtr + 8, true);
-    if (status !== 1 || !Number.isSafeInteger(answer) || answer < 0) {
-      throw new Error(`PoW solve failed: status=${status}, answer=${answer}`);
-    }
-    console.log('[DS-Mini:UI] PoW solved: answer=' + answer);
-
-    // 3. 打包
-    const powResponse = {
-      algorithm: challenge.algorithm,
-      challenge: challenge.challenge,
-      salt: challenge.salt,
-      answer: answer,
-      signature: challenge.signature,
-      target_path: '/api/v0/chat/completion',
-    };
-    return btoa(unescape(encodeURIComponent(JSON.stringify(powResponse))));
-  } finally {
-    wasm.__wbindgen_add_to_stack_pointer(16);
-  }
-}
-
-// 重新启用静默模式
-export function enableSilentMode() {
-  silentModeEnabled = true;
 }
 
 // 遗留导出保持兼容（不被调用，保留以防 import 错误）

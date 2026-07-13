@@ -112,6 +112,15 @@ function scrapeMessages(): ChatMessage[] {
       // User 消息 — 跳过包含 assistant 子元素的
       if (el.querySelector('.ds-markdown, .ds-think-content')) continue;
 
+      // 续接消息替换为 placeholder
+      const isContinuation =
+        el.hasAttribute('data-ds-continuation') ||
+        (
+          el.textContent &&
+          el.textContent.includes('以下是工具执行结果') &&
+          el.textContent.includes('original_task')
+        );
+
       let text = '';
       // 找第一个有文本的直接子元素
       for (let j = 0; j < el.children.length; j++) {
@@ -126,13 +135,57 @@ function scrapeMessages(): ChatMessage[] {
       }
       // 兜底
       if (!text) text = el.textContent?.trim() || '';
+
       if (text && text.length > 2) {
+        if (isContinuation) {
+          text = extractToolResultsFromContinuation(text);
+        }
         messages.push({ role: 'user' as const, content: text });
       }
     }
   }
 
   return messages;
+}
+
+interface ToolResultExport {
+  tool: string;
+  ok: boolean;
+  summary: string;
+  detail?: string;
+}
+
+function extractToolResultsFromContinuation(text: string): string {
+  // 提取 <tool_results> JSON
+  const re = /<tool_results>\s*([\s\S]*?)\s*<\/tool_results>/;
+  const match = re.exec(text);
+  if (!match) return '[Agent 工具执行]';
+
+  try {
+    const results: ToolResultExport[] = JSON.parse(match[1]);
+    if (!Array.isArray(results) || results.length === 0) return '[Agent 工具执行]';
+
+    const lines: string[] = ['[工具执行结果]'];
+    for (const r of results) {
+      const label = r.tool || 'unknown';
+      const ok = r.ok ? 'OK' : 'ERR';
+      const summary = r.summary || '';
+      lines.push(`${ok} ${label}: ${summary}`);
+    }
+
+    // 附加 detail（截断）
+    const details = results
+      .filter((r) => r.ok && r.detail)
+      .map((r) => `\n### ${r.tool}\n\n${r.detail}`);
+    if (details.length > 0) {
+      lines.push('');
+      lines.push(...details);
+    }
+
+    return lines.join('\n');
+  } catch {
+    return '[Agent 工具执行]';
+  }
 }
 
 // ============================================================
@@ -337,7 +390,7 @@ function renderHTML(messages: ChatMessage[], title: string): string {
 // ============================================================
 // 工具结果内容处理 — 防止 Markdown 渲染
 // ============================================================
-function wrapToolResultMD(content: string): string {
+export function wrapToolResultMD(content: string): string {
   // 将匹配到的 [工具执行结果] 区域包裹在 ``` 代码块中
   return content.replace(/(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g, function (match) {
     // 去掉末尾可能匹配到的 ---
@@ -427,7 +480,7 @@ function escapeHTML(s: string): string {
   return d.innerHTML;
 }
 
-function slugify(text: string): string {
+export function slugify(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9一-鿿]+/g, '-')

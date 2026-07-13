@@ -2,8 +2,9 @@
 // deepseek-enhancer — 工具调用折叠块 UI
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
-import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-parser';
+import { extractToolCalls, extractTaskComplete, stripTaskComplete, stripToolCalls } from './sse-parser';
 import { executeToolCall } from './tool-executor';
+import { renderInlineMarkdown } from './markdown';
 import wasmUrl from '../../public/deepseek/sha3_wasm_bg.wasm?url';
 // ============================================================
 // 状态
@@ -14,10 +15,179 @@ const MAX_LOOP = 10;
 let toolBlocksInited = false;
 let silentModeEnabled = false; // Agent 模式开启时使用静默循环
 let savedReqHeaders: Record<string, string> | null = null; // PoW 请求用
+let agentPanel: AgentPanel | null = null; // Agent loop UI panel
+let agentLoopRunning = false; // 并发防护
 
 // 由 content.ts 调用
 export function setSilentMode(enabled: boolean) {
   silentModeEnabled = enabled;
+}
+
+// ============================================================
+// Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
+// ============================================================
+class AgentPanel {
+  container: HTMLElement;
+  loopId: string;
+  steps: Map<number, HTMLElement> = new Map();
+  private _observer: MutationObserver | null = null;
+
+  constructor(loopId: string) {
+    this.loopId = loopId;
+    this.container = document.createElement('div');
+    this.container.className = 'ds-agent-container';
+    this.container.style.cssText =
+      'padding-left:16px;border-left:1px solid rgba(0,0,0,0.1);margin:8px 0;';
+  }
+
+  mount(atElement: Element) {
+    atElement.after(this.container);
+    // MutationObserver 防虚拟列表重渲染导致 detached
+    this._observer = new MutationObserver(() => {
+      if (!this.container.isConnected && this.container.parentElement === null) {
+        const msgs = document.querySelectorAll('.ds-message');
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg) lastMsg.after(this.container);
+      }
+    });
+    const root = document.getElementById('root');
+    if (root) this._observer.observe(root, { childList: true, subtree: true });
+  }
+
+  unmount() {
+    if (this._observer) {
+      this._observer.disconnect();
+      this._observer = null;
+    }
+    if (this.container.parentElement) {
+      this.container.parentElement.removeChild(this.container);
+    }
+    this.steps.clear();
+  }
+
+  createStep(stepIndex: number, onStop?: () => void): HTMLElement {
+    const step = document.createElement('div');
+    step.className = 'ds-agent-step';
+    step.setAttribute('data-step-index', String(stepIndex));
+    step.setAttribute('data-status', 'streaming');
+    step.style.cssText =
+      'border-left:2px solid #4e6ef2;padding:8px 12px;margin:4px 0;font-size:14px;';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'ds-agent-step-header';
+    header.style.cssText =
+      'display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;color:#1d2129;font-weight:500;';
+
+    const left = document.createElement('div');
+    left.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    left.innerHTML = `<span>Step ${stepIndex}</span><span class="ds-agent-step-status" style="color:#86909c;font-weight:400;font-size:12px;">streaming...</span>`;
+
+    header.appendChild(left);
+
+    if (onStop) {
+      const stopBtn = document.createElement('button');
+      stopBtn.textContent = 'Stop';
+      stopBtn.style.cssText =
+        'font-size:12px;padding:2px 8px;border:1px solid rgba(0,0,0,0.15);border-radius:4px;background:#fff;color:#e74c3c;cursor:pointer;';
+      stopBtn.onclick = (e) => {
+        e.stopPropagation();
+        onStop();
+      };
+      header.appendChild(stopBtn);
+    }
+
+    // Auto-collapse on header click
+    header.onclick = () => {
+      const collapsed = step.getAttribute('data-collapsed');
+      if (collapsed === '') {
+        step.removeAttribute('data-collapsed');
+      } else {
+        step.setAttribute('data-collapsed', '');
+      }
+      this.updateCollapsedState(step);
+    };
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'ds-agent-step-body';
+    body.style.cssText =
+      'padding:4px 0;white-space:pre-wrap;word-break:break-word;color:#1d2129;line-height:1.6;max-height:400px;overflow-y:auto;';
+
+    // Tools
+    const tools = document.createElement('div');
+    tools.className = 'ds-agent-step-tools';
+
+    step.appendChild(header);
+    step.appendChild(body);
+    step.appendChild(tools);
+    this.container.appendChild(step);
+    this.steps.set(stepIndex, step);
+    return step;
+  }
+
+  updateStepStatus(step: HTMLElement, label: string, statusType: string) {
+    const statusEl = step.querySelector('.ds-agent-step-status');
+    if (statusEl) statusEl.textContent = label;
+    step.setAttribute('data-status', statusType);
+    const colors: Record<string, string> = {
+      streaming: '#4e6ef2',
+      'tool-executing': '#ff8800',
+      complete: '#00b42a',
+      error: '#f53f3f',
+    };
+    step.style.borderLeftColor = colors[statusType] || colors.streaming;
+  }
+
+  scrollStepBodyToBottom(step: HTMLElement) {
+    const body = step.querySelector('.ds-agent-step-body');
+    if (body) body.scrollTop = body.scrollHeight;
+  }
+
+  addToolResultToStep(step: HTMLElement, toolName: string, ok: boolean, summary: string) {
+    const tools = step.querySelector<HTMLElement>('.ds-agent-step-tools');
+    if (!tools) return;
+    const item = document.createElement('div');
+    item.className = 'ds-agent-step-tool-item ' + (ok ? 'ok' : 'err');
+    const label = ok ? '[OK]' : '[ERR]';
+    const color = ok ? '#00b42a' : '#f53f3f';
+    const shortSummary = summary.length > 100 ? summary.slice(0, 100) + '...' : summary;
+    item.style.cssText =
+      'padding:2px 0;font-size:12px;color:' + color + ';display:flex;align-items:center;gap:4px;';
+    item.innerHTML =
+      '<span style="font-weight:600">' + label + '</span> ' + toolName + ' — ' + shortSummary;
+    tools.appendChild(item);
+  }
+
+  addFooter(totalSteps: number, totalTools: number, isError: boolean, errorMsg?: string) {
+    const footer = document.createElement('div');
+    footer.className = 'ds-agent-footer';
+    footer.style.cssText =
+      'margin-top:8px;padding:6px 0;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;color:#86909c;display:flex;align-items:center;gap:4px;';
+    if (isError) {
+      footer.innerHTML = '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + (errorMsg || '');
+    } else {
+      footer.innerHTML =
+        '<span style="color:#00b42a">[OK]</span> Agent complete (' +
+        totalSteps +
+        ' step' +
+        (totalSteps > 1 ? 's' : '') +
+        ', ' +
+        totalTools +
+        ' tool call' +
+        (totalTools > 1 ? 's' : '') +
+        ')';
+    }
+    this.container.appendChild(footer);
+  }
+
+  updateCollapsedState(step: HTMLElement) {
+    const collapsed = step.getAttribute('data-collapsed') === '';
+    const body = step.querySelector<HTMLElement>('.ds-agent-step-body');
+    const tools = step.querySelector<HTMLElement>('.ds-agent-step-tools');
+    if (body) body.style.display = collapsed ? 'none' : '';
+    if (tools) tools.style.display = collapsed ? 'none' : '';
+  }
 }
 
 // ============================================================
@@ -34,13 +204,18 @@ export async function handleMainWorldToolCalls(
     console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
     return;
   }
+  if (agentLoopRunning) {
+    console.log('[DS-Mini:UI] Skipped — agent loop already running');
+    return;
+  }
   if (!toolCalls || toolCalls.length === 0) return;
 
-  // 新用户消息触发的首次工具调用 → 重置 loop 计数器
+  // 新用户消息触发的首次工具调用 → 重置 loop 计数器 + cleanup agent panel
   if (silentDepth === 0 || silentDepth === undefined) {
     if (loopDepth > 0)
       console.log('[DS-Mini:UI] New flow detected, reset loopDepth (was ' + loopDepth + ')');
     loopDepth = 0;
+    cleanupAgentPanel();
   }
 
   // doc_generate 直接在 isolated world 中处理（不需要 background worker）
@@ -68,6 +243,26 @@ export async function handleMainWorldToolCalls(
 
   console.log('[DS-Mini:UI] Loop #' + loopDepth + ' — ' + toolCalls.length + ' call(s)');
 
+  // Agent Panel: 首次循环 → 创建容器 + 生成 loopId
+  if (loopDepth === 1) {
+    agentLoopRunning = true;
+    const loopId = crypto.randomUUID();
+    agentPanel = new AgentPanel(loopId);
+    const msgs = container.querySelectorAll('.ds-message');
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg) agentPanel.mount(lastMsg);
+    // loopId 存储在 agentPanel 实例中，通过 postMessage 传递给 MAIN world
+    console.log('[DS-Mini:UI] Agent panel created, loopId=' + loopId);
+  }
+
+  // Agent Panel: 创建当前 step
+  if (agentPanel) {
+    agentPanel.createStep(loopDepth, () => {
+      // Stop handler — 通知 MAIN world 停止循环
+      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_AGENT_STOP' }, '*');
+    });
+  }
+
   const results: ToolResult[] = [];
   for (const call of toolCalls) {
     const block = createLoadingBlock(call, container);
@@ -75,6 +270,18 @@ export async function handleMainWorldToolCalls(
     const result = await executeToolCall(call);
     results.push(result);
     block.replaceWith(createResultBlock(call, result));
+  }
+
+  // Agent Panel: 添加工具结果到当前 step
+  if (agentPanel) {
+    const currentStep = agentPanel.steps.get(loopDepth);
+    if (currentStep) {
+      for (const r of results) {
+        const toolLabel = getLabel(r.toolName);
+        agentPanel.addToolResultToStep(currentStep, toolLabel, r.success, r.summary || r.result || '');
+      }
+      agentPanel.updateStepStatus(currentStep, 'Completed (' + results.length + ' tool' + (results.length > 1 ? 's' : '') + ')', 'complete');
+    }
   }
 
   const ok = results.filter((r) => r.success);
@@ -90,6 +297,7 @@ export async function handleMainWorldToolCalls(
             type: 'DS_MINI_SILENT_RESULT',
             text: formatResults(ok),
             powHeader: powHeader,
+            loopId: agentPanel ? agentPanel.loopId : null,
           },
           '*',
         );
@@ -109,6 +317,15 @@ export async function handleMainWorldToolCalls(
   toolExecutionInProgress = false;
 }
 
+function cleanupAgentPanel() {
+  if (agentPanel) {
+    agentPanel.unmount();
+    agentPanel = null;
+  }
+  agentLoopRunning = false;
+  console.log('[DS-Mini:UI] Agent panel cleaned up');
+}
+
 // ============================================================
 // 初始化 — 带保护锁
 // ============================================================
@@ -123,6 +340,57 @@ export function initToolBlocks(_state: AppState) {
 
   const container = findChatContainer();
   if (!container) return;
+
+  // Agent panel 消息监听
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    const d = event.data;
+    if (!d || d.source !== 'DS_MINI_MAIN') return;
+
+    if (d.type === 'DS_MINI_AGENT_STEP_STARTED' && agentPanel) {
+      const step = agentPanel.steps.get(d.stepIndex);
+      if (step) agentPanel.updateStepStatus(step, 'streaming...', 'streaming');
+    }
+
+    if (d.type === 'DS_MINI_AGENT_STREAM_CHUNK' && agentPanel) {
+      const step = agentPanel.steps.get(d.stepIndex);
+      if (step) {
+        const body = step.querySelector<HTMLElement>('.ds-agent-step-body');
+        if (body) {
+          // 过滤工具 XML + Markdown 渲染
+          body.innerHTML = renderInlineMarkdown(stripToolCalls(d.fullText || ''));
+        }
+        agentPanel.scrollStepBodyToBottom(step);
+      }
+    }
+
+    if (d.type === 'DS_MINI_AGENT_LOOP_COMPLETE' && agentPanel) {
+      agentLoopRunning = false;
+      const step = agentPanel.steps.get(d.stepIndex);
+      if (step) agentPanel.updateStepStatus(step, 'Complete', 'complete');
+      // Footer with stats
+      const totalSteps = agentPanel.steps.size;
+      let totalTools = 0;
+      agentPanel.steps.forEach((s) => {
+        const items = s.querySelectorAll('.ds-agent-step-tool-item');
+        totalTools += items.length;
+      });
+      agentPanel.addFooter(totalSteps, totalTools, false);
+      // Auto-collapse last step after 800ms
+      if (step) {
+        setTimeout(() => {
+          step.setAttribute('data-collapsed', '');
+          agentPanel!.updateCollapsedState(step);
+        }, 800);
+      }
+    }
+
+    if (d.type === 'DS_MINI_AGENT_STOP') {
+      agentLoopRunning = false;
+      cleanupAgentPanel();
+      console.log('[DS-Mini:UI] Agent loop stopped by user');
+    }
+  });
 
   new MutationObserver((mutations) => {
     for (const mut of mutations) {

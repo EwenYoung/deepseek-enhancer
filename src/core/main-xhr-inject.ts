@@ -242,6 +242,7 @@
           if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
             silentDepth = 0;
             nudgeCount = 0;
+            activeLoopId = null;
             lastCtx.parentMessageId = null;
           }
 
@@ -654,6 +655,7 @@
         console.log('[DS-Mini:MAIN] Agent mode:', agentModeEnabled ? 'ON' : 'OFF');
         break;
       case 'DS_MINI_SILENT_RESULT':
+        if (event.data.loopId) activeLoopId = event.data.loopId;
         handleSilentLoop(event.data.text, event.data.powHeader);
         break;
     }
@@ -666,6 +668,7 @@
   const MAX_SILENT = 10;
   var nudgeCount = 0;
   var MAX_NUDGES = 8;
+  var activeLoopId = null; // 从 isolated world 传递的 loopId
 
   function buildContinuationPrompt(originalTask, resultText) {
     var task = originalTask || '';
@@ -702,6 +705,23 @@
     }
 
     console.log('[DS-Mini:MAIN] Silent loop #' + silentDepth + (isNudge ? ' (nudge)' : ''));
+
+    // Agent Panel: 通知 isolated world 新 step 开始
+    var loopId = activeLoopId;
+    if (loopId && !isNudge) {
+      window.postMessage(
+        {
+          source: 'DS_MINI_MAIN',
+          type: 'DS_MINI_AGENT_STEP_STARTED',
+          loopId: loopId,
+          stepIndex: silentDepth,
+        },
+        '*',
+      );
+      console.log('[DS-Mini:MAIN] Agent step started, loopId=' + loopId + ', step=' + silentDepth);
+    } else if (!loopId) {
+      console.log('[DS-Mini:MAIN] Agent step skipped — no loopId on window');
+    }
 
     // 随机延迟 2.5-6.5s 防速率限制
     var delay = 2500 + Math.random() * 4000;
@@ -773,7 +793,30 @@
           }
 
           var text = extractTextFromData(data);
-          if (text) buf.text += text;
+          if (text) {
+            buf.text += text;
+
+            // Agent Panel: throttled stream chunk (every ~100ms)
+            if (!xhr.__ds_last_chunk_ts) xhr.__ds_last_chunk_ts = 0;
+            var now = Date.now();
+            if (now - xhr.__ds_last_chunk_ts > 100) {
+              xhr.__ds_last_chunk_ts = now;
+              var sid = silentDepth;
+              var lid = activeLoopId;
+              if (lid) {
+                window.postMessage(
+                  {
+                    source: 'DS_MINI_MAIN',
+                    type: 'DS_MINI_AGENT_STREAM_CHUNK',
+                    loopId: lid,
+                    stepIndex: sid,
+                    fullText: buf.text,
+                  },
+                  '*',
+                );
+              }
+            }
+          }
 
           // 检测 SSE ready 事件（有 response_message_id 但无 choices 且无 v 字段）
           if (data.response_message_id && !data.choices && !data.v) {
@@ -788,6 +831,21 @@
                 ', buf.raw=' +
                 buf.raw.length,
             );
+            // Final flush of stream text to agent panel
+            var sidF = silentDepth;
+            var lidF = activeLoopId;
+            if (lidF) {
+              window.postMessage(
+                {
+                  source: 'DS_MINI_MAIN',
+                  type: 'DS_MINI_AGENT_STREAM_CHUNK',
+                  loopId: lidF,
+                  stepIndex: sidF,
+                  fullText: buf.text,
+                },
+                '*',
+              );
+            }
             checkSilentBuf(buf);
             buf = { text: '', raw: '', pos: 0 };
           }
@@ -862,6 +920,19 @@
         },
         '*',
       );
+      // Agent Panel: loop complete
+      var loopId2 = activeLoopId;
+      if (loopId2) {
+        window.postMessage(
+          {
+            source: 'DS_MINI_MAIN',
+            type: 'DS_MINI_AGENT_LOOP_COMPLETE',
+            loopId: loopId2,
+            stepIndex: silentDepth,
+          },
+          '*',
+        );
+      }
       return;
     }
 
@@ -927,12 +998,26 @@
           { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
           '*',
         );
+        var loopIdM = activeLoopId;
+        if (loopIdM) {
+          window.postMessage(
+            { source: 'DS_MINI_MAIN', type: 'DS_MINI_AGENT_LOOP_COMPLETE', loopId: loopIdM, stepIndex: silentDepth },
+            '*',
+          );
+        }
         console.log('[DS-Mini:MAIN] Silent loop final (max nudge)');
       } else {
         window.postMessage(
           { source: 'DS_MINI_MAIN_FINAL', type: 'DS_MINI_FINAL_RESPONSE', text: buf.text },
           '*',
         );
+        var loopIdN = activeLoopId;
+        if (loopIdN) {
+          window.postMessage(
+            { source: 'DS_MINI_MAIN', type: 'DS_MINI_AGENT_LOOP_COMPLETE', loopId: loopIdN, stepIndex: silentDepth },
+            '*',
+          );
+        }
         console.log('[DS-Mini:MAIN] Silent loop final');
       }
     }

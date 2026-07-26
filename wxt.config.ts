@@ -11,6 +11,11 @@ export default defineConfig({
       'https://api.deepseek.com/*',
       'https://api.tavily.com/*',
     ],
+    icons: {
+      '16': 'icons/icon.png',
+      '48': 'icons/icon.png',
+      '128': 'icons/icon.png',
+    },
   },
   srcDir: 'src',
   outDir: 'dist',

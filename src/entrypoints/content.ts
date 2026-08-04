@@ -40,7 +40,11 @@ export default defineContentScript({
       if (event.source !== window) return;
       if (!event.data) return;
       if (event.data.type === 'DS_MINI_TOOL_CALLS') {
-        handleMainWorldToolCalls(event.data.toolCalls, event.data.silentDepth);
+        handleMainWorldToolCalls(
+          event.data.toolCalls,
+          event.data.silentDepth,
+          event.data.reqHeaders,
+        );
       }
       if (event.data.type === 'DS_MINI_TOKEN_SPEED') {
         updateTokenSpeed(event.data.tokPerSec, event.data.finished);

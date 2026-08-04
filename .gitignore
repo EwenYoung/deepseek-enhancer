@@ -27,15 +27,22 @@ Desktop.ini
 # WXT cache
 .wxt/
 
+# Tooling cache / local-only
+.playwright-mcp/
+.serena/
+
+# Generated assets
+logos/
+
+# OpenSpec (specs management)
+openspec/
+
 # Graphify output
 graphify-out/
 
 # DeepSeek DOM reference (saved HTML snapshots)
 .ds-reference/*.html
 .ds-reference/*_files/
-
-# Windows deploy mount
-/mnt/d/
 
 # Logs
 *.log

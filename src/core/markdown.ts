@@ -66,14 +66,18 @@ export function renderInlineMarkdown(text: string): string {
     // Unordered list
     const ulMatch = line.match(/^[\s]*[-*+]\s+(.+)/);
     if (ulMatch) {
-      result.push(`<ul style="margin:2px 0;padding-left:16px"><li>${renderInlineSpans(escapeHTML(ulMatch[1]))}</li></ul>`);
+      result.push(
+        `<ul style="margin:2px 0;padding-left:16px"><li>${renderInlineSpans(escapeHTML(ulMatch[1]))}</li></ul>`,
+      );
       continue;
     }
 
     // Ordered list
     const olMatch = line.match(/^[\s]*\d+\.\s+(.+)/);
     if (olMatch) {
-      result.push(`<ol style="margin:2px 0;padding-left:16px"><li>${renderInlineSpans(escapeHTML(olMatch[1]))}</li></ol>`);
+      result.push(
+        `<ol style="margin:2px 0;padding-left:16px"><li>${renderInlineSpans(escapeHTML(olMatch[1]))}</li></ol>`,
+      );
       continue;
     }
 
@@ -83,11 +87,12 @@ export function renderInlineMarkdown(text: string): string {
     // Table row
     if (/^\|.+\|$/.test(line)) {
       const cells = line.split('|').filter((c) => c.trim() !== '');
-      const tag = i > 0 && lines[i + 1] && /^\|[\s\-:|]+\|$/.test(lines[i + 1])
-        ? 'th'
-        : 'td';
+      const tag = i > 0 && lines[i + 1] && /^\|[\s\-:|]+\|$/.test(lines[i + 1]) ? 'th' : 'td';
       const row = cells
-        .map((c) => `<${tag} style="padding:2px 8px;border:1px solid rgba(0,0,0,0.1)">${renderInlineSpans(escapeHTML(c.trim()))}</${tag}>`)
+        .map(
+          (c) =>
+            `<${tag} style="padding:2px 8px;border:1px solid rgba(0,0,0,0.1)">${renderInlineSpans(escapeHTML(c.trim()))}</${tag}>`,
+        )
         .join('');
       result.push(`<table style="border-collapse:collapse;margin:4px 0"><tr>${row}</tr></table>`);
       continue;
@@ -123,9 +128,15 @@ function renderInlineSpans(text: string): string {
   // Italic
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
   // Inline code
-  text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.05);padding:1px 4px;border-radius:3px;font-size:0.9em">$1</code>');
+  text = text.replace(
+    /`([^`]+)`/g,
+    '<code style="background:rgba(0,0,0,0.05);padding:1px 4px;border-radius:3px;font-size:0.9em">$1</code>',
+  );
   // Links
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#4e6ef2">$1</a>');
+  text = text.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener" style="color:#4e6ef2">$1</a>',
+  );
 
   return text;
 }

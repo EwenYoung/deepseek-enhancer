@@ -115,11 +115,9 @@ function scrapeMessages(): ChatMessage[] {
       // 续接消息替换为 placeholder
       const isContinuation =
         el.hasAttribute('data-ds-continuation') ||
-        (
-          el.textContent &&
+        (el.textContent &&
           el.textContent.includes('以下是工具执行结果') &&
-          el.textContent.includes('original_task')
-        );
+          el.textContent.includes('original_task'));
 
       let text = '';
       // 找第一个有文本的直接子元素

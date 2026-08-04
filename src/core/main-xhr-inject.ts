@@ -523,8 +523,7 @@
     let rawBuf = getBuf(xhr, 'raw');
 
     // FR-5: 先检测 task_complete 标记
-    var taskCompleteRe =
-      /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
+    var taskCompleteRe = /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
     var tcMatchText = taskCompleteRe.exec(textBuf);
     var tcMatchRaw = taskCompleteRe.exec(rawBuf);
     if (tcMatchText || tcMatchRaw) {
@@ -538,22 +537,8 @@
       console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
 
       // 移除标记（DOM submit 下页面自己渲染最终回复，不额外注入）
-      setBuf(
-        xhr,
-        'text',
-        textBuf.replace(
-          /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
-          '',
-        ),
-      );
-      setBuf(
-        xhr,
-        'raw',
-        rawBuf.replace(
-          /<task_complete>\{[\s\S]*?\}<\/task_complete>/g,
-          '',
-        ),
-      );
+      setBuf(xhr, 'text', textBuf.replace(/<task_complete>\{[\s\S]*?\}<\/task_complete>/g, ''));
+      setBuf(xhr, 'raw', rawBuf.replace(/<task_complete>\{[\s\S]*?\}<\/task_complete>/g, ''));
       return;
     }
 

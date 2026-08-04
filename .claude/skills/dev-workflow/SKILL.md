@@ -38,7 +38,7 @@ pnpm test
 pnpm build
 ```
 
-构建产物 `dist/chrome-mv3/` 部署到 `D:\deepseek-enhancer\`。
+构建产物 `dist/chrome-mv3/` 目录即可加载。
 
 ### 5. 人工验证（用户）
 
@@ -54,7 +54,7 @@ pnpm build
 1. 打开 `chrome://extensions`
 2. 启用「开发者模式」
 3. 点击「加载已解压的扩展程序」
-4. 选择 `D:\deepseek-enhancer\` 目录
+4. 选择 `dist/chrome-mv3/` 目录
 
 ## 测试覆盖
 

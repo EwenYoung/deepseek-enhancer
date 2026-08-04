@@ -4,7 +4,7 @@ import { saveSkill } from './skill-registry';
 // ============================================================
 // SKILL.md 解析
 // ============================================================
-function parseSkillMD(content: string): Skill {
+export function parseSkillMD(content: string): Skill {
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)/);
   let name = '';
   let description = '';
@@ -141,7 +141,7 @@ export async function importAndSave(skill: Skill): Promise<Skill> {
   return skill;
 }
 
-function hashStr(str: string): string {
+export function hashStr(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = (hash << 5) - hash + str.charCodeAt(i);

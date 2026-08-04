@@ -2,7 +2,12 @@
 // deepseek-enhancer — 工具调用折叠块 UI
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
-import { extractToolCalls, extractTaskComplete, stripTaskComplete, stripToolCalls } from './sse-parser';
+import {
+  extractToolCalls,
+  extractTaskComplete,
+  stripTaskComplete,
+  stripToolCalls,
+} from './sse-parser';
 import { executeToolCall } from './tool-executor';
 import { renderInlineMarkdown } from './markdown';
 // ============================================================
@@ -163,7 +168,8 @@ class AgentPanel {
     footer.style.cssText =
       'margin-top:8px;padding:6px 0;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;color:#86909c;display:flex;align-items:center;gap:4px;';
     if (isError) {
-      footer.innerHTML = '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + (errorMsg || '');
+      footer.innerHTML =
+        '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + (errorMsg || '');
     } else {
       footer.innerHTML =
         '<span style="color:#00b42a">[OK]</span> Agent complete (' +
@@ -276,9 +282,18 @@ export async function handleMainWorldToolCalls(
     if (currentStep) {
       for (const r of results) {
         const toolLabel = getLabel(r.toolName);
-        agentPanel.addToolResultToStep(currentStep, toolLabel, r.success, r.summary || r.result || '');
+        agentPanel.addToolResultToStep(
+          currentStep,
+          toolLabel,
+          r.success,
+          r.summary || r.result || '',
+        );
       }
-      agentPanel.updateStepStatus(currentStep, 'Completed (' + results.length + ' tool' + (results.length > 1 ? 's' : '') + ')', 'complete');
+      agentPanel.updateStepStatus(
+        currentStep,
+        'Completed (' + results.length + ' tool' + (results.length > 1 ? 's' : '') + ')',
+        'complete',
+      );
     }
   }
 
@@ -472,7 +487,10 @@ function hideRawToolCalls(container: HTMLElement, toolCalls: ToolCall[]) {
 /**
  * FR-5: 从可见 DOM 文本中移除 task_complete 标记
  */
-function hideRawTaskComplete(container: HTMLElement, taskComplete: { found: boolean; summary: string }) {
+function hideRawTaskComplete(
+  container: HTMLElement,
+  taskComplete: { found: boolean; summary: string },
+) {
   if (!taskComplete.found) return;
   const asstMsgs = container.querySelectorAll('.ds-message:not(.d29f3d7d)');
   if (!asstMsgs.length) return;

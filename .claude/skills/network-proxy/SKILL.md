@@ -21,8 +21,8 @@ unset http_proxy https_proxy
 
 ## 适用场景
 
-- `npm install` / `npm update`
+- `pnpm install` / `pnpm update`
 - `git clone` / `git fetch` / `git pull`
 - `curl` / `wget`
 - 任何访问外部网络的命令
-- 本地操作不需要（git status、npm run build 等）
+- 本地操作不需要（git status、pnpm build 等）

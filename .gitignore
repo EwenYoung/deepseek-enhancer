@@ -50,3 +50,18 @@ npm-debug.log*
 
 # Claude Code
 .claude/.graphify_*
+
+# Scratch (local issue tracking / WIP)
+.scratch/
+
+# Untracked skill directories (local-only, not part of project)
+.claude/skills/banner-design/
+.claude/skills/brand/
+.claude/skills/design-system/
+.claude/skills/design/
+.claude/skills/setup-ts-deep-modules/
+.claude/skills/slides/
+.claude/skills/to-spec/
+.claude/skills/to-tickets/
+.claude/skills/ui-styling/
+.claude/skills/ui-ux-pro-max/

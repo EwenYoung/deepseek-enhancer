@@ -33,7 +33,8 @@ export default defineContentScript({
       if (r.ds_mini_agent_mode) setSilentMode(true);
     });
     chrome.storage.local.get('ds_mini_tools_state').then((r) => {
-      if (r.ds_mini_tools_state) setDisabledTools(r.ds_mini_tools_state);
+      const state = (r as { ds_mini_tools_state?: unknown }).ds_mini_tools_state;
+      if (state) setDisabledTools(state as Record<string, boolean>);
     });
 
     window.addEventListener('message', (event) => {
@@ -102,21 +103,21 @@ export default defineContentScript({
     document.head.appendChild(hideStyle);
 
     // 隐藏 [工具执行结果] 中间消息 — 找含 hash class 的消息级容器
-    function isMsgComponent(el) {
-      var cls = el.className;
+    function isMsgComponent(el: Element) {
+      const cls = el.className;
       if (!cls || typeof cls !== 'string') return false;
-      var parts = cls.split(/\s+/);
-      for (var i = 0; i < parts.length; i++) {
+      const parts = cls.split(/\s+/);
+      for (let i = 0; i < parts.length; i++) {
         if (/^[_a-zA-Z][a-zA-Z0-9]{5,9}$/.test(parts[i])) return true;
       }
       return false;
     }
 
-    function hideToolResultMsg(el) {
-      var node = el;
+    function hideToolResultMsg(el: Element) {
+      let node: Element | null = el;
       while (node && node !== document.body && node !== document.documentElement) {
         if (node.nodeType === 1) {
-          var cls = String(node.className || '');
+          const cls = String(node.className || '');
           if (cls.indexOf('virtual-list') !== -1) break;
           if (
             isMsgComponent(node) &&
@@ -139,7 +140,7 @@ export default defineContentScript({
       for (const mut of mutations) {
         if (mut.type === 'characterData') {
           if (mut.target.textContent && mut.target.textContent.indexOf('[工具执行结果]') === 0) {
-            hideToolResultMsg(mut.target);
+            hideToolResultMsg(mut.target as Element);
           }
         }
         for (const node of mut.addedNodes) {
@@ -172,7 +173,7 @@ let speedTimer: ReturnType<typeof setTimeout> | null = null;
 function updateTokenSpeed(tokPerSec: number, finished: boolean) {
   const ENHANCER_KEY = 'ds_mini_enhancer';
   chrome.storage.local.get(ENHANCER_KEY).then((r) => {
-    const cfg = r[ENHANCER_KEY] || {};
+    const cfg = (r[ENHANCER_KEY] as { tokenSpeed?: boolean }) || {};
     if (!cfg.tokenSpeed) {
       if (speedEl) {
         speedEl.remove();

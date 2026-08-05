@@ -21,6 +21,7 @@ import {
 let catState: CategoryState = {
   categories: { order: [], items: {}, sessionCategory: {} },
   hiddenSessions: [],
+  sessionTitles: {},
 };
 let panelInjected = false;
 let panelEl: HTMLElement | null = null;
@@ -645,8 +646,9 @@ function bindCategoryEvents() {
   if (!panelEl) return;
 
   // 事件委托：只绑定一次到 panelEl 自身（React 重渲染不丢失）
-  if (panelEl._dsBound) return;
-  panelEl._dsBound = true;
+  const elWithFlag = panelEl as HTMLElement & { _dsBound?: boolean };
+  if (elWithFlag._dsBound) return;
+  elWithFlag._dsBound = true;
 
   panelEl.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
@@ -754,6 +756,7 @@ function bindCategoryEvents() {
   // 分类拖拽排序
   let _dragCatIdx = -1;
   panelEl.addEventListener('dragstart', (e) => {
+    if (!panelEl || !e.dataTransfer) return;
     const el = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
     if (!el || el.closest('#ds-cat-header')) {
       e.preventDefault();
@@ -766,6 +769,7 @@ function bindCategoryEvents() {
     e.dataTransfer.effectAllowed = 'move';
   });
   panelEl.addEventListener('dragend', () => {
+    if (!panelEl) return;
     _dragCatIdx = -1;
     panelEl.classList.remove('ds-cat-dragging-active');
     panelEl
@@ -782,6 +786,7 @@ function bindCategoryEvents() {
       );
   });
   panelEl.addEventListener('dragover', (e) => {
+    if (!panelEl) return;
     const el = (e.target as HTMLElement).closest('.ds-cat-item') as HTMLElement | null;
     if (!el || _dragCatIdx < 0) return;
     e.preventDefault();
@@ -804,7 +809,7 @@ function bindCategoryEvents() {
   });
   panelEl.addEventListener('drop', (e) => {
     e.preventDefault();
-    if (_dragCatIdx < 0) return;
+    if (!panelEl || _dragCatIdx < 0) return;
     const overEl = panelEl.querySelector(
       '.ds-cat-drag-over-before, .ds-cat-drag-over-after',
     ) as HTMLElement | null;
@@ -824,7 +829,7 @@ function bindCategoryEvents() {
     if (!b || !tb) return;
     const ex = b.classList.toggle('ds-cat-expanded');
     tb.innerHTML = ex ? chevronDownSVG() : chevronRightSVG();
-    tb.title = ex ? '收起' : '展开';
+    (tb as HTMLElement).title = ex ? '收起' : '展开';
     sessionStorage.setItem(CAT_KEY, String(ex));
   }
 }

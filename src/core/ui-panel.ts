@@ -240,7 +240,7 @@ function createPanel(state: AppState) {
         const label = document.getElementById('ds-enh-opacity-val');
         if (slider) slider.value = val ? String(val) : '100';
         if (label) label.textContent = val ? val + '%' : '100%';
-        applyOpacity(val || 100);
+        applyOpacity((val as number) || 100);
       });
   });
   darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
@@ -500,7 +500,7 @@ async function bindPanelEvents(state: AppState) {
           showToast(enhState.tokenSpeed ? 'Token 速度已开启' : 'Token 速度已关闭');
         },
       };
-      funcMap[id]?.();
+      if (id) funcMap[id]?.();
     });
   });
 
@@ -669,7 +669,9 @@ async function loadAPIKey() {
   if (!input) return;
 
   try {
-    const r = await chrome.storage.local.get('ds_mini_tavily_key');
+    const r = (await chrome.storage.local.get('ds_mini_tavily_key')) as {
+      ds_mini_tavily_key?: string;
+    };
     input.value = r.ds_mini_tavily_key || '';
     updateAPIKeyStatus(!!r.ds_mini_tavily_key);
   } catch {
@@ -839,7 +841,7 @@ async function loadEnhancerPanel() {
           slider.value = String(val);
         }
         if (label) label.textContent = val + '%';
-        applyOpacity(val);
+        applyOpacity(val as number);
       }
     });
 }

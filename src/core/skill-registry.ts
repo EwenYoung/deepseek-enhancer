@@ -33,7 +33,7 @@ export async function loadSkills(): Promise<Skill[]> {
 async function loadUserSkills(): Promise<Skill[]> {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEY);
-    return result[STORAGE_KEY] || [];
+    return (result[STORAGE_KEY] as Skill[] | undefined) || [];
   } catch {
     return [];
   }

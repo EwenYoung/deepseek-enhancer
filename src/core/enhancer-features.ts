@@ -24,7 +24,7 @@ export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
     return (
-      r[ENHANCER_KEY] || {
+      (r[ENHANCER_KEY] as EnhancerConfig | undefined) || {
         wideScreen: false,
         themeIdx: 0,
         hideScrollbar: false,
@@ -537,7 +537,10 @@ export async function applyTheme(idx: number) {
   for (let i = 0; i < allEls.length; i++) {
     const el = allEls[i] as HTMLElement;
     const cs = getComputedStyle(el);
-    const bf = cs.backdropFilter || (cs as CSSStyleDeclaration).webkitBackdropFilter || '';
+    const bf =
+      cs.backdropFilter ||
+      (cs as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter ||
+      '';
     if (bf && bf !== 'none' && !el.closest('#ds-mini-panel')) {
       el.style.setProperty('opacity', '0', 'important');
       el.setAttribute('data-ds-no-bg', '');
@@ -801,7 +804,19 @@ export async function toggleAutoHideInput(enabled: boolean) {
 // ============================================================
 // 5.5 语音输入
 // ============================================================
-let recognition: SpeechRecognition | null = null;
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+let recognition: SpeechRecognitionLike | null = null;
 let isRecording = false;
 let currentBrandColor = '#4d6bfe';
 
@@ -931,8 +946,11 @@ function toggleRecording(btn: HTMLElement) {
 }
 
 function startRecording(btn: HTMLElement) {
-  const SpeechRecognition =
-    window.SpeechRecognition || (window as Record<string, unknown>).webkitSpeechRecognition;
+  const w = window as Window & {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     alert('浏览器不支持语音识别');
     return;
@@ -1001,32 +1019,32 @@ const FONT_PRESETS: Record<string, Record<string, FontDef>> = {
     wenkai: {
       label: '霞鹜文楷',
       family: "'LXGW WenKai', '霞鹜文楷', serif",
-      urls: 'https://fontsapi.zeoseven.com/292/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/292/main/result.css'],
     },
     'noto-serif': {
       label: '思源宋体',
       family: "'Noto Serif CJK', '思源宋体', serif",
-      urls: 'https://fontsapi.zeoseven.com/285/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/285/main/result.css'],
     },
     'noto-sans': {
       label: '思源黑体',
       family: "'Noto Sans CJK', '思源黑体', sans-serif",
-      urls: 'https://fontsapi.zeoseven.com/69/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/69/main/result.css'],
     },
     zhuque: {
       label: '朱雀仿宋',
       family: "'Zhuque Fangsong', '朱雀仿宋', serif",
-      urls: 'https://fontsapi.zeoseven.com/7/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/7/main/result.css'],
     },
     hanchan: {
       label: '寒蝉活宋体',
       family: "'ChillHuoSong_F', '寒蝉活宋体', serif",
-      urls: 'https://fontsapi.zeoseven.com/875/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/875/main/result.css'],
     },
     chill: {
       label: '寒蝉全圆体',
       family: "'ChillRoundF', '寒蝉全圆体', sans-serif",
-      urls: 'https://fontsapi.zeoseven.com/3/main/result.css',
+      urls: ['https://fontsapi.zeoseven.com/3/main/result.css'],
     },
   },
   mono: {

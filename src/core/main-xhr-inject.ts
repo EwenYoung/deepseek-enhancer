@@ -1,7 +1,9 @@
 // ============================================================
 // deepseek-enhancer — 主世界 XHR 拦截脚本
 // ============================================================
-/* eslint-disable no-var, @typescript-eslint/no-unused-vars */
+// 此文件为 raw 注入脚本（原文注入页面执行），不参与类型系统
+/* eslint-disable no-var, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
 (function () {
   'use strict';
 
@@ -736,7 +738,9 @@
         '[DS-Mini:MAIN] Delete request for',
         sid,
         'auth:',
-        headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE',
+        (headers as Record<string, string>)['Authorization']
+          ? (headers as Record<string, string>)['Authorization'].substring(0, 30) + '...'
+          : 'NONE',
       );
 
       fetch('/api/v0/chat_session/delete', {

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { parseSkillMD, hashStr } from '../skill-importer';
-import type { Skill } from '../types';
 
 describe('parseSkillMD', () => {
   it('parses frontmatter name and description', () => {

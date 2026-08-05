@@ -177,7 +177,8 @@ function cssDropdownText(anchorEl: HTMLElement): string {
 }
 
 function buildDropdownItems() {
-  if (!dropdownEl) return;
+  const dd = dropdownEl;
+  if (!dd) return;
   currentMatches.forEach((skill, i) => {
     const item = document.createElement('div');
     item.className = 'ds-mini-ac-shadow-item';
@@ -198,7 +199,7 @@ function buildDropdownItems() {
       selectedIndex = i;
       updateSelection();
     });
-    dropdownEl.appendChild(item);
+    dd.appendChild(item);
   });
 }
 

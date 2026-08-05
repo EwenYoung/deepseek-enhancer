@@ -17,14 +17,11 @@ let toolExecutionInProgress = false;
 let loopDepth = 0;
 const MAX_LOOP = 10;
 let toolBlocksInited = false;
-let silentModeEnabled = false; // Agent 模式开关（保留给 content.ts 调用）
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
 let agentLoopRunning = false; // 并发防护
 
-// 由 content.ts 调用
-export function setSilentMode(enabled: boolean) {
-  silentModeEnabled = enabled;
-}
+// 由 content.ts 调用（agent 模式状态由 storage + MAIN 层管理，此处仅保留调用入口）
+export function setSilentMode(_enabled: boolean) {}
 
 // ============================================================
 // Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
@@ -203,7 +200,7 @@ export async function handleMainWorldToolCalls(
   reqHeaders?: Record<string, string> | null,
 ) {
   // 必须在 toolExecutionInProgress 检查之前存储（消息路径因锁被跳过）
-  if (reqHeaders) savedReqHeaders = reqHeaders;
+  void reqHeaders;
   if (toolExecutionInProgress) {
     console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
     return;
@@ -692,14 +689,14 @@ function findChatContainer(): HTMLElement | null {
 
 // 多帧扫描隐藏 [工具执行结果] 消息（应对虚拟列表渲染副本）
 function scanAndHideToolResults() {
-  var frames = 0;
-  var maxFrames = 30;
+  let frames = 0;
+  const maxFrames = 30;
   // 识别消息级组件：hash class 格式如 _9663006, b13855df（7-8位字母数字）
-  function isMsgComponent(el) {
-    var cls = el.className;
+  function isMsgComponent(el: Element) {
+    const cls = el.className;
     if (!cls || typeof cls !== 'string') return false;
-    var parts = cls.split(/\s+/);
-    for (var i = 0; i < parts.length; i++) {
+    const parts = cls.split(/\s+/);
+    for (let i = 0; i < parts.length; i++) {
       if (/^[_a-zA-Z][a-zA-Z0-9]{5,9}$/.test(parts[i])) return true;
     }
     return false;
@@ -707,17 +704,17 @@ function scanAndHideToolResults() {
 
   function scan() {
     frames++;
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    var textNode;
-    var found = false;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let textNode;
+    let found = false;
     while ((textNode = walker.nextNode())) {
       if (textNode.textContent && textNode.textContent.indexOf('[工具执行结果]') === 0) {
         // 从文本节点向上找 hash class 消息容器（限步 8 层）
-        var p = textNode.parentElement;
-        var steps = 0;
+        let p = textNode.parentElement;
+        let steps = 0;
         while (p && p !== document.body && p !== document.documentElement && steps < 8) {
           steps++;
-          var pCls = String(p.className || '');
+          const pCls = String(p.className || '');
           // 跳过虚拟列表容器
           if (pCls.indexOf('virtual-list') !== -1) break;
           if (isMsgComponent(p) && !p.hasAttribute('data-ds-hidden')) {
@@ -767,4 +764,4 @@ function reorderToolBlocks() {
 }
 
 // 遗留导出保持兼容（不被调用，保留以防 import 错误）
-export async function onSSEToolCallDetected() {}
+export async function onSSEToolCallDetected(_text?: string, _xhr?: unknown) {}

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { CategoryState, CategoriesData, CategoryItem } from '../conversation-store';
+import { describe, it, expect, vi } from 'vitest';
+import type { CategoryState, CategoryItem } from '../conversation-store';
 
 // ============================================================
 // Mock chrome.storage.local

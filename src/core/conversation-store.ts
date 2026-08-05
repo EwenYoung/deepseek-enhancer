@@ -60,9 +60,11 @@ export async function loadCategories(): Promise<CategoryState> {
       STORAGE_KEY_HIDDEN,
       STORAGE_KEY_TITLES,
     ]);
-    const categories = r[STORAGE_KEY_CATEGORIES] || emptyCategories();
-    const hiddenSessions: string[] = r[STORAGE_KEY_HIDDEN] || [];
-    const sessionTitles: Record<string, string> = r[STORAGE_KEY_TITLES] || {};
+    const categories =
+      (r[STORAGE_KEY_CATEGORIES] as CategoriesData | undefined) ?? emptyCategories();
+    const hiddenSessions: string[] = (r[STORAGE_KEY_HIDDEN] as string[] | undefined) ?? [];
+    const sessionTitles: Record<string, string> =
+      (r[STORAGE_KEY_TITLES] as Record<string, string> | undefined) ?? {};
     return { categories, hiddenSessions, sessionTitles };
   } catch {
     return emptyState();

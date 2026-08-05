@@ -22,7 +22,6 @@ export function renderInlineMarkdown(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let inCodeBlock = false;
-  let codeBlockLang = '';
   const codeLines: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -32,7 +31,6 @@ export function renderInlineMarkdown(text: string): string {
     if (/^```/.test(line)) {
       if (!inCodeBlock) {
         inCodeBlock = true;
-        codeBlockLang = line.slice(3).trim();
         continue;
       } else {
         inCodeBlock = false;

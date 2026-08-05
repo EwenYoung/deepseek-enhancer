@@ -77,8 +77,7 @@ export function importFromLocal(): Promise<Skill> {
 function openFolderPicker(resolve: (s: Skill) => void, reject: (e: Error) => void) {
   const input = document.createElement('input');
   input.type = 'file';
-  // @ts-expect-error - webkitdirectory is a non-standard property
-  input.webkitdirectory = true;
+  (input as HTMLInputElement & { webkitdirectory?: boolean }).webkitdirectory = true;
 
   input.addEventListener('change', async () => {
     const files = input.files;
@@ -125,7 +124,7 @@ function openFolderPicker(resolve: (s: Skill) => void, reject: (e: Error) => voi
       input.remove();
       resolve(skill);
     } catch (err) {
-      reject(err);
+      reject(err instanceof Error ? err : new Error(String(err)));
     }
   });
 

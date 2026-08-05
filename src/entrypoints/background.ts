@@ -4,6 +4,8 @@
 // 代理跨域请求，绕过 CORS 限制
 // 使用 Tavily API 进行搜索和网页抓取
 
+import { defineBackground } from 'wxt/utils/define-background';
+
 const TAVILY_BASE = 'https://api.tavily.com';
 const STORAGE_KEY = 'ds_mini_tavily_key';
 
@@ -95,7 +97,7 @@ async function handleToolExecution(req: ToolExecRequest) {
 
 async function getAPIKey(): Promise<string> {
   const r = await chrome.storage.local.get(STORAGE_KEY);
-  return r[STORAGE_KEY] || '';
+  return (r[STORAGE_KEY] as string) || '';
 }
 
 // ============================================================
@@ -525,8 +527,10 @@ async function fetchRedditML(): Promise<string> {
   const res = await fetch('https://www.reddit.com/r/MachineLearning/hot.json?limit=15', {
     headers: { 'User-Agent': 'deepseek-enhancer/0.1' },
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  const children = data?.data?.children as Array<Record<string, unknown>> | undefined;
+  const data = (await res.json()) as {
+    data?: { children?: Array<Record<string, unknown>> };
+  };
+  const children = data?.data?.children;
 
   if (!children || children.length === 0) return '(无 Reddit 数据)';
 

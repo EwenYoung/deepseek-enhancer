@@ -331,7 +331,7 @@ function renderHTML(messages: ChatMessage[], title: string): string {
     box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden
   }
   .header{
-    background:linear-gradient(135deg,#4f46e5,#6366f1);color:#fff;padding:28px 32px
+    background:#4f46e5;color:#fff;padding:28px 32px
   }
   .header h1{font-size:22px;font-weight:700;margin-bottom:6px}
   .header .meta{font-size:13px;opacity:.85}

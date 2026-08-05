@@ -28,6 +28,13 @@ export default defineContentScript({
 
     console.log('[DS-Mini:UI] Initializing...');
 
+    // 扩展热刷新后，旧实例的 chrome.* 调用会 reject（Extension context invalidated）。
+    // 抑制该特定未捕获错误，让旧实例静默失效，避免污染控制台。
+    window.addEventListener('unhandledrejection', (e) => {
+      const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
+      if (msg.includes('Extension context invalidated')) e.preventDefault();
+    });
+
     // 尽早启动 storage 读取，避免 silentModeEnabled 竞态
     chrome.storage.local.get('ds_mini_agent_mode').then((r) => {
       if (r.ds_mini_agent_mode) setSilentMode(true);

@@ -16,6 +16,12 @@ export default defineConfig({
       '48': 'icons/icon.png',
       '128': 'icons/icon.png',
     },
+    web_accessible_resources: [
+      {
+        resources: ['content-scripts/main-world.js'],
+        matches: ['https://chat.deepseek.com/*'],
+      },
+    ],
   },
   srcDir: 'src',
   outDir: 'dist',

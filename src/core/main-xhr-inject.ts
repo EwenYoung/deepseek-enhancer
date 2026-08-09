@@ -738,9 +738,7 @@
         '[DS-Mini:MAIN] Delete request for',
         sid,
         'auth:',
-        (headers as Record<string, string>)['Authorization']
-          ? (headers as Record<string, string>)['Authorization'].substring(0, 30) + '...'
-          : 'NONE',
+        headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE',
       );
 
       fetch('/api/v0/chat_session/delete', {

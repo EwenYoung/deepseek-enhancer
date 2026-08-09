@@ -6,6 +6,13 @@ import type { AppState, Skill } from './types';
 import { loadSkills, saveSkill, deleteSkill } from './skill-registry';
 import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
+import {
+  exportAllData,
+  importAllData,
+  serializeBackup,
+  downloadBackup,
+  readFileAsText,
+} from './data-backup';
 import type { EnhancerConfig } from './enhancer-features';
 import {
   toggleWideScreen,
@@ -320,6 +327,16 @@ function buildPanelHTML(): string {
             <button id="ds-mini-export-html" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">HTML</button>
           </div>
         </div>
+
+        <!-- 数据备份 -->
+        <div style="padding:8px 16px;border-bottom:1px solid var(--panel-border);">
+          <div style="font-size:11px;font-weight:600;color:var(--panel-text-secondary);margin-bottom:4px;">数据备份</div>
+          <div style="display:flex;gap:6px;">
+            <button id="ds-mini-backup-export" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导出备份</button>
+            <button id="ds-mini-backup-import" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导入备份</button>
+          </div>
+          <input id="ds-mini-backup-file" type="file" accept=".json" style="display:none;">
+        </div>
       </div>
 
       <!-- ========== SCROLLABLE AREA ========== -->
@@ -419,6 +436,51 @@ async function bindPanelEvents(state: AppState) {
     ?.addEventListener('click', () => exportChat('html'));
   // 导出按钮 hover（边框高亮 + 背景微变）
   panelEl.querySelectorAll('#ds-mini-export-md, #ds-mini-export-html').forEach((btn) => {
+    btn.addEventListener('mouseenter', () => {
+      (btn as HTMLElement).style.borderColor = 'var(--accent)';
+      (btn as HTMLElement).style.color = 'var(--accent)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      (btn as HTMLElement).style.borderColor = 'var(--panel-border)';
+      (btn as HTMLElement).style.color = 'var(--panel-text)';
+    });
+  });
+
+  // 数据备份
+  const backupFileInput = panelEl.querySelector('#ds-mini-backup-file') as HTMLInputElement;
+  panelEl.querySelector('#ds-mini-backup-export')?.addEventListener('click', async () => {
+    const payload = await exportAllData();
+    downloadBackup(serializeBackup(payload));
+    showToast('备份已导出');
+  });
+  panelEl.querySelector('#ds-mini-backup-import')?.addEventListener('click', () => {
+    backupFileInput.click();
+  });
+  backupFileInput.addEventListener('change', async () => {
+    const file = backupFileInput.files?.[0];
+    if (!file) return;
+    try {
+      const text = await readFileAsText(file);
+      const parsed = JSON.parse(text);
+      const skillCount = Array.isArray(parsed.data?.ds_mini_skills)
+        ? parsed.data.ds_mini_skills.length
+        : 0;
+      const catCount = parsed.data?.ds_mini_categories?.order?.length ?? 0;
+      const ok = confirm(
+        `将覆盖当前全部设置（含 ${skillCount} 个技能、${catCount} 个分类）。确认恢复？`,
+      );
+      if (!ok) return;
+      await importAllData(text);
+      showToast(`已恢复 ${skillCount} 个技能、${catCount} 个分类`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '导入失败';
+      showToast(msg);
+    } finally {
+      backupFileInput.value = '';
+    }
+  });
+  // 备份按钮 hover
+  panelEl.querySelectorAll('#ds-mini-backup-export, #ds-mini-backup-import').forEach((btn) => {
     btn.addEventListener('mouseenter', () => {
       (btn as HTMLElement).style.borderColor = 'var(--accent)';
       (btn as HTMLElement).style.color = 'var(--accent)';

@@ -1352,11 +1352,40 @@ function refreshPanel() {
       b.innerHTML = buildCategoryListHTML();
       bindCategoryEvents();
     }
-    // 持久化 buildCategoryListHTML 中从 DOM 缓存的标题
-    saveCategories(catState);
   } catch (e) {
     console.error('[Categories] refreshPanel:', e);
   }
+}
+
+/** 从 storage 重新加载分类数据并刷新面板（供备份恢复后调用） */
+export async function refreshCategories() {
+  catState = await loadCategories();
+  await ensurePanelRendered();
+}
+
+/** 确保分类面板已渲染（带重试，应对侧边栏 DOM 被其他模块重建的情况） */
+async function ensurePanelRendered() {
+  for (let i = 0; i < 6; i++) {
+    const el = panelEl as HTMLElement | null;
+    if (panelInjected && el && document.body.contains(el)) {
+      const b = el.querySelector('#ds-cat-body') as HTMLElement | null;
+      if (b) {
+        b.innerHTML = buildCategoryListHTML();
+        bindCategoryEvents();
+        return;
+      }
+    }
+    // 面板不存在或已被移除，重置并重注入
+    panelInjected = false;
+    panelEl = null;
+    tryInjectPanel();
+    // 等待侧边栏就绪后重试
+    await delay(400);
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 function escHtml(s: string): string {
   const d = document.createElement('div');

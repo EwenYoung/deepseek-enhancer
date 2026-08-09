@@ -21,6 +21,8 @@ const BACKUP_KEYS: Record<string, unknown> = {
   ds_mini_enhancer: {},
   ds_mini_tavily_key: '',
   ds_mini_agent_mode: false,
+  ds_panel_opacity_light: 100,
+  ds_panel_opacity_dark: 100,
 };
 
 export type BackupData = typeof BACKUP_KEYS;
@@ -74,9 +76,16 @@ export async function importAllData(jsonString: string): Promise<void> {
     throw new Error('备份文件格式无效：缺少 data 字段');
   }
 
+  // 白名单过滤：只写入已知 key，防止恶意备份污染 storage
+  const data = payload.data as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const key of Object.keys(BACKUP_KEYS)) {
+    if (key in data) sanitized[key] = data[key];
+  }
+
   // 全量替换：先清空再写入
   await chrome.storage.local.clear();
-  await chrome.storage.local.set(payload.data);
+  await chrome.storage.local.set(sanitized);
 }
 
 // ============================================================

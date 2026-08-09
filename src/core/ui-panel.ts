@@ -328,15 +328,6 @@ function buildPanelHTML(): string {
           </div>
         </div>
 
-        <!-- 数据备份 -->
-        <div style="padding:8px 16px;border-bottom:1px solid var(--panel-border);">
-          <div style="font-size:11px;font-weight:600;color:var(--panel-text-secondary);margin-bottom:4px;">数据备份</div>
-          <div style="display:flex;gap:6px;">
-            <button id="ds-mini-backup-export" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导出备份</button>
-            <button id="ds-mini-backup-import" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导入备份</button>
-          </div>
-          <input id="ds-mini-backup-file" type="file" accept=".json" style="display:none;">
-        </div>
       </div>
 
       <!-- ========== SCROLLABLE AREA ========== -->
@@ -408,6 +399,19 @@ function buildPanelHTML(): string {
             </div>
           </div>
         </div>
+
+        <!-- 数据备份 -->
+        <div class="ds-settings-card">
+          <div class="ds-card-header"><span class="ds-card-icon">${keySVG}</span>数据备份</div>
+          <div class="ds-card-body">
+            <div style="font-size:11px;color:var(--panel-text-secondary);margin-bottom:8px;">导出或导入全部配置（技能、分类、主题、API Key 等）</div>
+            <div style="display:flex;gap:6px;">
+              <button id="ds-mini-backup-export" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导出备份</button>
+              <button id="ds-mini-backup-import" style="flex:1;padding:5px 10px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:11px;font-weight:500;transition:border-color 0.15s,color 0.15s;">导入备份</button>
+            </div>
+            <input id="ds-mini-backup-file" type="file" accept=".json" style="display:none;">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -466,12 +470,11 @@ async function bindPanelEvents(state: AppState) {
         ? parsed.data.ds_mini_skills.length
         : 0;
       const catCount = parsed.data?.ds_mini_categories?.order?.length ?? 0;
-      const ok = confirm(
-        `将覆盖当前全部设置（含 ${skillCount} 个技能、${catCount} 个分类）。确认恢复？`,
-      );
+      const ok = await showBackupConfirm(skillCount, catCount);
       if (!ok) return;
       await importAllData(text);
-      showToast(`已恢复 ${skillCount} 个技能、${catCount} 个分类`);
+      showToast(`已恢复 ${skillCount} 个技能、${catCount} 个分类，即将刷新页面...`);
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '导入失败';
       showToast(msg);
@@ -1230,47 +1233,82 @@ function showModalEditor(state: AppState, skill?: Skill) {
   }, 100);
 }
 
-function showDeleteConfirm(state: AppState, skillId: string, skillName: string) {
-  const existing = document.getElementById('ds-mini-modal-overlay');
-  if (existing) existing.remove();
+/** 通用确认弹窗 */
+function showConfirm(options: {
+  title: string;
+  body: string;
+  confirmText: string;
+  confirmDanger?: boolean;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('ds-mini-modal-overlay');
+    if (existing) existing.remove();
 
-  const overlay = document.createElement('div');
-  overlay.id = 'ds-mini-modal-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:999997;
-    background:var(--overlay-bg, rgba(0,0,0,0.3));
-    backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-  `;
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'ds-mini-modal-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:999997;
+      background:var(--overlay-bg, rgba(0,0,0,0.3));
+      backdrop-filter:blur(4px);
+      display:flex;align-items:center;justify-content:center;
+    `;
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+        resolve(false);
+      }
+    });
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      width:360px; padding:20px;
+      background:var(--panel-bg); backdrop-filter:var(--panel-blur);
+      border:1px solid var(--panel-border); border-radius:14px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.15);
+      color:var(--panel-text);
+      font-family:'DM Sans', -apple-system, sans-serif;
+    `;
+    const confirmBg = options.confirmDanger ? 'var(--danger)' : 'var(--accent)';
+    modal.innerHTML = `
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;">${esc(options.title)}</div>
+      <div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">${esc(options.body)}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="ds-confirm-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
+        <button id="ds-confirm-ok" style="padding:7px 16px;border:none;border-radius:8px;background:${confirmBg};color:#fff;cursor:pointer;font-size:12px;font-weight:500;">${esc(options.confirmText)}</button>
+      </div>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    modal.querySelector('#ds-confirm-cancel')?.addEventListener('click', () => {
+      overlay.remove();
+      resolve(false);
+    });
+    modal.querySelector('#ds-confirm-ok')?.addEventListener('click', () => {
+      overlay.remove();
+      resolve(true);
+    });
   });
+}
 
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    width:360px; padding:20px;
-    background:var(--panel-bg); backdrop-filter:var(--panel-blur);
-    border:1px solid var(--panel-border); border-radius:14px;
-    box-shadow:0 8px 32px rgba(0,0,0,0.15);
-    color:var(--panel-text);
-    font-family:'DM Sans', -apple-system, sans-serif;
-  `;
-  modal.innerHTML = `
-    <div style="font-weight:600;font-size:14px;margin-bottom:8px;">确认删除</div>
-    <div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">确定删除 "${esc(skillName)}"？此操作不可撤销。</div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button id="ds-del-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
-      <button id="ds-del-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--danger);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">删除</button>
-    </div>
-  `;
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-
-  modal.querySelector('#ds-del-cancel')?.addEventListener('click', () => overlay.remove());
-  modal.querySelector('#ds-del-confirm')?.addEventListener('click', async () => {
+function showDeleteConfirm(state: AppState, skillId: string, skillName: string) {
+  showConfirm({
+    title: '确认删除',
+    body: `确定删除 "${skillName}"？此操作不可撤销。`,
+    confirmText: '删除',
+    confirmDanger: true,
+  }).then(async (ok) => {
+    if (!ok) return;
     await deleteSkill(skillId);
-    overlay.remove();
     await refreshSkillList(state);
+  });
+}
+
+function showBackupConfirm(skillCount: number, catCount: number): Promise<boolean> {
+  return showConfirm({
+    title: '确认恢复',
+    body: `将覆盖当前全部设置（含 ${skillCount} 个技能、${catCount} 个分类）。确认恢复？`,
+    confirmText: '确认恢复',
   });
 }
 

@@ -29,20 +29,30 @@ export default defineContentScript({
     console.log('[DS-Mini:UI] Initializing...');
 
     // 扩展热刷新后，旧实例的 chrome.* 调用会 reject（Extension context invalidated）。
-    // 抑制该特定未捕获错误，让旧实例静默失效，避免污染控制台。
+    // preventDefault 消费该 rejection，让旧实例静默失效、不污染控制台。
+    // 注意：addEventListener 回调返回值被忽略，只有 DOM0 形式才靠 return true。
     window.addEventListener('unhandledrejection', (e) => {
       const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
-      if (msg.includes('Extension context invalidated')) e.preventDefault();
+      if (msg.includes('Extension context invalidated')) {
+        e.preventDefault();
+      }
     });
 
     // 尽早启动 storage 读取，避免 silentModeEnabled 竞态
-    chrome.storage.local.get('ds_mini_agent_mode').then((r) => {
-      if (r.ds_mini_agent_mode) setSilentMode(true);
-    });
-    chrome.storage.local.get('ds_mini_tools_state').then((r) => {
-      const state = (r as { ds_mini_tools_state?: unknown }).ds_mini_tools_state;
-      if (state) setDisabledTools(state as Record<string, boolean>);
-    });
+    // .catch 消费 rejection，防止扩展热刷新后 "Extension context invalidated" 污染控制台
+    chrome.storage.local
+      .get('ds_mini_agent_mode')
+      .then((r) => {
+        if (r.ds_mini_agent_mode) setSilentMode(true);
+      })
+      .catch(() => {});
+    chrome.storage.local
+      .get('ds_mini_tools_state')
+      .then((r) => {
+        const st = (r as { ds_mini_tools_state?: unknown }).ds_mini_tools_state;
+        if (st) setDisabledTools(st as Record<string, boolean>);
+      })
+      .catch(() => {});
 
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
@@ -179,19 +189,22 @@ let speedTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateTokenSpeed(tokPerSec: number, finished: boolean) {
   const ENHANCER_KEY = 'ds_mini_enhancer';
-  chrome.storage.local.get(ENHANCER_KEY).then((r) => {
-    const cfg = (r[ENHANCER_KEY] as { tokenSpeed?: boolean }) || {};
-    if (!cfg.tokenSpeed) {
-      if (speedEl) {
-        speedEl.remove();
-        speedEl = null;
+  // .catch 消费 rejection，防止扩展热刷新后 "Extension context invalidated" 污染控制台
+  chrome.storage.local
+    .get(ENHANCER_KEY)
+    .then((r) => {
+      const cfg = (r[ENHANCER_KEY] as { tokenSpeed?: boolean }) || {};
+      if (!cfg.tokenSpeed) {
+        if (speedEl) {
+          speedEl.remove();
+          speedEl = null;
+        }
+        return;
       }
-      return;
-    }
-    if (!speedEl) {
-      speedEl = document.createElement('div');
-      speedEl.id = 'ds-mini-tok-speed';
-      speedEl.style.cssText = `
+      if (!speedEl) {
+        speedEl = document.createElement('div');
+        speedEl.id = 'ds-mini-tok-speed';
+        speedEl.style.cssText = `
         position: fixed; right: 16px; bottom: 120px; z-index: 99999;
         font-family: -apple-system, sans-serif; font-size: 11px;
         color: #9ca3af; pointer-events: none; user-select: none;
@@ -199,17 +212,18 @@ function updateTokenSpeed(tokPerSec: number, finished: boolean) {
         background: rgba(0,0,0,0.05); padding: 2px 8px;
         border-radius: 4px;
       `;
-      document.body.appendChild(speedEl);
-    }
-    speedEl.textContent = `~${tokPerSec.toFixed(0)} tok/s`;
-    speedEl.style.opacity = '1';
-    if (finished) {
-      if (speedTimer) clearTimeout(speedTimer);
-      speedTimer = setTimeout(() => {
-        speedEl!.style.opacity = '0';
-      }, 2000);
-    }
-  });
+        document.body.appendChild(speedEl);
+      }
+      speedEl.textContent = `~${tokPerSec.toFixed(0)} tok/s`;
+      speedEl.style.opacity = '1';
+      if (finished) {
+        if (speedTimer) clearTimeout(speedTimer);
+        speedTimer = setTimeout(() => {
+          speedEl!.style.opacity = '0';
+        }, 2000);
+      }
+    })
+    .catch(() => {});
 }
 
 // 注入语音脉冲 CSS

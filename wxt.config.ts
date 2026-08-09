@@ -19,4 +19,5 @@ export default defineConfig({
   },
   srcDir: 'src',
   outDir: 'dist',
+  publicDir: 'src/public',
 });

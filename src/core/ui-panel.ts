@@ -41,9 +41,15 @@ let panelInited = false;
 export async function initPanel(state: AppState) {
   state.skills = await loadSkills();
 
-  if (panelInited) {
+  if (panelInited && panelEl && panelEl.isConnected) {
     refreshSkillList(state);
     return;
+  }
+
+  // DOM 已被销毁（扩展热刷新）→ 重建
+  if (panelInited && (!panelEl || !panelEl.isConnected)) {
+    panelInited = false;
+    panelEl = null;
   }
 
   createPanel(state);

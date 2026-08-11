@@ -11,7 +11,7 @@ const MATCHERS = [
 ];
 
 // Commands that need network but are self-contained with their own proxy config
-const EXCLUSIONS: RegExp[] = [];
+const EXCLUSIONS = [];
 
 function main() {
   const chunks = [];

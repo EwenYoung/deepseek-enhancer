@@ -57,23 +57,27 @@ export default defineContentScript({
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
       if (!event.data) return;
-      if (event.data.type === 'DS_MINI_TOOL_CALLS') {
-        handleMainWorldToolCalls(
-          event.data.toolCalls,
-          event.data.silentDepth,
-          event.data.reqHeaders,
-        );
+      const src = event.data.source;
+      if (src === 'DS_MINI_MAIN') {
+        if (event.data.type === 'DS_MINI_TOOL_CALLS') {
+          handleMainWorldToolCalls(
+            event.data.toolCalls,
+            event.data.silentDepth,
+            event.data.reqHeaders,
+          );
+        }
+        if (event.data.type === 'DS_MINI_TOKEN_SPEED') {
+          updateTokenSpeed(event.data.tokPerSec, event.data.finished);
+        }
+        if (event.data.type === 'DS_MINI_FINAL_RESPONSE') {
+          renderFinalResponse(event.data.text);
+        }
+        if (event.data.type === 'DS_MINI_DOM_FALLBACK') {
+          domSubmitFallback(event.data.text);
+        }
+        return;
       }
-      if (event.data.type === 'DS_MINI_TOKEN_SPEED') {
-        updateTokenSpeed(event.data.tokPerSec, event.data.finished);
-      }
-      if (event.data.type === 'DS_MINI_FINAL_RESPONSE') {
-        renderFinalResponse(event.data.text);
-      }
-      if (event.data.type === 'DS_MINI_DOM_FALLBACK') {
-        domSubmitFallback(event.data.text);
-      }
-      if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_AGENT_MODE') {
+      if (src === 'DS_MINI_ISOLATED' && event.data.type === 'SET_AGENT_MODE') {
         setSilentMode(event.data.enabled);
       }
       if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_TOOLS_STATE') {

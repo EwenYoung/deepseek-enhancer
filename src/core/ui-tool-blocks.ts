@@ -155,7 +155,12 @@ class AgentPanel {
     item.style.cssText =
       'padding:2px 0;font-size:12px;color:' + color + ';display:flex;align-items:center;gap:4px;';
     item.innerHTML =
-      '<span style="font-weight:600">' + label + '</span> ' + toolName + ' — ' + shortSummary;
+      '<span style="font-weight:600">' +
+      label +
+      '</span> ' +
+      escapeHTML(toolName) +
+      ' — ' +
+      escapeHTML(shortSummary);
     tools.appendChild(item);
   }
 
@@ -166,7 +171,7 @@ class AgentPanel {
       'margin-top:8px;padding:6px 0;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;color:#86909c;display:flex;align-items:center;gap:4px;';
     if (isError) {
       footer.innerHTML =
-        '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + (errorMsg || '');
+        '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + escapeHTML(errorMsg || '');
     } else {
       footer.innerHTML =
         '<span style="color:#00b42a">[OK]</span> Agent complete (' +

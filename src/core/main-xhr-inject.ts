@@ -12,17 +12,20 @@
 
   console.log('[DS-Mini:MAIN] XHR hook installed');
 
+  // auth token 存闭包变量，不暴露到 window 全局
+  var __ds_captured_auth = '';
+
   // 立即拦截 fetch 以捕获 auth 请求头（放最前面确保不遗漏）
   const __origFetch = window.fetch;
   window.fetch = function (url, opts) {
     if (typeof url === 'string' && url.indexOf('/api/v0/') !== -1 && opts && opts.headers) {
       const h = opts.headers;
       if (h instanceof Headers) {
-        if (h.has('authorization')) window.__DS_DELETE_AUTH__ = h.get('authorization');
-        if (h.has('Authorization')) window.__DS_DELETE_AUTH__ = h.get('Authorization');
+        if (h.has('authorization')) __ds_captured_auth = h.get('authorization');
+        if (h.has('Authorization')) __ds_captured_auth = h.get('Authorization');
       } else if (typeof h === 'object') {
-        if (h.authorization) window.__DS_DELETE_AUTH__ = h.authorization;
-        if (h.Authorization) window.__DS_DELETE_AUTH__ = h.Authorization;
+        if (h.authorization) __ds_captured_auth = h.authorization;
+        if (h.Authorization) __ds_captured_auth = h.Authorization;
       }
     }
     return __origFetch.call(this, url, opts);
@@ -210,7 +213,7 @@
     if (!this.__ds_headers) this.__ds_headers = {};
     this.__ds_headers[header] = value;
     if (header.toLowerCase() === 'authorization' && value) {
-      window.__DS_DELETE_AUTH__ = value;
+      __ds_captured_auth = value;
     }
     return origSetHeader.call(this, header, value, ...rest);
   };
@@ -438,7 +441,12 @@
         if (elapsed > 0.5) {
           const tokPerSec = ((xhr.__ds_chars || 0) * 0.35) / elapsed;
           window.postMessage(
-            { type: 'DS_MINI_TOKEN_SPEED', tokPerSec: tokPerSec, finished: false },
+            {
+              source: 'DS_MINI_MAIN',
+              type: 'DS_MINI_TOKEN_SPEED',
+              tokPerSec: tokPerSec,
+              finished: false,
+            },
             '*',
           );
         }
@@ -450,7 +458,12 @@
           const totalChars = xhr.__ds_chars || 0;
           const finalTokPerSec = totalChars > 0 && elapsed > 0 ? (totalChars * 0.35) / elapsed : 0;
           window.postMessage(
-            { type: 'DS_MINI_TOKEN_SPEED', tokPerSec: finalTokPerSec, finished: true },
+            {
+              source: 'DS_MINI_MAIN',
+              type: 'DS_MINI_TOKEN_SPEED',
+              tokPerSec: finalTokPerSec,
+              finished: true,
+            },
             '*',
           );
         }
@@ -566,6 +579,7 @@
     }
     window.postMessage(
       {
+        source: 'DS_MINI_MAIN',
         type: 'DS_MINI_TOOL_CALLS',
         toolCalls: calls,
         silentDepth: 0, // legacy field kept for compatibility
@@ -686,7 +700,7 @@
 
       const headers = { 'Content-Type': 'application/json' };
       // 优先使用捕获到的页面 auth header
-      const capturedAuth = window.__DS_DELETE_AUTH__;
+      const capturedAuth = __ds_captured_auth;
       if (capturedAuth) {
         headers['Authorization'] = capturedAuth;
       }

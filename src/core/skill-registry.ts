@@ -65,8 +65,8 @@ export async function saveSkill(skill: Skill): Promise<void> {
 
 export async function deleteSkill(id: string): Promise<void> {
   const skills = await loadUserSkills();
-  // 不能删除内置技能
-  const filtered = skills.filter((s) => s.id !== id && s.source !== 'builtin');
+  // 不能删除内置技能：保留 builtin，只删匹配 id 的非 builtin
+  const filtered = skills.filter((s) => s.source === 'builtin' || s.id !== id);
   await saveUserSkills(filtered);
 }
 

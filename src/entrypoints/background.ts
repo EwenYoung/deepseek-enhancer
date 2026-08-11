@@ -10,7 +10,11 @@ const TAVILY_BASE = 'https://api.tavily.com';
 const STORAGE_KEY = 'ds_mini_tavily_key';
 
 export default defineBackground(() => {
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // 只接受来自 DeepSeek 聊天页面的消息
+    if (!sender.url?.startsWith('https://chat.deepseek.com/')) {
+      return false;
+    }
     if (message.type === 'EXECUTE_TOOL') {
       handleToolExecution(message.payload).then(sendResponse);
       return true;

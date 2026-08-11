@@ -3,13 +3,20 @@
 // ============================================================
 import type { Skill } from './types';
 
-function uid(): string {
-  return 'builtin-' + Math.random().toString(36).slice(2, 10);
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function uid(name: string): string {
+  return 'builtin-' + slugify(name);
 }
 
 export const BUILTIN_SKILLS: Skill[] = [
   {
-    id: uid(),
+    id: uid('ultra-think'),
     name: 'ultra-think',
     description: '引导模型进行深度思考和多步骤推理',
     source: 'builtin',
@@ -30,7 +37,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 - 不确定的地方请明确说明`,
   },
   {
-    id: uid(),
+    id: uid('code-review'),
     name: 'code-review',
     description: '专业的代码审查助手，帮助发现 bug 和改进点',
     source: 'builtin',
@@ -59,7 +66,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 \`\`\``,
   },
   {
-    id: uid(),
+    id: uid('writer'),
     name: 'writer',
     description: '专业写作助手，帮助润色、翻译、总结文本',
     source: 'builtin',
@@ -78,7 +85,7 @@ export const BUILTIN_SKILLS: Skill[] = [
   },
   // === 新增技能 ===
   {
-    id: uid(),
+    id: uid('article-writer'),
     name: 'article-writer',
     description: '结构化长文写作，含大纲和参考文献',
     source: 'builtin',
@@ -98,7 +105,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 - --- 分隔各个章节`,
   },
   {
-    id: uid(),
+    id: uid('translator'),
     name: 'translator',
     description: '多语翻译，保持原文语气和风格',
     source: 'builtin',
@@ -117,7 +124,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 - 如有必要，附上翻译说明（哪些地方做了特殊处理）`,
   },
   {
-    id: uid(),
+    id: uid('researcher'),
     name: 'researcher',
     description: '深度调研，多源搜索后交叉验证输出综述',
     source: 'builtin',
@@ -137,7 +144,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 - ## 不确定性说明`,
   },
   {
-    id: uid(),
+    id: uid('code-assistant'),
     name: 'code-assistant',
     description: '轻量代码助手：生成、解释、调试、重构',
     source: 'builtin',
@@ -156,7 +163,7 @@ export const BUILTIN_SKILLS: Skill[] = [
 - 如果涉及安全风险（正则注入/SQL注入/权限），**必须**标注警告`,
   },
   {
-    id: uid(),
+    id: uid('summarizer'),
     name: 'summarizer',
     description: '长文摘要，支持多种风格和详细程度',
     source: 'builtin',

@@ -442,7 +442,10 @@ function renderMarkdownToHTML(text: string): string {
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+    if (!/^https?:\/\//i.test(href)) return label;
+    return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+  });
   text = text.replace(/\n/g, '<br>');
 
   for (let i = 0; i < blocks.length; i++) {

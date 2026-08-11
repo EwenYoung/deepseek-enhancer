@@ -188,10 +188,10 @@ function buildDropdownItems() {
     item.style.cssText = `
       padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
       border-radius: 8px;
-      background: ${i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent'};
+      background: ${i === selectedIndex ? 'var(--accent-bg, rgba(24,24,27,0.08))' : 'transparent'};
     `;
     item.innerHTML = `
-      <span style="color:var(--accent,#007AFF);font-weight:600;min-width:20px;">/</span>
+      <span style="color:var(--accent,#18181b);font-weight:600;min-width:20px;">/</span>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;color:var(--panel-text,#1f2937);">${esc(skill.name)}</div>
         <div style="font-size:12px;color:var(--panel-text-secondary,#6b7280);">${esc(skill.description)}</div>
@@ -210,7 +210,7 @@ function updateSelection() {
   if (!dropdownEl) return;
   dropdownEl.querySelectorAll('.ds-mini-ac-shadow-item').forEach((item, i) => {
     (item as HTMLElement).style.background =
-      i === selectedIndex ? 'rgba(0,122,255,0.12)' : 'transparent';
+      i === selectedIndex ? 'var(--accent-bg, rgba(24,24,27,0.08))' : 'transparent';
     if (i === selectedIndex) (item as HTMLElement).scrollIntoView({ block: 'nearest' });
   });
 }

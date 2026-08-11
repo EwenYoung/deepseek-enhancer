@@ -93,7 +93,7 @@ const CAT_PANEL_CSS = `
   }
   #ds-cat-header .ds-cat-actions button:hover {
     background: var(--card-border, rgba(0,0,0,0.08));
-    color: var(--accent, #007AFF);
+    color: var(--accent, #18181b);
   }
   #ds-cat-body { overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; max-height: 0; transition: max-height 0.25s ease; }
   #ds-cat-body::-webkit-scrollbar { display: none; }
@@ -125,7 +125,7 @@ const CAT_PANEL_CSS = `
     opacity: 0; transition: opacity 0.15s;
   }
   .ds-cat-item-header:hover .ds-cat-menu { opacity: 1; }
-  .ds-cat-item-header .ds-cat-menu:hover { opacity: 1 !important; color: var(--accent, #007AFF); background: var(--card-border); }
+  .ds-cat-item-header .ds-cat-menu:hover { opacity: 1 !important; color: var(--accent, #18181b); background: var(--card-border); }
   .ds-cat-item-header .ds-cat-add-session {
     background: none; border: none; cursor: pointer;
     width: 20px; height: 20px; border-radius: 4px;
@@ -135,7 +135,7 @@ const CAT_PANEL_CSS = `
     opacity: 0; transition: opacity 0.15s, color 0.15s;
   }
   .ds-cat-item-header:hover .ds-cat-add-session { opacity: 0.5; }
-  .ds-cat-item-header .ds-cat-add-session:hover { opacity: 1 !important; color: var(--accent, #007AFF); background: var(--card-border); }
+  .ds-cat-item-header .ds-cat-add-session:hover { opacity: 1 !important; color: var(--accent, #18181b); background: var(--card-border); }
   .ds-cat-item-header .ds-cat-sort-btn {
     background: none; border: none; cursor: pointer;
     width: 20px; height: 20px; border-radius: 4px;
@@ -146,7 +146,7 @@ const CAT_PANEL_CSS = `
     opacity: 0;
   }
   .ds-cat-item-header:hover .ds-cat-sort-btn { opacity: 0.6; }
-  .ds-cat-item-header .ds-cat-sort-btn:hover { opacity: 1 !important; background: var(--card-border); color: var(--accent, #007AFF); }
+  .ds-cat-item-header .ds-cat-sort-btn:hover { opacity: 1 !important; background: var(--card-border); color: var(--accent, #18181b); }
   .ds-cat-item-sessions { display: none; }
   .ds-cat-item-sessions.open { display: block; }
   .ds-cat-session {
@@ -164,11 +164,11 @@ const CAT_PANEL_CSS = `
     opacity: 0; transition: opacity 0.15s;
   }
   .ds-cat-session:hover .ds-cat-session-remove { opacity: 1; }
-  .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #ff3b30); background: var(--card-border); }
+  .ds-cat-session .ds-cat-session-remove:hover { color: var(--danger, #dc2626); background: var(--card-border); }
   .ds-cat-item.ds-cat-dragging { opacity: 0.35; transform: scale(0.97); }
-  .ds-cat-item.ds-cat-drag-over { background: var(--accent-bg, rgba(0,122,255,0.06)); border-radius: 10px; }
-  .ds-cat-item.ds-cat-drag-over-before { box-shadow: inset 0 3px 0 0 var(--accent, #007AFF); }
-  .ds-cat-item.ds-cat-drag-over-after { box-shadow: inset 0 -3px 0 0 var(--accent, #007AFF); }
+  .ds-cat-item.ds-cat-drag-over { background: var(--accent-bg, var(--accent-bg, rgba(24,24,27,0.08))); border-radius: 10px; }
+  .ds-cat-item.ds-cat-drag-over-before { box-shadow: inset 0 3px 0 0 var(--accent, #18181b); }
+  .ds-cat-item.ds-cat-drag-over-after { box-shadow: inset 0 -3px 0 0 var(--accent, #18181b); }
 
   /* 三点菜单注入按钮 — 完全继承父级字体，不覆盖 */
   .ds-cat-menu-inject {
@@ -201,7 +201,7 @@ const CAT_PANEL_CSS = `
     font-size: 13px;
   }
   .ds-cat-menu-popup button:hover { background: var(--card-border); }
-  .ds-cat-menu-popup button.ds-cat-menu-danger { color: var(--danger, #ff3b30); }
+  .ds-cat-menu-popup button.ds-cat-menu-danger { color: var(--danger, #dc2626); }
 
   /* 批量操作栏 */
   #ds-batch-bar {
@@ -1213,7 +1213,7 @@ function showBatchCategorizeDialog(ids: string[]) {
           .join('') +
         '</div>'
       : '<div style="color:var(--panel-text-secondary);font-size:12px;margin-bottom:12px;">暂无分类，请先创建分类</div>') +
-    '<div style="margin-bottom:12px;"><input id="ds-batch-new-cat" placeholder="或新建分类..." style="width:100%;padding:7px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:12px;box-sizing:border-box;"></div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-cat-dialog-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-cat-dialog-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;font-weight:500;" ' +
+    '<div style="margin-bottom:12px;"><input id="ds-batch-new-cat" placeholder="或新建分类..." style="width:100%;padding:7px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:12px;box-sizing:border-box;"></div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-cat-dialog-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-cat-dialog-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--accent);color:var(--accent-text,#fff);cursor:pointer;font-size:12px;font-weight:500;" ' +
     (has ? '' : 'disabled') +
     '>归类</button></div>';
   overlay.appendChild(d);
@@ -1256,7 +1256,7 @@ function showBatchDeleteDialog(ids: string[]) {
   d.innerHTML =
     '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">确认删除</div><div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">确认删除 <strong>' +
     ids.length +
-    '</strong> 条会话？此操作不可撤销。</div><div style="font-size:11px;color:var(--danger,#ff3b30);margin-bottom:12px;display:none;" id="ds-del-progress"></div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-del-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-del-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--danger);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">删除</button></div>';
+    '</strong> 条会话？此操作不可撤销。</div><div style="font-size:11px;color:var(--danger,#dc2626);margin-bottom:12px;display:none;" id="ds-del-progress"></div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-del-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-del-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--danger);color:var(--accent-text,#fff);cursor:pointer;font-size:12px;font-weight:500;">删除</button></div>';
   overlay.appendChild(d);
   document.body.appendChild(overlay);
   d.querySelector('#ds-del-cancel')?.addEventListener('click', () => overlay.remove());

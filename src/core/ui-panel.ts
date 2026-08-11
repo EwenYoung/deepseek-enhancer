@@ -70,12 +70,14 @@ function createPanel(state: AppState) {
       --panel-text: #1f2937;
       --panel-text-secondary: #6b7280;
       --panel-border: rgba(0,0,0,0.08);
-      --accent: #007AFF;
-      --accent-secondary: #5E5CE6;
-      --danger: #FF3B30;
+      --accent: #18181b;
+      --accent-secondary: #3f3f46;
+      --accent-text: #ffffff;
+      --accent-bg: rgba(24,24,27,0.08);
+      --danger: #dc2626;
       --card-bg: rgba(255,255,255,0.5);
       --card-border: rgba(0,0,0,0.06);
-      --toggle-on: #007AFF;
+      --toggle-on: #18181b;
       --toggle-off: rgba(0,0,0,0.2);
       --toggle-knob: #fff;
       --input-bg: rgba(255,255,255,0.7);
@@ -87,14 +89,16 @@ function createPanel(state: AppState) {
       --panel-text: #e0e0e0;
       --panel-text-secondary: #a0a0b0;
       --panel-border: rgba(255,255,255,0.08);
-      --accent: #5E5CE6;
-      --accent-secondary: #007AFF;
-      --danger: #FF453A;
+      --accent: #e4e4e7;
+      --accent-secondary: #a1a1aa;
+      --accent-text: #18181b;
+      --accent-bg: rgba(228,228,231,0.12);
+      --danger: #f87171;
       --card-bg: rgba(255,255,255,0.08);
       --card-border: rgba(255,255,255,0.06);
-      --toggle-on: #5E5CE6;
+      --toggle-on: #e4e4e7;
       --toggle-off: rgba(255,255,255,0.15);
-      --toggle-knob: #fff;
+      --toggle-knob: #18181b;
       --input-bg: rgba(255,255,255,0.1);
       --input-border: rgba(255,255,255,0.12);
       --overlay-bg: rgba(0,0,0,0.5);
@@ -160,6 +164,46 @@ function createPanel(state: AppState) {
     #ds-font-size-slider::-moz-range-thumb { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); cursor: pointer; border: none; }
     #ds-enh-opacity::-webkit-slider-thumb { width: 10px; height: 10px; }
     #ds-enh-opacity::-moz-range-thumb { width: 10px; height: 10px; }
+
+    /* ===== 面板配色主题：墨色极简 Ink ===== */
+    #ds-mini-panel[data-ds-theme="ink"] {
+      --panel-bg: rgba(255,255,255,0.98);
+      --panel-text: #18181b;
+      --panel-text-secondary: #52525b;
+      --panel-border: rgba(24,24,27,0.08);
+      --accent: #18181b;
+      --accent-secondary: #3f3f46;
+      --accent-text: #ffffff;
+      --accent-bg: rgba(24,24,27,0.08);
+      --danger: #dc2626;
+      --card-bg: rgba(24,24,27,0.03);
+      --card-border: rgba(24,24,27,0.06);
+      --toggle-on: #18181b;
+      --toggle-off: rgba(24,24,27,0.15);
+      --toggle-knob: #fff;
+      --input-bg: rgba(24,24,27,0.04);
+      --input-border: rgba(24,24,27,0.1);
+      --overlay-bg: rgba(24,24,27,0.25);
+    }
+    html.ds-dark #ds-mini-panel[data-ds-theme="ink"] {
+      --panel-bg: rgba(12,12,12,0.98);
+      --panel-text: #fafafa;
+      --panel-text-secondary: #d4d4d8;
+      --panel-border: rgba(250,250,250,0.1);
+      --accent: #e4e4e7;
+      --accent-secondary: #a1a1aa;
+      --accent-text: #18181b;
+      --accent-bg: rgba(228,228,231,0.12);
+      --card-bg: rgba(250,250,250,0.04);
+      --card-border: rgba(250,250,250,0.08);
+      --toggle-off: rgba(250,250,250,0.2);
+      --toggle-on: #e4e4e7;
+      --toggle-knob: #18181b;
+      --input-bg: rgba(250,250,250,0.05);
+      --input-border: rgba(250,250,250,0.12);
+      --overlay-bg: rgba(0,0,0,0.5);
+    }
+
   `;
   document.head.appendChild(panelVars);
 
@@ -201,12 +245,12 @@ function createPanel(state: AppState) {
     position: fixed; bottom: 16px; right: 16px;
     z-index: 999998;
     display: flex; align-items: center; gap: 6px;
-    background: var(--accent, #007AFF);
-    color: #fff;
+    background: var(--accent, #18181b);
+    color: var(--accent-text, #fff);
     border: none; border-radius: 20px;
     padding: 8px 10px;
     cursor: pointer;
-    box-shadow: 0 0 12px var(--accent, #007AFF);
+    box-shadow: 0 0 12px rgba(24,24,27,0.3);
     transition: box-shadow 0.15s, padding 0.2s;
     font-family: 'DM Sans', -apple-system, sans-serif;
   `;
@@ -234,7 +278,7 @@ function createPanel(state: AppState) {
   if (initialDark) {
     panelEl.classList.add('dark');
     document.documentElement.classList.add('ds-dark');
-    trigger.style.setProperty('--accent', '#5E5CE6');
+    trigger.style.setProperty('--accent', '#e4e4e7');
   }
 
   // 监听深色模式切换
@@ -242,8 +286,11 @@ function createPanel(state: AppState) {
     const isDark = document.body.classList.contains('dark');
     panelEl?.classList.toggle('dark', isDark);
     document.documentElement.classList.toggle('ds-dark', isDark);
-    const accent = isDark ? '#5E5CE6' : '#007AFF';
+    const accent = isDark ? '#e4e4e7' : '#18181b';
     trigger.style.setProperty('--accent', accent);
+    trigger.style.boxShadow = isDark
+      ? '0 0 14px rgba(228,228,231,0.35)'
+      : '0 0 14px rgba(24,24,27,0.3)';
     // 切换透明度值
     chrome.storage.local
       .get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'])
@@ -319,7 +366,7 @@ function buildPanelHTML(): string {
               <button id="ds-mini-import-local" title="本地导入" style="padding:2px 6px;font-size:10px;border:1px solid var(--panel-border);border-radius:5px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;display:flex;align-items:center;gap:2px;">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导入
               </button>
-              <button id="ds-mini-add-skill" title="新建技能" style="padding:2px 6px;font-size:10px;border:none;border-radius:5px;background:var(--accent);color:#fff;cursor:pointer;">+ 新建</button>
+              <button id="ds-mini-add-skill" title="新建技能" style="padding:2px 6px;font-size:10px;border:none;border-radius:5px;background:var(--accent);color:var(--accent-text);cursor:pointer;">+ 新建</button>
             </div>
           </div>
           <div id="ds-mini-skill-list" style="max-height:200px;overflow-y:auto;scrollbar-width:none;margin-top:4px;"></div>
@@ -400,7 +447,7 @@ function buildPanelHTML(): string {
             </div>
             <div style="display:flex;gap:4px;">
               <input id="ds-mini-apikey" type="password" placeholder="tvly-xxxxxxxx" style="flex:1;padding:5px 8px;border:1px solid var(--input-border);border-radius:6px;background:var(--input-bg);color:var(--panel-text);font-size:11px;">
-              <button id="ds-mini-apikey-save" style="padding:5px 10px;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-size:10px;white-space:nowrap;font-weight:500;">保存</button>
+              <button id="ds-mini-apikey-save" style="padding:5px 10px;border:none;border-radius:6px;background:var(--accent);color:var(--accent-text);cursor:pointer;font-size:10px;white-space:nowrap;font-weight:500;">保存</button>
               <button id="ds-mini-apikey-test" style="padding:5px 10px;border:1px solid var(--panel-border);border-radius:6px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:10px;">测试</button>
             </div>
           </div>
@@ -928,6 +975,12 @@ async function loadEnhancerPanel() {
   });
   if (document.body)
     darkObs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+  // 应用墨色极简主题
+  if (panelEl) panelEl.setAttribute('data-ds-theme', 'ink');
+  // 同步触发器发光色
+  const trigger = document.getElementById('ds-mini-trigger');
+  if (trigger) trigger.style.boxShadow = '0 0 14px rgba(24,24,27,0.3)';
 }
 
 function applyOpacity(pct: number) {
@@ -1141,7 +1194,7 @@ function showModalEditor(state: AppState, skill?: Skill) {
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--panel-border);flex-shrink:0;">
       <button id="ds-modal-cancel" style="padding:7px 18px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
-      <button id="ds-modal-save" style="padding:7px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">保存</button>
+      <button id="ds-modal-save" style="padding:7px 18px;border:none;border-radius:8px;background:var(--accent);color:var(--accent-text);cursor:pointer;font-size:12px;font-weight:500;">保存</button>
     </div>
   `;
 

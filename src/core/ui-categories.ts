@@ -855,7 +855,7 @@ function showCategoryDialog(mode: 'new' | 'rename', oldName?: string) {
     (isNew ? '新建分类' : '重命名分类') +
     '</div><input id="ds-cat-dialog-input" value="' +
     escAttr(oldName || '') +
-    '" placeholder="输入分类名称" style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;box-sizing:border-box;margin-bottom:12px;"><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-cat-dialog-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-cat-dialog-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-size:12px;font-weight:500;">' +
+    '" placeholder="输入分类名称" style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;box-sizing:border-box;margin-bottom:12px;"><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-cat-dialog-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-cat-dialog-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--accent);color:var(--accent-text,#fff);cursor:pointer;font-size:12px;font-weight:500;">' +
     (isNew ? '创建' : '保存') +
     '</button></div>';
   overlay.appendChild(d);

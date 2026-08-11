@@ -305,7 +305,25 @@ async function newsHubSearch(
   const sources: string[] = String(payload.sources || defaultSources)
     .split(',')
     .map((s) => s.trim());
+
+  // 需要 Tavily 的中文源：若 apiKey 缺失直接报错，避免静默 fallback 误导
+  const tavilySources = new Set(['baidu', 'weibo', 'zhihu', '36kr']);
+  const needsTavily = sources.some((s) => tavilySources.has(s));
+  if (needsTavily && !apiKey) {
+    return {
+      result: '（未配置 Tavily API Key，无法获取中文热点。请在插件面板中配置）',
+      summary: '缺少 API Key',
+      detail: '（未配置 Tavily API Key）',
+      output: [],
+      truncated: false,
+    };
+  }
+
   const results: Array<{ source: string; content: string }> = [];
+
+  // 动态生成当前年月（如 "2026年8月"），避免硬编码过期
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`;
 
   for (const src of sources) {
     try {
@@ -314,25 +332,25 @@ async function newsHubSearch(
         case 'baidu':
           results.push({
             source: '百度热搜',
-            content: await searchViaTavily(apiKey, '2026年6月 百度热搜榜 实时热点'),
+            content: await searchViaTavily(apiKey, `${yearMonth} 百度热搜榜 实时热点`),
           });
           break;
         case 'weibo':
           results.push({
             source: '微博热搜',
-            content: await searchViaTavily(apiKey, '2026年6月 微博热搜榜 实时'),
+            content: await searchViaTavily(apiKey, `${yearMonth} 微博热搜榜 实时`),
           });
           break;
         case 'zhihu':
           results.push({
             source: '知乎热榜',
-            content: await searchViaTavily(apiKey, '2026年6月 知乎热榜 热点话题'),
+            content: await searchViaTavily(apiKey, `${yearMonth} 知乎热榜 热点话题`),
           });
           break;
         case '36kr':
           results.push({
             source: '36氪 AI科技',
-            content: await searchViaTavily(apiKey, '2026年6月 36氪 人工智能 科技新闻'),
+            content: await searchViaTavily(apiKey, `${yearMonth} 36氪 人工智能 科技新闻`),
           });
           break;
         // 国际平台 — 直接 API 调用（无 CORS 限制）

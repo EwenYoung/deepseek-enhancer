@@ -5,6 +5,8 @@ import {
   stripToolCalls,
   accumulateText,
   resetAccumulator,
+  createAccumulateState,
+  type AccumulateState,
 } from '../sse-parser';
 
 describe('parseSSEChunk', () => {
@@ -186,40 +188,50 @@ describe('stripToolCalls', () => {
 });
 
 describe('accumulateText', () => {
+  let state: AccumulateState;
+
   beforeEach(() => {
-    resetAccumulator();
+    state = createAccumulateState();
   });
 
   it('accumulates text across multiple calls', () => {
-    const r1 = accumulateText('Hello ');
+    const r1 = accumulateText('Hello ', state);
     expect(r1.text).toContain('Hello');
 
-    const r2 = accumulateText('World');
+    const r2 = accumulateText('World', state);
     expect(r2.text).toContain('Hello');
     expect(r2.text).toContain('World');
   });
 
   it('detects tool calls in accumulated text', () => {
-    const r1 = accumulateText('Before <web_se');
+    const r1 = accumulateText('Before <web_se', state);
     expect(r1.toolCalls).toEqual([]);
 
-    const r2 = accumulateText('arch>{"q":"test"}</web_search>');
+    const r2 = accumulateText('arch>{"q":"test"}</web_search>', state);
     expect(r2.toolCalls).toHaveLength(1);
     expect(r2.toolCalls[0].name).toBe('web_search');
   });
 
   it('strips tool calls from accumulated text', () => {
-    accumulateText('text <web_search>{"q":"x"}</web_search>');
-    const result = accumulateText(' more');
+    accumulateText('text <web_search>{"q":"x"}</web_search>', state);
+    const result = accumulateText(' more', state);
     expect(result.text).not.toContain('<web_search>');
     expect(result.text).toContain('text');
     expect(result.text).toContain('more');
   });
 
   it('resetAccumulator clears accumulated state', () => {
-    accumulateText('some text');
-    resetAccumulator();
-    const result = accumulateText('fresh');
+    accumulateText('some text', state);
+    resetAccumulator(state);
+    const result = accumulateText('fresh', state);
     expect(result.text).toBe('fresh');
+  });
+
+  it('does not share state across independent instances', () => {
+    const state2 = createAccumulateState();
+    accumulateText('A', state);
+    accumulateText('B', state2);
+    expect(state.accumulatedText).not.toContain('B');
+    expect(state2.accumulatedText).not.toContain('A');
   });
 });

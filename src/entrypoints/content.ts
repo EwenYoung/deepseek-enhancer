@@ -246,7 +246,8 @@ document.head.appendChild(voiceStyle);
 // ============================================================
 async function submitViaDOM(text: string) {
   await new Promise((r) => setTimeout(r, 300));
-  const ta = document.querySelector('textarea');
+  const scope = document.getElementById('root') || document.body;
+  const ta = scope.querySelector('textarea');
   if (!ta) return;
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
   if (setter) setter.call(ta, text);

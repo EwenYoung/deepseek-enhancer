@@ -95,11 +95,22 @@ function augmentRequestBody(body: BodyInit, state: AppState): BodyInit {
 // ============================================================
 // SSE 流拦截
 // ============================================================
+// ============================================================
+// 每个请求独立的 SSE 解析上下文（避免跨请求 buffer 污染）
+// ============================================================
+interface SSEParseContext {
+  /** SSE 文本积累缓冲区 */
+  sseTextBuffer: string;
+}
+
 function teeStreamResponse(response: Response, state: AppState): Response {
   const [ourStream, pageStream] = response.body!.tee();
 
+  // 每个请求持有独立的解析上下文
+  const ctx: SSEParseContext = { sseTextBuffer: '' };
+
   // 后台解析 SSE 流
-  parseStreamInBackground(ourStream, state);
+  parseStreamInBackground(ourStream, state, ctx);
 
   // 返回原始流给页面
   return new Response(pageStream, {
@@ -109,7 +120,11 @@ function teeStreamResponse(response: Response, state: AppState): Response {
   });
 }
 
-async function parseStreamInBackground(stream: ReadableStream<Uint8Array>, state: AppState) {
+async function parseStreamInBackground(
+  stream: ReadableStream<Uint8Array>,
+  state: AppState,
+  ctx: SSEParseContext,
+) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -129,7 +144,7 @@ async function parseStreamInBackground(stream: ReadableStream<Uint8Array>, state
         if (!part.trim()) continue;
         const parsed = parseSSEChunk(part);
         if (parsed) {
-          handleParsedMessage(parsed, state);
+          handleParsedMessage(parsed, state, ctx);
         }
       }
     }
@@ -138,7 +153,7 @@ async function parseStreamInBackground(stream: ReadableStream<Uint8Array>, state
     if (buffer.trim()) {
       const parsed = parseSSEChunk(buffer);
       if (parsed) {
-        handleParsedMessage(parsed, state);
+        handleParsedMessage(parsed, state, ctx);
       }
     }
   } catch (err) {
@@ -151,31 +166,30 @@ async function parseStreamInBackground(stream: ReadableStream<Uint8Array>, state
 // ============================================================
 // SSE 文本积累 & 工具调用检测
 // ============================================================
-let sseTextBuffer = '';
 
-function handleParsedMessage(msg: ParsedMessage, _state: AppState) {
+function handleParsedMessage(msg: ParsedMessage, _state: AppState, ctx: SSEParseContext) {
   if (!msg.text && !msg.finished) return;
 
   // 积累文本
-  sseTextBuffer += msg.text;
+  ctx.sseTextBuffer += msg.text;
 
   // 流结束时 flush
   if (msg.finished) {
-    checkToolCalls();
-    sseTextBuffer = '';
+    checkToolCalls(ctx);
+    ctx.sseTextBuffer = '';
   } else if (msg.text) {
     // 流式过程中检测（每收到文本就检查）
-    checkToolCalls();
+    checkToolCalls(ctx);
   }
 }
 
-function checkToolCalls() {
-  const toolCalls = extractToolCalls(sseTextBuffer);
+function checkToolCalls(ctx: SSEParseContext) {
+  const toolCalls = extractToolCalls(ctx.sseTextBuffer);
   if (toolCalls.length > 0) {
-    onSSEToolCallDetected(sseTextBuffer, null);
+    onSSEToolCallDetected(ctx.sseTextBuffer, null);
     // 清除已处理的工具调用文本
     for (const call of toolCalls) {
-      sseTextBuffer = sseTextBuffer.replace(call.raw, '');
+      ctx.sseTextBuffer = ctx.sseTextBuffer.replace(call.raw, '');
     }
   }
 }

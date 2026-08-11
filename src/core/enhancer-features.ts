@@ -499,12 +499,22 @@ export async function applyTheme(idx: number) {
   // 监听侧边栏 DOM 变化（React 切换会话后重新标记选中项）
   const sbar = document.querySelector('[data-ds-sidebar]');
   if (sbar && theme.sidebarHighlight) {
+    // 清理旧的 observer 和 click 监听，防止重复调用时泄漏
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
+      sidebarObserver = null;
+    }
+    if (sidebarClickHandler) {
+      sbar.removeEventListener('click', sidebarClickHandler, true);
+      sidebarClickHandler = null;
+    }
+
     // MutationObserver：拦截 React 重渲染
     const listContainer = sbar.querySelector('[class*="_77cdc67"]') || sbar;
-    const observer = new MutationObserver(() => {
+    sidebarObserver = new MutationObserver(() => {
       markSelectedSidebarItem();
     });
-    observer.observe(listContainer, {
+    sidebarObserver.observe(listContainer, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -512,13 +522,10 @@ export async function applyTheme(idx: number) {
     });
 
     // 点击监听：用户点击侧边栏后延迟重标记（React 渲染完成后）
-    sbar.addEventListener(
-      'click',
-      () => {
-        setTimeout(markSelectedSidebarItem, 100);
-      },
-      true,
-    );
+    sidebarClickHandler = () => {
+      setTimeout(markSelectedSidebarItem, 100);
+    };
+    sbar.addEventListener('click', sidebarClickHandler, true);
   }
 
   // 禁用磨砂玻璃效果：CSS 全局禁用 backdrop-filter（排除面板）
@@ -819,6 +826,9 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 let recognition: SpeechRecognitionLike | null = null;
 let isRecording = false;
 let currentBrandColor = '#4d6bfe';
+
+let sidebarObserver: MutationObserver | null = null;
+let sidebarClickHandler: ((e: Event) => void) | null = null;
 
 function onVoiceKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'm') {

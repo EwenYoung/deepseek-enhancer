@@ -55,8 +55,11 @@ export function initAutocomplete(_state: AppState) {
   }
   if (boundInput === inputEl) return;
   inputEl.addEventListener('input', onInput);
-  window.addEventListener('keydown', onKeyDown, true);
-  document.addEventListener('mousedown', onDocClick, true);
+  if (!window.__ds_ac_keydown_bound) {
+    window.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('mousedown', onDocClick, true);
+    window.__ds_ac_keydown_bound = true;
+  }
   boundInput = inputEl;
 }
 

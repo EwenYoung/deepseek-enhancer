@@ -595,6 +595,7 @@
     const regex = __DS_TOOL_NAMES_REGEX__;
     const calls = [];
     let match;
+    regex.lastIndex = 0;
     while ((match = regex.exec(text)) !== null) {
       const name = match[1];
       const body = match[2].trim();
@@ -717,13 +718,8 @@
                 lsk.indexOf('Token') !== -1 ||
                 lsk.indexOf('Auth') !== -1)
             ) {
-              const lsv = localStorage.getItem(lsk);
-              console.log(
-                '[DS-Mini:MAIN] localStorage token candidate:',
-                lsk,
-                '=',
-                lsv ? lsv.substring(0, 30) + '...' : 'empty',
-              );
+              const _lsv = localStorage.getItem(lsk);
+              void _lsv;
             }
           }
         } catch (e) {}
@@ -733,19 +729,11 @@
           for (let ssi = 0; ssi < sessionStorage.length; ssi++) {
             const ssk = sessionStorage.key(ssi);
             if (ssk && (ssk.indexOf('token') !== -1 || ssk.indexOf('auth') !== -1)) {
-              const ssv = sessionStorage.getItem(ssk);
-              console.log(
-                '[DS-Mini:MAIN] sessionStorage token candidate:',
-                ssk,
-                '=',
-                ssv ? ssv.substring(0, 30) + '...' : 'empty',
-              );
+              const _ssv = sessionStorage.getItem(ssk);
+              void _ssv;
             }
           }
         } catch (e) {}
-
-        // 读取 cookies（完整输出用于诊断）
-        console.log('[DS-Mini:MAIN] Cookies:', document.cookie);
       }
 
       console.log(

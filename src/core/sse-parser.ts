@@ -165,6 +165,7 @@ export function extractToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
   let match: RegExpExecArray | null;
 
+  regex.lastIndex = 0;
   while ((match = regex.exec(text)) !== null) {
     const name = match[1];
     const body = match[2].trim();
@@ -224,18 +225,35 @@ export function stripTaskComplete(text: string): string {
 }
 
 /**
- * 收集完整文本并检测工具调用
+ * 累积状态 — 每个流/请求持有独立实例，避免跨请求污染
  */
-let _accumulatedText = '';
+export interface AccumulateState {
+  accumulatedText: string;
+}
 
-export function accumulateText(text: string): { text: string; toolCalls: ToolCall[] } {
-  _accumulatedText += text;
-  const toolCalls = extractToolCalls(_accumulatedText);
-  const cleanText = stripToolCalls(_accumulatedText);
+/**
+ * 创建独立的累积状态实例
+ */
+export function createAccumulateState(): AccumulateState {
+  return { accumulatedText: '' };
+}
+
+/**
+ * 收集完整文本并检测工具调用
+ * @param text 新增文本
+ * @param state 该请求独立的累积状态
+ */
+export function accumulateText(
+  text: string,
+  state: AccumulateState,
+): { text: string; toolCalls: ToolCall[] } {
+  state.accumulatedText += text;
+  const toolCalls = extractToolCalls(state.accumulatedText);
+  const cleanText = stripToolCalls(state.accumulatedText);
 
   return { text: cleanText, toolCalls };
 }
 
-export function resetAccumulator() {
-  _accumulatedText = '';
+export function resetAccumulator(state: AccumulateState) {
+  state.accumulatedText = '';
 }

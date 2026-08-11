@@ -594,7 +594,8 @@ function handleDocGenerate(call: import('./types').ToolCall) {
 // ============================================================
 async function domSubmitText(text: string) {
   await delay(400);
-  const ta = document.querySelector('textarea');
+  const scope = document.getElementById('root') || document.body;
+  const ta = scope.querySelector('textarea');
   if (!ta) {
     console.warn('[DS-Mini:UI] domSubmit: no textarea');
     return;

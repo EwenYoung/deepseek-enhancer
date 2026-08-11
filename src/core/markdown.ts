@@ -130,11 +130,17 @@ function renderInlineSpans(text: string): string {
     /`([^`]+)`/g,
     '<code style="background:rgba(0,0,0,0.05);padding:1px 4px;border-radius:3px;font-size:0.9em">$1</code>',
   );
-  // Links
-  text = text.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener" style="color:#4e6ef2">$1</a>',
-  );
+  // Links — 协议白名单防止 javascript: 等 XSS
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+    if (!/^(https?|mailto):/i.test(href)) return label;
+    return (
+      '<a href="' +
+      href +
+      '" target="_blank" rel="noopener" style="color:#4e6ef2">' +
+      label +
+      '</a>'
+    );
+  });
 
   return text;
 }

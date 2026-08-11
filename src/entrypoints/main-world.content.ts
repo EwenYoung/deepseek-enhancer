@@ -7,8 +7,12 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import mainXHRCode from '../core/main-xhr-inject?raw';
 import { TOOL_DESCRIPTORS } from '../core/tool-descriptors';
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function buildToolRegex(): string {
-  const names = TOOL_DESCRIPTORS.map((t) => t.name).join('|');
+  const names = TOOL_DESCRIPTORS.map((t) => escapeRegExp(t.name)).join('|');
   return `/<(${names})>\\s*(\\{[\\s\\S]*?\\})\\s*(?:<\\/\\1>)?/g`;
 }
 

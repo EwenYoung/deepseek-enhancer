@@ -17,17 +17,8 @@ const STORAGE_KEY = 'ds_mini_skills';
 // ============================================================
 export async function loadSkills(): Promise<Skill[]> {
   const userSkills = await loadUserSkills();
-
-  // 将用户保存的状态合并到内置技能上（覆盖 enabled 等）
-  const builtin = BUILTIN_SKILLS.map((b) => {
-    const userCopy = userSkills.find((s) => s.id === b.id);
-    return userCopy ? { ...b, ...userCopy } : b;
-  });
-
-  // 非内置的用户自定义技能
   const custom = userSkills.filter((s) => s.source !== 'builtin');
-
-  return [...builtin, ...custom].sort((a, b) => a.name.localeCompare(b.name));
+  return [...BUILTIN_SKILLS, ...custom].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function loadUserSkills(): Promise<Skill[]> {
@@ -78,27 +69,6 @@ export async function getSkillById(id: string): Promise<Skill | undefined> {
 export async function getSkillByName(name: string): Promise<Skill | undefined> {
   const all = await loadSkills();
   return all.find((s) => s.name === name && s.enabled);
-}
-
-// ============================================================
-// 开关
-// ============================================================
-export async function toggleSkill(id: string, enabled: boolean): Promise<void> {
-  // 内置技能的状态也保存在用户存储中
-  const userSkills = await loadUserSkills();
-  const skill = userSkills.find((s) => s.id === id);
-
-  if (skill) {
-    skill.enabled = enabled;
-  } else {
-    // 可能是内置技能首次 toggle
-    const builtin = BUILTIN_SKILLS.find((s) => s.id === id);
-    if (builtin) {
-      userSkills.push({ ...builtin, enabled });
-    }
-  }
-
-  await saveUserSkills(userSkills);
 }
 
 // ============================================================

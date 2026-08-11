@@ -909,6 +909,19 @@ async function loadEnhancerPanel() {
         applyOpacity(val as number);
       }
     });
+
+  // dark mode 切换时重新加载对应 opacity（解决 import 备份后 reload 的时序问题）
+  const darkObs = new MutationObserver(() => {
+    const isDarkNow = document.body.classList.contains('dark');
+    chrome.storage.local
+      .get([isDarkNow ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'])
+      .then((r2) => {
+        const v = r2[isDarkNow ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
+        if (v) applyOpacity(v as number);
+      });
+  });
+  if (document.body)
+    darkObs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
 function applyOpacity(pct: number) {

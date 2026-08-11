@@ -37,7 +37,7 @@ class AgentPanel {
     this.container = document.createElement('div');
     this.container.className = 'ds-agent-container';
     this.container.style.cssText =
-      'padding-left:16px;border-left:1px solid rgba(0,0,0,0.1);margin:8px 0;';
+      'padding-left:16px;border-left:1px solid var(--ds-border);margin:8px 0;';
   }
 
   mount(atElement: Element) {
@@ -77,11 +77,11 @@ class AgentPanel {
     const header = document.createElement('div');
     header.className = 'ds-agent-step-header';
     header.style.cssText =
-      'display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;color:#1d2129;font-weight:500;';
+      'display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;user-select:none;color:var(--ds-text);font-weight:500;';
 
     const left = document.createElement('div');
     left.style.cssText = 'display:flex;align-items:center;gap:8px;';
-    left.innerHTML = `<span>Step ${stepIndex}</span><span class="ds-agent-step-status" style="color:#86909c;font-weight:400;font-size:12px;">streaming...</span>`;
+    left.innerHTML = `<span>Step ${stepIndex}</span><span class="ds-agent-step-status" style="color:var(--ds-text-secondary);font-weight:400;font-size:12px;">streaming...</span>`;
 
     header.appendChild(left);
 
@@ -89,7 +89,7 @@ class AgentPanel {
       const stopBtn = document.createElement('button');
       stopBtn.textContent = 'Stop';
       stopBtn.style.cssText =
-        'font-size:12px;padding:2px 8px;border:1px solid rgba(0,0,0,0.15);border-radius:4px;background:#fff;color:#e74c3c;cursor:pointer;';
+        'font-size:12px;padding:2px 8px;border:1px solid var(--ds-border);border-radius:4px;background:var(--ds-bg-subtle);color:#e74c3c;cursor:pointer;';
       stopBtn.onclick = (e) => {
         e.stopPropagation();
         onStop();
@@ -112,7 +112,7 @@ class AgentPanel {
     const body = document.createElement('div');
     body.className = 'ds-agent-step-body';
     body.style.cssText =
-      'padding:4px 0;white-space:pre-wrap;word-break:break-word;color:#1d2129;line-height:1.6;max-height:400px;overflow-y:auto;';
+      'padding:4px 0;white-space:pre-wrap;word-break:break-word;color:var(--ds-text);line-height:1.6;max-height:400px;overflow-y:auto;';
 
     // Tools
     const tools = document.createElement('div');
@@ -168,7 +168,7 @@ class AgentPanel {
     const footer = document.createElement('div');
     footer.className = 'ds-agent-footer';
     footer.style.cssText =
-      'margin-top:8px;padding:6px 0;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;color:#86909c;display:flex;align-items:center;gap:4px;';
+      'margin-top:8px;padding:6px 0;border-top:1px solid var(--ds-border);font-size:12px;color:var(--ds-text-secondary);display:flex;align-items:center;gap:4px;';
     if (isError) {
       footer.innerHTML =
         '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + escapeHTML(errorMsg || '');
@@ -327,9 +327,27 @@ export function initToolBlocks(_state: AppState) {
   if (toolBlocksInited) return;
   toolBlocksInited = true;
 
-  // 注入 hover 样式
+  // 注入 hover 样式 + CSS 变量（深色/浅色主题）
   const style = document.createElement('style');
-  style.textContent = `.ds-mini-tool-block > div:first-child > div[onclick]:hover { background: rgba(0,0,0,0.04); }`;
+  style.textContent = `
+    .ds-mini-tool-block > div:first-child > div[onclick]:hover { background: rgba(0,0,0,0.04); }
+    :root {
+      --ds-text: #1d2129;
+      --ds-text-secondary: #86909c;
+      --ds-bg-subtle: rgba(0,0,0,0.02);
+      --ds-bg-error: rgba(245,63,63,0.04);
+      --ds-border: rgba(0,0,0,0.06);
+      --ds-border-error: rgba(245,63,63,0.2);
+    }
+    body.dark {
+      --ds-text: #e8e8e8;
+      --ds-text-secondary: #999;
+      --ds-bg-subtle: rgba(255,255,255,0.06);
+      --ds-bg-error: rgba(245,63,63,0.12);
+      --ds-border: rgba(255,255,255,0.12);
+      --ds-border-error: rgba(245,63,63,0.4);
+    }
+  `;
   document.head.appendChild(style);
 
   const container = findChatContainer();
@@ -655,20 +673,20 @@ function createLoadingBlock(call: ToolCall, _c: HTMLElement): HTMLElement {
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', 'loading');
-  w.innerHTML = `<div style="border:1px solid rgba(0,0,0,0.06);border-radius:8px;padding:12px 16px;margin:8px 0;background:rgba(0,0,0,0.02);font-size:14px"><div style="display:flex;align-items:center;gap:8px;color:#86909c"><span style="color:#86909c">---</span><span>正在执行 ${getLabel(call.name)}...</span></div></div>`;
+  w.innerHTML = `<div style="border:1px solid var(--ds-border);border-radius:8px;padding:12px 16px;margin:8px 0;background:var(--ds-bg-subtle);font-size:14px"><div style="display:flex;align-items:center;gap:8px;color:var(--ds-text-secondary)"><span style="color:var(--ds-text-secondary)">---</span><span>正在执行 ${getLabel(call.name)}...</span></div></div>`;
   return w;
 }
 
 function createResultBlock(call: ToolCall, result: ToolResult): HTMLElement {
   const ok = result.success;
-  const bc = ok ? 'rgba(0,0,0,0.06)' : 'rgba(245,63,63,0.2)';
-  const bg = ok ? 'rgba(0,0,0,0.02)' : 'rgba(245,63,63,0.04)';
+  const bc = ok ? 'var(--ds-border)' : 'var(--ds-border-error)';
+  const bg = ok ? 'var(--ds-bg-subtle)' : 'var(--ds-bg-error)';
   const id = `ds-tool-${call.id.slice(0, 8)}`;
   const c = ok ? escapeHTML(result.result || '(空)') : `ERR: ${escapeHTML(result.error || '')}`;
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', ok ? 'done' : 'error');
-  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:#1d2129;font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'[+]':'[-]'"><div style="display:flex;align-items:center;gap:8px"><span style="color:${ok ? '#86909c' : '#f53f3f'}">[${ok ? 'OK' : 'ERR'}]</span><span>${getLabel(call.name)} ${ok ? '已完成' : '失败'}</span><span style="color:#86909c;font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:#86909c">[+]</span></div><div id="${id}" style="display:none;padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:#1d2129;line-height:1.6">${c}</div></div>`;
+  w.innerHTML = `<div style="border:1px solid ${bc};border-radius:8px;margin:8px 0;background:${bg};font-size:14px;overflow:hidden"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;cursor:pointer;user-select:none;color:var(--ds-text);font-weight:500" onclick="var b=document.getElementById('${id}'),i=this.querySelector('.ds-toggle-icon');if(b)b.style.display=b.style.display==='none'?'block':'none';if(i)i.textContent=b.style.display==='none'?'[+]':'[-]'"><div style="display:flex;align-items:center;gap:8px"><span style="color:${ok ? 'var(--ds-text-secondary)' : '#f53f3f'}">[${ok ? 'OK' : 'ERR'}]</span><span>${getLabel(call.name)} ${ok ? '已完成' : '失败'}</span><span style="color:var(--ds-text-secondary);font-weight:400;font-size:12px">${result.duration.toFixed(0)}ms</span></div><span class="ds-toggle-icon" style="color:var(--ds-text-secondary)">[+]</span></div><div id="${id}" style="display:none;padding:0 16px 12px;border-top:1px solid ${bc};white-space:pre-wrap;word-break:break-word;color:var(--ds-text);line-height:1.6">${c}</div></div>`;
   return w;
 }
 

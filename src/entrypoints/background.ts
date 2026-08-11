@@ -353,18 +353,54 @@ async function newsHubSearch(
             content: await searchViaTavily(apiKey, `${yearMonth} 36氪 人工智能 科技新闻`),
           });
           break;
-        // 国际平台 — 直接 API 调用（无 CORS 限制）
+        // 国际平台 — 直接 API 调用，CORS 失败时 fallback 到 Tavily
         case 'github':
-          results.push({ source: 'GitHub Trending', content: await fetchGitHubTrending() });
+          try {
+            results.push({ source: 'GitHub Trending', content: await fetchGitHubTrending() });
+          } catch {
+            results.push({
+              source: 'GitHub Trending',
+              content: apiKey
+                ? await searchViaTavily(apiKey, 'GitHub trending repositories today 2026')
+                : '（未配置 Tavily API Key，无法 fallback）',
+            });
+          }
           break;
         case 'hackernews':
-          results.push({ source: 'Hacker News', content: await fetchHackerNews() });
+          try {
+            results.push({ source: 'Hacker News', content: await fetchHackerNews() });
+          } catch {
+            results.push({
+              source: 'Hacker News',
+              content: apiKey
+                ? await searchViaTavily(apiKey, 'Hacker News top stories today')
+                : '（未配置 Tavily API Key，无法 fallback）',
+            });
+          }
           break;
         case 'reddit':
-          results.push({ source: 'Reddit ML', content: await fetchRedditML() });
+          try {
+            results.push({ source: 'Reddit ML', content: await fetchRedditML() });
+          } catch {
+            results.push({
+              source: 'Reddit ML',
+              content: apiKey
+                ? await searchViaTavily(apiKey, 'Reddit MachineLearning hot topics')
+                : '（未配置 Tavily API Key，无法 fallback）',
+            });
+          }
           break;
         case 'arxiv':
-          results.push({ source: 'arXiv AI', content: await fetchArXiv() });
+          try {
+            results.push({ source: 'arXiv AI', content: await fetchArXiv() });
+          } catch {
+            results.push({
+              source: 'arXiv AI',
+              content: apiKey
+                ? await searchViaTavily(apiKey, 'arXiv AI machine learning latest papers')
+                : '（未配置 Tavily API Key，无法 fallback）',
+            });
+          }
           break;
         default:
           results.push({ source: src, content: await searchViaTavily(apiKey, String(src)) });

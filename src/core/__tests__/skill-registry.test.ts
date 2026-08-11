@@ -68,19 +68,6 @@ describe('skill-registry', () => {
       }
     });
 
-    it('merges user overrides onto builtin skills', async () => {
-      // 获取内置技能列表，取第一个的 id 作为覆盖目标
-      const builtins = await skillRegistry.loadSkills();
-      const target = builtins[0];
-      await chrome.storage.local.set({
-        ds_mini_skills: [{ id: target.id, name: target.name, source: 'builtin', enabled: false }],
-      });
-      const skills = await skillRegistry.loadSkills();
-      const overridden = skills.find((s) => s.id === target.id);
-      expect(overridden).toBeDefined();
-      expect(overridden!.enabled).toBe(false);
-    });
-
     it('includes custom skills alongside builtin', async () => {
       const custom: Skill = makeSkill({ id: 'custom-1', source: 'custom', name: 'my-custom' });
       await chrome.storage.local.set({ ds_mini_skills: [custom] });
@@ -173,27 +160,6 @@ describe('skill-registry', () => {
       await skillRegistry.saveSkill(skill);
       const found = await skillRegistry.getSkillByName('disabled-skill');
       expect(found).toBeUndefined();
-    });
-  });
-
-  describe('toggleSkill', () => {
-    it('toggles a builtin skill to disabled', async () => {
-      const builtins = await skillRegistry.loadSkills();
-      const first = builtins[0];
-      await skillRegistry.toggleSkill(first.id, false);
-
-      const found = await skillRegistry.getSkillById(first.id);
-      expect(found?.enabled).toBe(false);
-    });
-
-    it('re-enables a toggled skill', async () => {
-      const builtins = await skillRegistry.loadSkills();
-      const first = builtins[0];
-      await skillRegistry.toggleSkill(first.id, false);
-      await skillRegistry.toggleSkill(first.id, true);
-
-      const found = await skillRegistry.getSkillById(first.id);
-      expect(found?.enabled).toBe(true);
     });
   });
 

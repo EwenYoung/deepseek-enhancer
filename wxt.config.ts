@@ -12,9 +12,9 @@ export default defineConfig({
       'https://api.tavily.com/*',
     ],
     icons: {
-      '16': 'icons/icon.png',
-      '48': 'icons/icon.png',
-      '128': 'icons/icon.png',
+      '16': 'icons/icon16.png',
+      '48': 'icons/icon48.png',
+      '128': 'icons/icon128.png',
     },
     web_accessible_resources: [
       {

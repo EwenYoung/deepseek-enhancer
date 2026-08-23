@@ -15,9 +15,9 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 2. **补测试**——可自动化的纯逻辑（SSE 解析、上下文构建、技能导入解析、导出包装、storage CRUD）在 `src/core/__tests__/` 补充或更新测试；DOM 重依赖或网络拦截层（ui-panel、ui-tool-blocks、ui-autocomplete、ui-categories、artifact、fetch-hook、main-xhr-inject）说明原因后跳过。完成条件：每处可测的行为变更都有对应测试。
 3. **全量测试**——`pnpm test` 全绿才算完成；失败修复代码或更新测试（预期行为已变时）。
 4. **构建**——`pnpm build` 成功产出 `dist/chrome-mv3/`。
-5. **人工验证**——在 `chrome://extensions`（开发者模式 → 加载已解压的扩展程序 → 选 `dist/chrome-mv3/`）重新加载后，由用户在 chat.deepseek.com 验证：各主题视觉、Agent 端到端工具调用、SPA 导航后状态保持。
+5. **人工验证**——在 `chrome://extensions`（开发者模式 → 加载已解压的扩展程序 → 选 `dist/chrome-mv3/`）重新加载后，由用户在 chat.deepseek.com 验证：各主题视觉、Agent 端到端工具调用、SPA 导航后状态保持。完成条件：用户明确确认验证通过。
 
-**提交门槛**：`pnpm typecheck` → `pnpm lint` → `pnpm format:check` 依次通过；format 失败跑 `pnpm format` 后重新 add。Commit 信息用中文 conventional commits（`feat:` / `fix:` / `chore:` + 一句话描述）。
+**提交门槛**：代码停在未提交状态，直到第 5 步完成（用户确认）；期间用户要求修改则回到第 1 步。提交前依次过 `pnpm typecheck` → `pnpm lint` → `pnpm format:check`；format 失败跑 `pnpm format` 后重新 add。Commit 信息用中文 conventional commits（`feat:` / `fix:` / `chore:` + 一句话描述）。
 
 ## 环境
 

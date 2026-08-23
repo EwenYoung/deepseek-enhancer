@@ -250,8 +250,8 @@ function isDarkMode(): boolean {
   return document.body.classList.contains('dark');
 }
 
-/** 品牌底色上的图标颜色：按相对亮度取白/深灰，避免浅粉彩品牌上白图标对比不足 */
-export function iconColorOnBrand(hex: string): string {
+/** 品牌底色上的对勾前景色：按相对亮度取白/深灰，避免浅粉彩品牌上白对勾对比不足 */
+export function textColorOnBrand(hex: string): string {
   const n = hex.replace('#', '');
   const channel = (i: number) => parseInt(n.slice(i, i + 2), 16) / 255;
   const linearize = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
@@ -319,7 +319,7 @@ export async function applyTheme(idx: number) {
       --dsl-checkbox-color: ${theme.brandColor} !important;
     }
     #root .ds-checkbox--active svg path {
-      fill: ${iconColorOnBrand(theme.brandColor)} !important;
+      fill: ${textColorOnBrand(theme.brandColor)} !important;
     }
     /* 精确着色：仅对标记了蓝色的原生图标位置 */
     /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/
@@ -389,6 +389,14 @@ export async function applyTheme(idx: number) {
     #root [data-ds-sidebar] a[data-ds-sidebar-selected] .ds-focus-ring {
       outline: none !important;
       box-shadow: none !important;
+    }
+    /* 官方多选：勾选圆点保持品牌色。补 background-color 直写（含子树）是因为上面
+       sidebar-selected 的 "*" 规则（1-2-1）会盖过原生 var 消费，把当前会话行上勾选圆点
+       及其内部方形 svg 涂成 sidebarHighlight，在圆内露出方形色块。
+       本规则特异性 (1-3-1) > (1-2-1)，靠特异性压制，不依赖源顺序 */
+    #root [data-ds-sidebar] a:has(.ds-checkbox--active) .ds-checkbox--active,
+    #root [data-ds-sidebar] a:has(.ds-checkbox--active) .ds-checkbox--active * {
+      background-color: ${theme.brandColor} !important;
     }
     /* 已思考折叠区域：融入主题色 */
     #root [data-ds-chatpanel] .ds-message:has(.ds-think-content) > :first-child {

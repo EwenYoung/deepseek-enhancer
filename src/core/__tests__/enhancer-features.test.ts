@@ -18,7 +18,7 @@ vi.stubGlobal('chrome', {
   },
 });
 
-const { getConfig, iconColorOnBrand } = await import('../enhancer-features');
+const { getConfig, textColorOnBrand } = await import('../enhancer-features');
 
 const FULL_DEFAULTS = {
   wideScreen: false,
@@ -72,22 +72,27 @@ describe('getConfig', () => {
   });
 });
 
-describe('iconColorOnBrand', () => {
-  it('深品牌色 → 白图标（含原生 deepseek 蓝）', () => {
-    expect(iconColorOnBrand('#3964fe')).toBe('#ffffff');
-    expect(iconColorOnBrand('#179299')).toBe('#ffffff'); // Catppuccin浅
-    expect(iconColorOnBrand('#E07850')).toBe('#ffffff'); // Claude深
+describe('textColorOnBrand', () => {
+  it('深品牌色 → 白前景（含原生 deepseek 蓝）', () => {
+    expect(textColorOnBrand('#3964fe')).toBe('#ffffff');
+    expect(textColorOnBrand('#179299')).toBe('#ffffff'); // Catppuccin浅
+    expect(textColorOnBrand('#E07850')).toBe('#ffffff'); // Claude深
   });
 
-  it('浅粉彩品牌色 → 深灰图标（白图标对比不足）', () => {
-    expect(iconColorOnBrand('#89b4fa')).toBe('#18181b'); // Catppuccin深
-    expect(iconColorOnBrand('#bd93f9')).toBe('#18181b'); // Dracula
-    expect(iconColorOnBrand('#61afef')).toBe('#18181b'); // OneHalf
-    expect(iconColorOnBrand('#D98A6A')).toBe('#18181b'); // Claude浅
+  it('浅粉彩品牌色 → 深灰前景（白前景对比不足）', () => {
+    expect(textColorOnBrand('#89b4fa')).toBe('#18181b'); // Catppuccin深
+    expect(textColorOnBrand('#bd93f9')).toBe('#18181b'); // Dracula
+    expect(textColorOnBrand('#61afef')).toBe('#18181b'); // OneHalf
+    expect(textColorOnBrand('#D98A6A')).toBe('#18181b'); // Claude浅
   });
 
-  it('无效输入不抛错（按黑底处理 → 白图标）', () => {
-    expect(iconColorOnBrand('')).toBe('#ffffff');
-    expect(iconColorOnBrand('#zz')).toBe('#ffffff');
+  it('亮度阈值边界（0.32）→ 灰阶 #999999 白 / #9a9a9a 深灰', () => {
+    expect(textColorOnBrand('#999999')).toBe('#ffffff');
+    expect(textColorOnBrand('#9a9a9a')).toBe('#18181b');
+  });
+
+  it('无效输入不抛错（按黑底处理 → 白前景）', () => {
+    expect(textColorOnBrand('')).toBe('#ffffff');
+    expect(textColorOnBrand('#zz')).toBe('#ffffff');
   });
 });

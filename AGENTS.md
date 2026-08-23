@@ -51,5 +51,7 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 ## 经验教训
 
 <!-- retro:escalated 完整版见 .retro/，满 8 条时降级最旧条目 -->
+完整经验库在 **[.retro/](.retro/INDEX.md)**（按主题组织，条目含症状/原因/解法/置信度）：排查卡壳先查其 INDEX；会话收尾沉淀用 /retro 技能，写入前按 INDEX 去重合并。
+
 - 元素级 CSS 变量声明永远赢过继承：主题变量别声明在面板元素上再用 html 内联覆盖；合成值（透明度）拆成独立低层变量（如 `--panel-alpha`）下发（2026-08-24，ui-theme-vars.md）
 - ink 深色下 `--accent`/`--danger` 是浅色，按钮文字一律 `var(--accent-text,#fff)`，写死 `#fff` 会不可读（2026-08-24，ui-theme-vars.md）

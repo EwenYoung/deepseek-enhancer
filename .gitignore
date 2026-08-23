@@ -54,6 +54,9 @@ npm-debug.log*
 # Scratch (local issue tracking / WIP)
 .scratch/
 
+# Handoff documents (session-local)
+.handoff/
+
 # Untracked skill directories (local-only, not part of project)
 .claude/skills/banner-design/
 .claude/skills/brand/

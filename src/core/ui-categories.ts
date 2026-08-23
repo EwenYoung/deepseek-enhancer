@@ -218,11 +218,7 @@ const CAT_PANEL_CSS = `
     background: var(--card-bg); color: var(--panel-text); border-color: var(--card-border);
   }
   #ds-batch-bar .ds-batch-btn:hover { filter: brightness(0.93); }
-  /* 删除 — 用红色文字 + 弱红背景 */
-  #ds-batch-bar .ds-batch-btn.ds-batch-danger,
-  html:not(.ds-dark) #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #dc2626; border-color: transparent; background: #fef2f2; }
   /* 深色主题：亮色文字 + 半透明背景 */
-  html.ds-dark #ds-batch-bar .ds-batch-btn.ds-batch-danger { color: #fca5a5; border-color: transparent; background: rgba(252,165,165,0.1); }
   html.ds-dark #ds-batch-bar .ds-batch-btn { color: #e0e0e0; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
 
   /* 复选框 */
@@ -566,7 +562,7 @@ function buildCategoryHTML(): string {
     (ex ? 'ds-cat-expanded' : '') +
     '">' +
     buildCategoryListHTML() +
-    '</div><div id="ds-batch-bar"><span>已选 <span id="ds-batch-count" class="ds-batch-count">0</span></span><button id="ds-batch-categorize" class="ds-batch-btn ds-batch-primary">归类到</button><button id="ds-batch-delete" class="ds-batch-btn ds-batch-danger">删除</button><button id="ds-batch-cancel" class="ds-batch-btn">取消</button></div>'
+    '</div><div id="ds-batch-bar"><span>已选 <span id="ds-batch-count" class="ds-batch-count">0</span></span><button id="ds-batch-categorize" class="ds-batch-btn ds-batch-primary">归类到</button><button id="ds-batch-cancel" class="ds-batch-btn">取消</button></div>'
   );
 }
 
@@ -740,11 +736,6 @@ function bindCategoryEvents() {
     if (target.closest('#ds-batch-categorize')) {
       const s = getSelectedSessions();
       if (s.length) showBatchCategorizeDialog(s);
-      return;
-    }
-    if (target.closest('#ds-batch-delete')) {
-      const s = getSelectedSessions();
-      if (s.length) showBatchDeleteDialog(s);
       return;
     }
     if (target.closest('#ds-batch-cancel')) {
@@ -1235,105 +1226,6 @@ function showBatchCategorizeDialog(ids: string[]) {
     exitBatchMode();
     applyHiddenSessions();
     refreshPanel();
-  });
-}
-
-// ============================================================
-// 批量删除（真删除 + 清理本地状态）
-// ============================================================
-function showBatchDeleteDialog(ids: string[]) {
-  document.getElementById('ds-cat-dialog-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'ds-cat-dialog-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;z-index:999997;background:var(--overlay-bg,rgba(0,0,0,0.3));display:flex;align-items:center;justify-content:center;';
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-  const d = document.createElement('div');
-  d.style.cssText =
-    "width:360px;padding:20px;background:var(--panel-bg);backdrop-filter:var(--panel-blur);-webkit-backdrop-filter:var(--panel-blur);border:1px solid var(--panel-border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.15);color:var(--panel-text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;";
-  d.innerHTML =
-    '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">确认删除</div><div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">确认删除 <strong>' +
-    ids.length +
-    '</strong> 条会话？此操作不可撤销。</div><div style="font-size:11px;color:var(--danger,#dc2626);margin-bottom:12px;display:none;" id="ds-del-progress"></div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="ds-del-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button><button id="ds-del-confirm" style="padding:7px 16px;border:none;border-radius:8px;background:var(--danger);color:var(--accent-text,#fff);cursor:pointer;font-size:12px;font-weight:500;">删除</button></div>';
-  overlay.appendChild(d);
-  document.body.appendChild(overlay);
-  d.querySelector('#ds-del-cancel')?.addEventListener('click', () => overlay.remove());
-  d.querySelector('#ds-del-confirm')?.addEventListener('click', async () => {
-    const c = d.querySelector('#ds-del-confirm') as HTMLButtonElement,
-      cancel = d.querySelector('#ds-del-cancel') as HTMLButtonElement,
-      p = d.querySelector('#ds-del-progress') as HTMLElement;
-    c.disabled = true;
-    cancel.disabled = true;
-    c.style.opacity = '0.5';
-    p.style.display = 'block';
-    let ok = 0,
-      fail = 0;
-    for (let i = 0; i < ids.length; i++) {
-      p.textContent = '删除中... (' + (i + 1) + '/' + ids.length + ')';
-      try {
-        if (await callDeleteAPI(ids[i])) {
-          ok++;
-          const oldCat = catState.categories.sessionCategory[ids[i]];
-          if (oldCat) {
-            const item = catState.categories.items[oldCat];
-            if (item) {
-              const sidx = item.sessions.indexOf(ids[i]);
-              if (sidx !== -1) item.sessions.splice(sidx, 1);
-            }
-            delete catState.categories.sessionCategory[ids[i]];
-          }
-          const hidx = catState.hiddenSessions.indexOf(ids[i]);
-          if (hidx !== -1) catState.hiddenSessions.splice(hidx, 1);
-        } else {
-          fail++;
-        }
-      } catch {
-        fail++;
-      }
-      if (i < ids.length - 1) await new Promise((r) => setTimeout(r, 300));
-    }
-    await saveCategories(catState);
-    p.textContent = '删除完成：成功 ' + ok + ' 条，失败 ' + fail + ' 条';
-    p.style.color = fail > 0 ? 'var(--danger)' : 'var(--accent)';
-    c.textContent = '关闭';
-    c.disabled = false;
-    c.style.opacity = '1';
-    // 2 秒后自动刷新页面（所有会话已从服务器删除）
-    setTimeout(() => {
-      overlay.remove();
-      location.reload();
-    }, 2000);
-  });
-}
-
-async function callDeleteAPI(sid: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    function handler(event: MessageEvent) {
-      if (
-        event.data?.source === 'DS_MINI_MAIN' &&
-        event.data?.type === 'DS_MINI_DELETE_RESPONSE' &&
-        event.data.sessionId === sid
-      ) {
-        window.removeEventListener('message', handler);
-        console.log('[Categories] Delete result:', event.data.response);
-        resolve(event.data.success === true);
-      }
-    }
-    window.addEventListener('message', handler);
-    window.postMessage(
-      {
-        source: 'DS_MINI_ISOLATED',
-        type: 'DS_MINI_DELETE_SESSION',
-        sessionId: sid,
-      },
-      '*',
-    );
-    setTimeout(() => {
-      window.removeEventListener('message', handler);
-      resolve(false);
-    }, 2000);
   });
 }
 

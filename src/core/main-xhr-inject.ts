@@ -12,25 +12,6 @@
 
   console.log('[DS-Mini:MAIN] XHR hook installed');
 
-  // auth token 存闭包变量，不暴露到 window 全局
-  var __ds_captured_auth = '';
-
-  // 立即拦截 fetch 以捕获 auth 请求头（放最前面确保不遗漏）
-  const __origFetch = window.fetch;
-  window.fetch = function (url, opts) {
-    if (typeof url === 'string' && url.indexOf('/api/v0/') !== -1 && opts && opts.headers) {
-      const h = opts.headers;
-      if (h instanceof Headers) {
-        if (h.has('authorization')) __ds_captured_auth = h.get('authorization');
-        if (h.has('Authorization')) __ds_captured_auth = h.get('Authorization');
-      } else if (typeof h === 'object') {
-        if (h.authorization) __ds_captured_auth = h.authorization;
-        if (h.Authorization) __ds_captured_auth = h.Authorization;
-      }
-    }
-    return __origFetch.call(this, url, opts);
-  };
-
   // ==========================================================
   // 模式检测 — 使用 _31a22b0 定位实际激活的模式
   // ==========================================================
@@ -212,9 +193,6 @@
     // 保存所有 headers 到 XHR 实例，供静默循环回放
     if (!this.__ds_headers) this.__ds_headers = {};
     this.__ds_headers[header] = value;
-    if (header.toLowerCase() === 'authorization' && value) {
-      __ds_captured_auth = value;
-    }
     return origSetHeader.call(this, header, value, ...rest);
   };
 
@@ -650,138 +628,4 @@
 
   window.__DS_MINI_MODE = currentMode;
   console.log('[DS-Mini:MAIN] Ready, mode:', currentMode);
-
-  // ==========================================================
-  // 分类插件删除请求
-  // ==========================================================
-  window.addEventListener('message', function (event) {
-    if (
-      event.data &&
-      event.data.source === 'DS_MINI_ISOLATED' &&
-      event.data.type === 'DS_MINI_DELETE_SESSION'
-    ) {
-      const sid = event.data.sessionId;
-
-      // 从 localStorage 读取 token（DeepSeek 的存储方式）
-      let token = '';
-      try {
-        // 常见的 token 存储 key
-        const keys = [
-          'token',
-          'accessToken',
-          'access_token',
-          'dsToken',
-          'ds_access_token',
-          'Authorization',
-          'userToken',
-        ];
-        for (var i = 0; i < keys.length; i++) {
-          const val = localStorage.getItem(keys[i]);
-          if (val) {
-            token = val;
-            break;
-          }
-        }
-        // 如果 localStorage 没找到，尝试从 cookie 读取
-        if (!token) {
-          const cookies = document.cookie.split(';');
-          for (var i = 0; i < cookies.length; i++) {
-            const c = cookies[i].trim();
-            if (
-              c.indexOf('token=') === 0 ||
-              c.indexOf('access=') === 0 ||
-              c.indexOf('auth=') === 0
-            ) {
-              token = c.substring(c.indexOf('=') + 1);
-              break;
-            }
-          }
-        }
-      } catch (e) {}
-
-      const headers = { 'Content-Type': 'application/json' };
-      // 优先使用捕获到的页面 auth header
-      const capturedAuth = __ds_captured_auth;
-      if (capturedAuth) {
-        headers['Authorization'] = capturedAuth;
-      }
-
-      // 如果还没捕获到，直接去 localStorage 读各种可能 key
-      if (!capturedAuth) {
-        try {
-          for (let lsi = 0; lsi < localStorage.length; lsi++) {
-            const lsk = localStorage.key(lsi);
-            if (
-              lsk &&
-              (lsk.indexOf('token') !== -1 ||
-                lsk.indexOf('auth') !== -1 ||
-                lsk.indexOf('Token') !== -1 ||
-                lsk.indexOf('Auth') !== -1)
-            ) {
-              const _lsv = localStorage.getItem(lsk);
-              void _lsv;
-            }
-          }
-        } catch (e) {}
-
-        // 检查 sessionStorage
-        try {
-          for (let ssi = 0; ssi < sessionStorage.length; ssi++) {
-            const ssk = sessionStorage.key(ssi);
-            if (ssk && (ssk.indexOf('token') !== -1 || ssk.indexOf('auth') !== -1)) {
-              const _ssv = sessionStorage.getItem(ssk);
-              void _ssv;
-            }
-          }
-        } catch (e) {}
-      }
-
-      console.log(
-        '[DS-Mini:MAIN] Delete request for',
-        sid,
-        'auth:',
-        headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NONE',
-      );
-
-      fetch('/api/v0/chat_session/delete', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ chat_session_id: sid }),
-      })
-        .then(function (r) {
-          return r.json().catch(function () {
-            return { code: r.status, msg: r.statusText };
-          });
-        })
-        .then(function (data) {
-          window.postMessage(
-            {
-              source: 'DS_MINI_MAIN',
-              type: 'DS_MINI_DELETE_RESPONSE',
-              sessionId: sid,
-              success: data.code === 0 || data.code === 200 || !data.code,
-              response: data,
-            },
-            '*',
-          );
-          if (data.code === 0 || data.code === 200 || !data.code) {
-            console.log('[DS-Mini:MAIN] Session deleted:', sid);
-          } else {
-            console.warn('[DS-Mini:MAIN] Delete failed:', data);
-          }
-        })
-        .catch(function (err) {
-          window.postMessage(
-            {
-              source: 'DS_MINI_MAIN',
-              type: 'DS_MINI_DELETE_RESPONSE',
-              sessionId: sid,
-              success: false,
-              error: err.message,
-            },
-            '*',
-          );
-        });
-    }
-  });
 })();

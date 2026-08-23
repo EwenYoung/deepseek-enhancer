@@ -28,3 +28,11 @@
   这套流程在提交前就能用「真实数据 + 真实代码」验证 DOM 层，本轮靠它一次定位根因并确认修复。
 - **置信度**：验证过
 - **首次记录**：2026-08-24
+
+## 验证注入 CSS 效果先查 transition：立即读 computed style 会撞上过渡起始帧
+
+- **症状**：往页面注入样式规则（含 !important，特异性拉满甚至行内 important）后，立即 `getComputedStyle(el).backgroundColor` 读到的仍是旧值/透明，表象是「规则完全没生效、有更高优先级规则压着」，差点把修复方向带偏（去追查根本不存在的更高特异性规则）。
+- **原因**：目标元素带 `transition: background 0.3s`（DeepSeek 消息气泡原生就有），注入/改值瞬间读取正处于过渡起始帧，computed style 返回动画中间值（≈旧值）。
+- **解法**：验证注入 CSS 效果前先查 `getComputedStyle(el).transitionProperty` / `transitionDuration`；有 transition 就等过渡结束（duration 之后）再断言，或临时 `el.style.transition='none'` 验证后还原。本会话靠「注入后 sleep 600ms 再读」一次确认规则生效。
+- **置信度**：验证过（同会话内被假象误导后修复验证）
+- **首次记录**：2026-08-24

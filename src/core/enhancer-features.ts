@@ -353,6 +353,12 @@ export async function applyTheme(idx: number) {
     #root .c15ec89f {
       box-shadow: inset 0 0 0 2px ${theme.brandColor}66 !important;
     }
+    /* 用户消息气泡着色：d29f3d7d = 用户消息标识类（哈希，随官方构建变化），
+       气泡容器 = 消息容器第一个子元素；只叠加品牌色透明底色，不改布局。
+       选择器需带 [data-ds-chatpanel]：特异性 (1,4,0) 压过 no-bg 透明规则 (1,3,0) */
+    #root [data-ds-chatpanel] .ds-message.d29f3d7d > :first-child {
+      background-color: color-mix(in srgb, ${theme.brandColor} ${dark ? 20 : 12}%, transparent) !important;
+    }
     `
         : ''
     }

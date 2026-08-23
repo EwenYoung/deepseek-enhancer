@@ -23,6 +23,7 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 
 - 包管理器一律用 **pnpm**（由 corepack 管理；package.json 无 packageManager 字段）。
 - 危险 git 操作（`reset --hard`、`clean -fd`、`branch -D`、`push --force`）执行前向用户展示会丢失的内容并确认。
+- **chrome-devtools-mcp 用完即断**：任务结束前执行 `chrome-devtools stop`，并确认无残留进程（`Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome-devtools' }` 为空，含 telemetry watchdog 孤儿进程）；遗忘会残留多个 chrome-devtools-mcp 进程，干扰其他调试任务。
 
 ## 架构：三层运行时
 
@@ -57,3 +58,4 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 - ink 深色下 `--accent`/`--danger` 是浅色，按钮文字一律 `var(--accent-text,#fff)`，写死 `#fff` 会不可读（2026-08-24，ui-theme-vars.md）
 - 导出助手回复是双数据源：原始 markdown 缓存（#ds-mini-asst-raw）只覆盖本页会话生成的回复，历史会话必须走已渲染 DOM 提取+白名单净化（chat-exporter 的 extractRenderedReplyHTML），textContent 回退会丢 markdown 并混入「复制/下载」与引用角标文本（2026-08-24，chat-export.md）
 - 视觉/布局结论以计算样式+几何测量为准（DOM 顺序会骗人，justify-content 漏加即此坑）；用户报障先读真实产物（导出文件/页面实测）再动代码（2026-08-24，agent-verification.md）
+- 注入 CSS 验证效果先查目标元素 transition：立即读 computed style 会撞上过渡起始帧（表象=规则没生效），须等过渡结束或临时禁用再断言（2026-08-24，agent-verification.md）

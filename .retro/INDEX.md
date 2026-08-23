@@ -1,9 +1,10 @@
 # 经验索引
 
-- [ui-theme-vars](ui-theme-vars.md) — 面板主题 CSS 变量的坑（3 条）
+- [ui-theme-vars](ui-theme-vars.md) — 面板主题 CSS 变量的坑（4 条）
   - 元素级 CSS 变量声明永远赢过继承，html 内联覆盖对它无效；合成值用独立低层变量下发
   - ink 深色下 --accent/--danger 是浅色，按钮文字必须用 --accent-text，写死 #fff 不可读
   - 官方新组件主题冲突：--dsl-checkbox-color 元素级不走 dsw-alias 链；当前会话行 * 涂装会给行内 svg 刷方形底，覆盖须含整个子树
+  - 特异性三列公式：:first-child 等伪类归第二列，写进注释的数字先按公式核算
 - [storage-config-defaults](storage-config-defaults.md) — storage 配置读取与备份的默认值处理（1 条）
   - 存储值可能是 undefined/{}/部分字段，读取侧合并默认值；备份导入缺键回填默认值
 - [sidebar-dom-automation](sidebar-dom-automation.md) — 侧边栏 DOM 自动化操作（3 条）
@@ -13,7 +14,8 @@
 - [chat-export](chat-export.md) — 会话导出（2 条）
   - 助手回复导出双数据源：#ds-mini-asst-raw 缓存只覆盖本页会话，历史会话必须走已渲染 DOM 提取+白名单净化
   - 已渲染回复 DOM 结构：装饰=md-code-block-banner-wrap/ds-markdown-cite/[role=button]，正文是真实 h/p/strong/code/table 标签
-- [agent-verification](agent-verification.md) — Agent 自验方法（3 条）
+- [agent-verification](agent-verification.md) — Agent 自验方法（4 条）
   - 布局验证断言计算样式+几何（justify-content/边缘重合），DOM 顺序不代表视觉方位
   - chrome-devtools MCP 截图不回传、filePath 被拒；用 evaluate_script 程序化断言，要视觉就走本地 http + Browser Use emitImage
   - DOM 重依赖代码端到端自验：jiti 跑 TS 源码 + CORS receiver 收真实页面 DOM + 真实管线生成预览再断言
+  - 验证注入 CSS 效果先查 transition：立即读 computed style 会撞上过渡起始帧，须等过渡结束再断言

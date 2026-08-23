@@ -20,34 +20,26 @@ export interface EnhancerConfig {
 // ============================================================
 // 配置管理
 // ============================================================
+const DEFAULT_CONFIG: EnhancerConfig = {
+  wideScreen: false,
+  themeIdx: 0,
+  hideScrollbar: false,
+  autoHideInput: false,
+  voiceInput: false,
+  tokenSpeed: false,
+  chatFont: '',
+  chatMonoFont: '',
+  chatFontSize: 0,
+};
+
 export async function getConfig(): Promise<EnhancerConfig> {
   try {
     const r = await chrome.storage.local.get(ENHANCER_KEY);
-    return (
-      (r[ENHANCER_KEY] as EnhancerConfig | undefined) || {
-        wideScreen: false,
-        themeIdx: 0,
-        hideScrollbar: false,
-        autoHideInput: false,
-        voiceInput: false,
-        tokenSpeed: false,
-        chatFont: '',
-        chatMonoFont: '',
-        chatFontSize: 0,
-      }
-    );
+    // 存储值可能是部分字段（历史写入只存增量），与默认值合并保证字段完整
+    const stored = r[ENHANCER_KEY] as Partial<EnhancerConfig> | undefined;
+    return { ...DEFAULT_CONFIG, ...stored };
   } catch {
-    return {
-      wideScreen: false,
-      themeIdx: 0,
-      hideScrollbar: false,
-      autoHideInput: false,
-      voiceInput: false,
-      tokenSpeed: false,
-      chatFont: '',
-      chatMonoFont: '',
-      chatFontSize: 0,
-    };
+    return { ...DEFAULT_CONFIG };
   }
 }
 

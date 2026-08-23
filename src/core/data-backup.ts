@@ -80,7 +80,8 @@ export async function importAllData(jsonString: string): Promise<void> {
   const data = payload.data as Record<string, unknown>;
   const sanitized: Record<string, unknown> = {};
   for (const key of Object.keys(BACKUP_KEYS)) {
-    if (key in data) sanitized[key] = data[key];
+    // 旧版本备份缺 key 时回填默认值；否则 clear() 后该设置会被静默清空
+    sanitized[key] = key in data ? data[key] : BACKUP_KEYS[key];
   }
 
   // 全量替换：先清空再写入

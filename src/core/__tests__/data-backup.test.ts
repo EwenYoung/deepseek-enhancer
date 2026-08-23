@@ -64,6 +64,8 @@ function seedStorage() {
   storage.set('ds_mini_enhancer', { wideScreen: true, themeIdx: 2 });
   storage.set('ds_mini_tavily_key', 'tvly-testkey');
   storage.set('ds_mini_agent_mode', true);
+  storage.set('ds_panel_opacity_light', 55);
+  storage.set('ds_panel_opacity_dark', 70);
 }
 
 // ============================================================
@@ -86,7 +88,7 @@ describe('data-backup', () => {
       expect(result.data).toBeDefined();
     });
 
-    it('读取全部 7 个 key', async () => {
+    it('读取全部 9 个 key', async () => {
       seedStorage();
       const result = await dataBackup.exportAllData();
 
@@ -97,6 +99,8 @@ describe('data-backup', () => {
       expect(result.data.ds_mini_enhancer).toEqual({ wideScreen: true, themeIdx: 2 });
       expect(result.data.ds_mini_tavily_key).toBe('tvly-testkey');
       expect(result.data.ds_mini_agent_mode).toBe(true);
+      expect(result.data.ds_panel_opacity_light).toBe(55);
+      expect(result.data.ds_panel_opacity_dark).toBe(70);
     });
 
     it('存储为空时各 key 为默认空值', async () => {
@@ -108,6 +112,8 @@ describe('data-backup', () => {
       expect(result.data.ds_mini_session_titles).toEqual({});
       expect(result.data.ds_mini_tavily_key).toBe('');
       expect(result.data.ds_mini_agent_mode).toBe(false);
+      expect(result.data.ds_panel_opacity_light).toBe(100);
+      expect(result.data.ds_panel_opacity_dark).toBe(100);
     });
   });
 
@@ -122,6 +128,31 @@ describe('data-backup', () => {
       expect(storage.get('ds_mini_skills')).toHaveLength(1);
       expect(storage.get('ds_mini_tavily_key')).toBe('tvly-testkey');
       expect(storage.get('ds_mini_agent_mode')).toBe(true);
+      expect(storage.get('ds_panel_opacity_light')).toBe(55);
+      expect(storage.get('ds_panel_opacity_dark')).toBe(70);
+    });
+
+    it('旧格式备份缺 key → 回填默认值，而非被 clear 清空', async () => {
+      seedStorage();
+      // 旧版本（opacity 键加入白名单前）导出的备份只有 7 个 key
+      const legacyBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: {
+          ds_mini_skills: [],
+          ds_mini_categories: { order: [], items: {}, sessionCategory: {} },
+          ds_mini_hidden_sessions: [],
+          ds_mini_session_titles: {},
+          ds_mini_enhancer: { wideScreen: false, themeIdx: 0 },
+          ds_mini_tavily_key: '',
+          ds_mini_agent_mode: false,
+        },
+      };
+
+      await dataBackup.importAllData(JSON.stringify(legacyBackup));
+
+      expect(storage.get('ds_panel_opacity_light')).toBe(100);
+      expect(storage.get('ds_panel_opacity_dark')).toBe(100);
     });
 
     it('全量替换：旧数据被清除', async () => {
@@ -186,6 +217,8 @@ describe('data-backup', () => {
       expect(storage.get('ds_mini_enhancer')).toEqual(exported.data.ds_mini_enhancer);
       expect(storage.get('ds_mini_tavily_key')).toBe(exported.data.ds_mini_tavily_key);
       expect(storage.get('ds_mini_agent_mode')).toBe(exported.data.ds_mini_agent_mode);
+      expect(storage.get('ds_panel_opacity_light')).toBe(55);
+      expect(storage.get('ds_panel_opacity_dark')).toBe(70);
     });
   });
 });

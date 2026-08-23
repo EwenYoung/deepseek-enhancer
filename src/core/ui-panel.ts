@@ -65,7 +65,7 @@ function createPanel(state: AppState) {
   panelVars.id = 'ds-panel-vars';
   panelVars.textContent = `
     :root {
-      --panel-bg: rgba(255,255,255,0.92);
+      --panel-bg: rgba(255,255,255,var(--panel-alpha,0.92));
       --panel-blur: blur(20px);
       --panel-text: #1f2937;
       --panel-text-secondary: #6b7280;
@@ -85,7 +85,7 @@ function createPanel(state: AppState) {
       --overlay-bg: rgba(0,0,0,0.3);
     }
     html.ds-dark {
-      --panel-bg: rgba(0,0,0,0.88);
+      --panel-bg: rgba(0,0,0,var(--panel-alpha,0.88));
       --panel-text: #e0e0e0;
       --panel-text-secondary: #a0a0b0;
       --panel-border: rgba(255,255,255,0.08);
@@ -167,7 +167,7 @@ function createPanel(state: AppState) {
 
     /* ===== 面板配色主题：墨色极简 Ink ===== */
     #ds-mini-panel[data-ds-theme="ink"] {
-      --panel-bg: rgba(255,255,255,0.98);
+      --panel-bg: rgba(255,255,255,var(--panel-alpha,0.98));
       --panel-text: #18181b;
       --panel-text-secondary: #52525b;
       --panel-border: rgba(24,24,27,0.08);
@@ -186,7 +186,7 @@ function createPanel(state: AppState) {
       --overlay-bg: rgba(24,24,27,0.25);
     }
     html.ds-dark #ds-mini-panel[data-ds-theme="ink"] {
-      --panel-bg: rgba(12,12,12,0.98);
+      --panel-bg: rgba(12,12,12,var(--panel-alpha,0.98));
       --panel-text: #fafafa;
       --panel-text-secondary: #d4d4d8;
       --panel-border: rgba(250,250,250,0.1);
@@ -984,12 +984,9 @@ async function loadEnhancerPanel() {
 }
 
 function applyOpacity(pct: number) {
-  const lightBase = '255,255,255';
-  const darkBase = '0,0,0';
-  const isDark = document.body.classList.contains('dark');
-  const rgb = isDark ? darkBase : lightBase;
-  const alpha = (pct / 100).toFixed(2);
-  document.documentElement.style.setProperty('--panel-bg', `rgba(${rgb},${alpha})`);
+  // 不能直接覆盖 --panel-bg：ink 主题在 #ds-mini-panel 自身声明了该变量，
+  // 元素级声明优先于从 html 继承的值；经 --panel-alpha 下发才能同时作用于面板与其余 UI
+  document.documentElement.style.setProperty('--panel-alpha', (pct / 100).toFixed(2));
   // 也更新弹窗遮罩透明度
   const modalBg = panelEl?.querySelector('#ds-mini-modal-overlay');
   if (modalBg) {

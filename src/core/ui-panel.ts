@@ -1343,7 +1343,7 @@ function showConfirm(options: {
       <div style="font-size:13px;color:var(--panel-text-secondary);margin-bottom:16px;">${esc(options.body)}</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button id="ds-confirm-cancel" style="padding:7px 16px;border:1px solid var(--panel-border);border-radius:8px;background:var(--card-bg);color:var(--panel-text);cursor:pointer;font-size:12px;">取消</button>
-        <button id="ds-confirm-ok" style="padding:7px 16px;border:none;border-radius:8px;background:${confirmBg};color:#fff;cursor:pointer;font-size:12px;font-weight:500;">${esc(options.confirmText)}</button>
+        <button id="ds-confirm-ok" style="padding:7px 16px;border:none;border-radius:8px;background:${confirmBg};color:var(--accent-text,#fff);cursor:pointer;font-size:12px;font-weight:500;">${esc(options.confirmText)}</button>
       </div>
     `;
     overlay.appendChild(modal);

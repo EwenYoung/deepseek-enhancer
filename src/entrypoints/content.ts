@@ -306,7 +306,7 @@ function renderFinalResponse(text: string) {
   msg.className = 'ds-message ds-mini-final-response';
   msg.dataset.dsToolProcessed = 'true';
   msg.style.cssText =
-    'padding:12px 16px;margin:8px 0;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word';
+    'padding:12px 16px;margin:8px 0;border-radius:8px;background:var(--ds-bg-subtle);border:1px solid var(--ds-border);color:var(--ds-text);font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word';
   msg.textContent = text;
   if (lastBlock && lastBlock.parentNode === container) {
     lastBlock.after(msg);

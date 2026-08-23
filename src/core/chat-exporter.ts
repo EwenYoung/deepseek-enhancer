@@ -8,6 +8,8 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   thinking?: string;
+  /** 历史会话无原始 markdown 缓存时，从页面已渲染 DOM 提取并净化的 HTML */
+  renderedHTML?: string;
 }
 
 // ============================================================
@@ -96,7 +98,8 @@ function scrapeMessages(): ChatMessage[] {
     const thinkEl = el.querySelector<HTMLElement>('.ds-think-content');
 
     if (replyEl) {
-      // Assistant 消息 — 优先使用缓存的原始 Markdown 文本
+      // Assistant 消息 — 优先使用缓存的原始 Markdown 文本；
+      // 历史会话无缓存时退回页面已渲染 DOM 的净化 HTML（textContent 已丢失 markdown 语法）
       const thinking = thinkEl?.textContent?.trim() || '';
       const raw = asstRawTexts[asstIdx];
       const reply = raw ? raw.trim() : replyEl.textContent?.trim();
@@ -105,6 +108,7 @@ function scrapeMessages(): ChatMessage[] {
           role: 'assistant' as const,
           content: reply,
           thinking: thinking || undefined,
+          renderedHTML: raw ? undefined : extractRenderedReplyHTML(replyEl),
         });
       }
       if (raw) asstIdx++;
@@ -285,34 +289,11 @@ function renderMarkdown(messages: ChatMessage[], title: string): string {
 }
 
 // ============================================================
-// HTML 渲染
+// HTML 渲染 — 微信对话风格
 // ============================================================
-function renderHTML(messages: ChatMessage[], title: string): string {
+export function renderHTML(messages: ChatMessage[], title: string): string {
   const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-
-  const msgHTML = messages
-    .map((msg) => {
-      if (msg.role === 'user') {
-        return `<div class="message user">
-        <div class="msg-label user-label">👤 你</div>
-        <div class="msg-body">${renderUserContentHTML(msg.content)}</div>
-      </div>`;
-      }
-
-      let html = `<div class="message assistant">
-      <div class="msg-label ai-label">🤖 DeepSeek</div>`;
-
-      if (msg.thinking) {
-        html += `<details class="think-block" open>
-        <summary>💭 思考过程</summary>
-        <div class="think-content">${escapeHTML(msg.thinking)}</div>
-      </details>`;
-      }
-
-      html += `<div class="msg-body">${renderMarkdownToHTML(msg.content)}</div></div>`;
-      return html;
-    })
-    .join('\n');
+  const chatHTML = messages.map(renderWeChatMessage).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -321,69 +302,138 @@ function renderHTML(messages: ChatMessage[], title: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHTML(title)}</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
-    background:#f3f4f6;color:#1f2937;line-height:1.7;padding:20px
-  }
-  .container{
-    max-width:860px;margin:0 auto;background:#fff;border-radius:12px;
-    box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden
-  }
-  .header{
-    background:#4f46e5;color:#fff;padding:28px 32px
-  }
-  .header h1{font-size:22px;font-weight:700;margin-bottom:6px}
-  .header .meta{font-size:13px;opacity:.85}
-  .chat-body{padding:12px 24px}
-  .message{padding:20px 0;border-bottom:1px solid #f3f4f6}
-  .message:last-child{border-bottom:none}
-  .msg-label{font-size:13px;font-weight:600;margin-bottom:10px}
-  .user-label{color:#4f46e5}
-  .ai-label{color:#059669}
-  .msg-body{font-size:15px;white-space:pre-wrap;word-break:break-word}
-  .think-block{
-    background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
-    padding:12px 16px;margin:0 0 14px;font-size:14px
-  }
-  .think-block summary{
-    cursor:pointer;font-weight:600;color:#64748b;user-select:none
-  }
-  .think-content{
-    margin-top:8px;color:#475569;white-space:pre-wrap;font-size:13px;line-height:1.6
-  }
-  .msg-body pre{
-    background:#1e293b;color:#e2e8f0;padding:14px 16px;border-radius:8px;
-    overflow-x:auto;font-size:13px;line-height:1.5;margin:10px 0
-  }
-  .msg-body code{font-family:"JetBrains Mono","Fira Code",monospace;font-size:13px}
-  .msg-body p code{background:#f1f5f9;color:#e11d48;padding:2px 6px;border-radius:4px}
-  .msg-body table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
-  .msg-body th,.msg-body td{border:1px solid #e5e7eb;padding:8px 12px;text-align:left}
-  .msg-body th{background:#f9fafb;font-weight:600}
-  .msg-body blockquote{
-    border-left:4px solid #4f46e5;padding:8px 16px;margin:10px 0;
-    background:#f5f3ff;color:#4c1d95;border-radius:0 8px 8px 0
-  }
-  .msg-body ul,.msg-body ol{padding-left:24px;margin:8px 0}
-  .msg-body li{margin:4px 0}
-  .msg-body h1,.msg-body h2,.msg-body h3,.msg-body h4{margin:16px 0 8px;color:#111827}
-  .footer{text-align:center;padding:16px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6}
-  @media print{body{background:#fff;padding:0}.container{box-shadow:none;border-radius:0}.message{break-inside:avoid}}
+${WECHAT_STYLE}
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <h1>${escapeHTML(title)}</h1>
-    <div class="meta">📅 ${now} · 💬 ${messages.length} 条消息</div>
-  </div>
-  <div class="chat-body">${msgHTML}</div>
-  <div class="footer">由 Deepseek Enhancer 导出</div>
+<div class="wx-chat">
+  <header class="wx-nav">
+    <span class="wx-nav-back">‹</span>
+    <span class="wx-nav-title">${escapeHTML(title)}</span>
+    <span class="wx-nav-more">···</span>
+  </header>
+  <main class="wx-body">
+    <div class="wx-time">${now} · 共 ${messages.length} 条消息</div>
+    ${chatHTML}
+  </main>
+  <footer class="wx-sys">由 Deepseek Enhancer 导出</footer>
 </div>
 </body>
 </html>`;
 }
+
+function renderWeChatMessage(msg: ChatMessage): string {
+  if (msg.role === 'user') {
+    return `<div class="wx-row wx-me">
+  <div class="wx-bubble"><div class="wx-content">${renderUserContentHTML(msg.content)}</div></div>
+  <div class="wx-avatar wx-avatar-me">我</div>
+</div>`;
+  }
+
+  const think = msg.thinking
+    ? `<details class="wx-think" open>
+  <summary>💭 思考过程</summary>
+  <div class="wx-think-body">${escapeHTML(msg.thinking)}</div>
+</details>`
+    : '';
+
+  return `<div class="wx-row wx-ai">
+  <div class="wx-avatar wx-avatar-ai">DS</div>
+  <div class="wx-bubble">${think}<div class="wx-content">${msg.renderedHTML ?? renderMarkdownToHTML(msg.content)}</div></div>
+</div>`;
+}
+
+const WECHAT_STYLE = `  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC","Microsoft YaHei",Roboto,sans-serif;
+    background:#dcdcdc;color:#111;line-height:1.7;display:flex;justify-content:center;
+  }
+  .wx-chat{
+    width:100%;max-width:720px;min-height:100vh;background:#ededed;
+    display:flex;flex-direction:column;box-shadow:0 0 24px rgba(0,0,0,.15);
+  }
+  .wx-nav{
+    position:sticky;top:0;z-index:9;display:flex;align-items:center;
+    height:48px;padding:0 12px;background:#f7f7f7;border-bottom:1px solid #ddd;
+  }
+  .wx-nav-back{color:#576b95;font-size:22px;line-height:1;min-width:36px}
+  .wx-nav-title{
+    flex:1;text-align:center;font-size:16px;font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;
+  }
+  .wx-nav-more{color:#576b95;font-size:16px;min-width:36px;text-align:right;letter-spacing:2px}
+  .wx-body{flex:1;padding:14px 12px 28px}
+  .wx-time{text-align:center;color:#b2b2b2;font-size:12px;margin:8px 0 18px}
+  .wx-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+  .wx-me{justify-content:flex-end}
+  .wx-avatar{
+    width:40px;height:40px;border-radius:6px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:600;color:#fff;
+  }
+  .wx-avatar-ai{background:linear-gradient(135deg,#5470ff,#3a56e8)}
+  .wx-avatar-me{background:#576b95}
+  .wx-bubble{position:relative;max-width:78%;padding:10px 14px;border-radius:8px;font-size:15px}
+  .wx-ai .wx-bubble{background:#fff}
+  .wx-me .wx-bubble{background:#95ec69}
+  .wx-ai .wx-bubble::before{
+    content:"";position:absolute;left:-8px;top:12px;
+    border-top:8px solid transparent;border-bottom:8px solid transparent;
+    border-right:8px solid #fff;
+  }
+  .wx-me .wx-bubble::after{
+    content:"";position:absolute;right:-8px;top:12px;
+    border-top:8px solid transparent;border-bottom:8px solid transparent;
+    border-left:8px solid #95ec69;
+  }
+  .wx-content{word-break:break-word}
+  .wx-content>:first-child{margin-top:0}
+  .wx-content>:last-child{margin-bottom:0}
+  .wx-content p{margin:6px 0}
+  .wx-content h1,.wx-content h2,.wx-content h3,.wx-content h4,.wx-content h5,.wx-content h6{
+    margin:12px 0 6px;line-height:1.4;font-weight:600;
+  }
+  .wx-content h1{font-size:1.25em}
+  .wx-content h2{font-size:1.18em}
+  .wx-content h3{font-size:1.1em}
+  .wx-content h4,.wx-content h5,.wx-content h6{font-size:1em}
+  .wx-content ul,.wx-content ol{padding-left:1.4em;margin:6px 0}
+  .wx-content li{margin:3px 0}
+  .wx-content table{
+    display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;
+    margin:8px 0;font-size:.92em;
+  }
+  .wx-content th,.wx-content td{border:1px solid rgba(0,0,0,.12);padding:6px 10px;text-align:left}
+  .wx-content th{background:rgba(0,0,0,.045);font-weight:600}
+  .wx-content blockquote{
+    border-left:3px solid rgba(0,0,0,.15);background:rgba(0,0,0,.04);
+    padding:6px 10px;margin:8px 0;border-radius:0 6px 6px 0;
+  }
+  .wx-content hr{border:none;border-top:1px solid rgba(0,0,0,.12);margin:10px 0}
+  .wx-content a{color:#576b95}
+  .wx-content code{
+    font-family:"JetBrains Mono","Fira Code",Consolas,"Courier New",monospace;
+    font-size:.88em;background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;
+  }
+  .wx-content pre{
+    white-space:pre;overflow-x:auto;background:#26262d;color:#e6e6ee;
+    padding:12px 14px;border-radius:8px;margin:8px 0;font-size:13px;line-height:1.5;
+  }
+  .wx-content pre code{background:none;padding:0;font-size:inherit;color:inherit}
+  .wx-think{background:#f6f6f6;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px}
+  .wx-think summary{cursor:pointer;color:#9a9a9a;font-weight:500;user-select:none}
+  .wx-think-body{
+    margin-top:6px;color:#8a8a8a;line-height:1.6;
+    white-space:pre-wrap;word-break:break-word;max-height:340px;overflow-y:auto;
+  }
+  .wx-sys{text-align:center;color:#b2b2b2;font-size:12px;padding:10px 0 20px}
+  @media print{
+    body{background:#fff;display:block}
+    .wx-chat{max-width:none;box-shadow:none}
+    .wx-nav{position:static}
+    .wx-nav-back,.wx-nav-more{visibility:hidden}
+    .wx-row{break-inside:avoid}
+  }`;
 
 // ============================================================
 // 工具结果内容处理 — 防止 Markdown 渲染
@@ -410,11 +460,7 @@ function renderUserContentHTML(content: string): string {
     }
     // 工具结果部分 → <pre> 包裹，不渲染 markdown
     const raw = match[1].replace(/\n---$/, '');
-    parts.push(
-      '<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;word-break:break-word;color:#374151;">' +
-        escapeHTML(raw) +
-        '</pre>',
-    );
+    parts.push(`<pre>${escapeHTML(raw)}</pre>`);
     lastIdx = match.index + match[0].length;
   }
   // 剩余部分
@@ -425,33 +471,227 @@ function renderUserContentHTML(content: string): string {
 }
 
 // ============================================================
-// Markdown → 轻量 HTML
+// Markdown → 轻量 HTML（块级：代码块/标题/列表/表格/引用/分隔线/段落）
 // ============================================================
 function renderMarkdownToHTML(text: string): string {
-  const blocks: string[] = [];
-  let idx = 0;
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    const placeholder = `\x00CODE_BLOCK_${idx}\x00`;
+  // 代码块先抽取为占位符，避免被转义和行内规则改写
+  const codeBlocks: string[] = [];
+  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang: string, code: string) => {
     const la = lang ? ` data-lang="${escapeHTML(lang)}"` : '';
-    blocks.push(`<pre${la}><code>${escapeHTML(code.trim())}</code></pre>`);
-    idx++;
-    return placeholder;
+    codeBlocks.push(`<pre${la}><code>${escapeHTML(code.trim())}</code></pre>`);
+    return `\x00CB${codeBlocks.length - 1}\x00`;
   });
 
-  text = escapeHTML(text);
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-    if (!/^https?:\/\//i.test(href)) return label;
-    return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
-  });
-  text = text.replace(/\n/g, '<br>');
+  const lines = text.split('\n');
+  const html: string[] = [];
+  let i = 0;
 
-  for (let i = 0; i < blocks.length; i++) {
-    text = text.replace(`\x00CODE_BLOCK_${i}\x00`, blocks[i]);
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      i++;
+      continue;
+    }
+
+    // 独占一行的代码块占位符
+    const cbMatch = /^\x00CB(\d+)\x00$/.exec(trimmed);
+    if (cbMatch) {
+      html.push(codeBlocks[Number(cbMatch[1])]);
+      i++;
+      continue;
+    }
+
+    const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+    if (heading) {
+      const level = heading[1].length;
+      html.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+      i++;
+      continue;
+    }
+
+    if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      html.push('<hr>');
+      i++;
+      continue;
+    }
+
+    if (/^>\s?/.test(trimmed)) {
+      const quoted: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+        quoted.push(lines[i].trim().replace(/^>\s?/, ''));
+        i++;
+      }
+      html.push(`<blockquote>${renderMarkdownToHTML(quoted.join('\n'))}</blockquote>`);
+      continue;
+    }
+
+    if (/^[-*+]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim())) {
+        items.push(`<li>${renderInline(lines[i].trim().replace(/^[-*+]\s+/, ''))}</li>`);
+        i++;
+      }
+      html.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+
+    if (/^\d+[.、]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+[.、]\s+/.test(lines[i].trim())) {
+        items.push(`<li>${renderInline(lines[i].trim().replace(/^\d+[.、]\s+/, ''))}</li>`);
+        i++;
+      }
+      html.push(`<ol>${items.join('')}</ol>`);
+      continue;
+    }
+
+    if (isTableStart(lines, i)) {
+      const parseRow = (row: string) =>
+        row
+          .trim()
+          .replace(/^\||\|$/g, '')
+          .split('|')
+          .map((cell) => renderInline(cell.trim()));
+      const headers = parseRow(line);
+      i += 2; // 跳过表头与分隔行
+      const rows: string[][] = [];
+      while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())) {
+        rows.push(parseRow(lines[i]));
+        i++;
+      }
+      html.push(
+        '<table><thead><tr>' +
+          headers.map((h) => `<th>${h}</th>`).join('') +
+          '</tr></thead><tbody>' +
+          rows.map((r) => '<tr>' + r.map((c) => `<td>${c}</td>`).join('') + '</tr>').join('') +
+          '</tbody></table>',
+      );
+      continue;
+    }
+
+    // 段落：连续普通行，遇块级语法或空行结束
+    const paraLines: string[] = [];
+    while (i < lines.length && !isBlockStart(lines[i])) {
+      paraLines.push(renderInline(lines[i].trim()));
+      i++;
+    }
+    html.push(`<p>${paraLines.join('<br>')}</p>`);
   }
-  return text;
+
+  // 兜底：恢复混在行内的代码块占位符
+  return html.join('\n').replace(/\x00CB(\d+)\x00/g, (_, n: string) => codeBlocks[Number(n)] ?? '');
+}
+
+function isTableStart(lines: string[], i: number): boolean {
+  const header = lines[i].trim();
+  const separator = lines[i + 1]?.trim();
+  return /^\|.*\|$/.test(header) && !!separator && /^\|[\s:|-]+\|$/.test(separator);
+}
+
+function isBlockStart(line: string): boolean {
+  const t = line.trim();
+  if (!t) return true;
+  if (/^\x00CB\d+\x00$/.test(t)) return true;
+  if (/^#{1,6}\s/.test(t)) return true;
+  if (/^>\s?/.test(t)) return true;
+  if (/^[-*+]\s+/.test(t)) return true;
+  if (/^\d+[.、]\s+/.test(t)) return true;
+  if (/^\|.*\|$/.test(t)) return true;
+  return /^(?:-{3,}|\*{3,}|_{3,})$/.test(t);
+}
+
+// 行内语法：行内码/粗体/斜体/删除线/链接（行内码先占位，避免内部被其他规则改写）
+function renderInline(text: string): string {
+  const inlineCodes: string[] = [];
+  let out = escapeHTML(text).replace(/`([^`]+)`/g, (_, code: string) => {
+    inlineCodes.push(`<code>${code}</code>`);
+    return `\x00IC${inlineCodes.length - 1}\x00`;
+  });
+
+  out = out
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) =>
+      /^https?:\/\//i.test(href)
+        ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        : label,
+    );
+
+  inlineCodes.forEach((c, k) => {
+    out = out.replace(`\x00IC${k}\x00`, () => c);
+  });
+  return out;
+}
+
+// ============================================================
+// 已渲染回复 DOM → 净化 HTML（历史会话导出走此路径）
+// ============================================================
+// 页面装饰元素：代码块工具栏（语言标签+复制/下载按钮）、引用角标（含隐藏的 "-"）、图标
+const RENDERED_DOM_CHROME_SELECTOR =
+  '.md-code-block-banner-wrap, .ds-markdown-cite, svg, button, [role="button"]';
+
+function extractRenderedReplyHTML(replyEl: HTMLElement): string {
+  const clone = replyEl.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(RENDERED_DOM_CHROME_SELECTOR).forEach((el) => el.remove());
+  return sanitizeRenderedHTML(clone.innerHTML);
+}
+
+const RENDERED_ALLOWED_TAGS = new Set([
+  'p',
+  'br',
+  'hr',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'ul',
+  'ol',
+  'li',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+  'blockquote',
+  'pre',
+  'code',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'del',
+  'a',
+]);
+
+// 白名单净化：只保留允许的标签；未知标签解包（保留文字）；属性全剥，仅 a 保留 http(s) href
+export function sanitizeRenderedHTML(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, '')
+    .replace(
+      /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g,
+      (_m, slash: string, name: string, attrs: string) => {
+        const tag = name.toLowerCase();
+        if (!RENDERED_ALLOWED_TAGS.has(tag)) return '';
+        if (slash) return `</${tag}>`;
+        if (tag === 'a') {
+          const hrefMatch = /href\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
+          const href = hrefMatch && (hrefMatch[1] ?? hrefMatch[2]);
+          if (href && /^https?:\/\//i.test(href)) {
+            return `<a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">`;
+          }
+          return '<a>';
+        }
+        return `<${tag}>`;
+      },
+    );
 }
 
 // ============================================================
@@ -476,9 +716,12 @@ function download(content: string, filename: string, mime: string) {
 // 工具函数
 // ============================================================
 function escapeHTML(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function slugify(text: string): string {

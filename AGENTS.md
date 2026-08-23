@@ -42,7 +42,7 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 ## DeepSeek 页面 DOM 坑
 
 - **哈希类名会变**：`_9996a53`（输入框）、`cddfb2ed`（新对话页鲸鱼）、`_31a22b0`（活跃模式 tab）等类名由官方构建生成，随部署无通知变化。选择器失效时先用 DevTools 在真实页面重新探测再改，不猜。
-- **着色走变量链**：改主题色优先覆盖 `--dsw-alias-*` CSS 变量（如 `--dsw-alias-brand-primary`），而非逐元素写选择器；派生态可能是写死的 DeepSeek 蓝，需一并覆盖（例：hover 用 `--dsw-alias-button-primary-hover`，原生为 `--dsw-static-deepseek-450/500`）。
+- **着色走变量链**：改主题色优先覆盖 `--dsw-alias-*` CSS 变量（如 `--dsw-alias-brand-primary`），而非逐元素写选择器；派生态可能是写死的 DeepSeek 蓝，需一并覆盖（例：hover 用 `--dsw-alias-button-primary-hover`，原生为 `--dsw-static-deepseek-450/500`）。官方新组件还可能把颜色变量声明在**元素级**（如多选复选框 `--dsl-checkbox-color`），祖先级覆盖够不着，须同级选择器覆盖；且当前会话行的 `a[data-ds-sidebar-selected] *` 涂装会给行内所有子元素（含方形 svg）刷 sidebarHighlight，覆盖须含整个子树（详见 .retro/ui-theme-vars.md）。
 
 ## 决策记录
 

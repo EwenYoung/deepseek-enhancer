@@ -1,3 +1,0 @@
-- [main-world-raw-import-no-ts](feedback_main_world_raw_import.md) — main-xhr-inject.ts 通过 ?raw 注入，禁止加 TS 类型注解
-- [processPendingSessions-not-refreshPanel-for-new-sessions](feedback_processPendingSessions_vs_refreshPanel.md) — DS_MINI_NEW_SESSION 收到后必须调 processPendingSessions() 而非 refreshPanel()
-- [refreshPanel-in-mutation-observer-causes-flicker](feedback_refreshPanel_observer_loop.md) — sidebar observer 中调 refreshPanel() 需 hover 守卫，防止 innerHTML 重建导致闪动

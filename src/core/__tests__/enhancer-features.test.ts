@@ -18,7 +18,7 @@ vi.stubGlobal('chrome', {
   },
 });
 
-const { getConfig } = await import('../enhancer-features');
+const { getConfig, iconColorOnBrand } = await import('../enhancer-features');
 
 const FULL_DEFAULTS = {
   wideScreen: false,
@@ -69,5 +69,25 @@ describe('getConfig', () => {
     getShouldFail = true;
 
     await expect(getConfig()).resolves.toEqual(FULL_DEFAULTS);
+  });
+});
+
+describe('iconColorOnBrand', () => {
+  it('深品牌色 → 白图标（含原生 deepseek 蓝）', () => {
+    expect(iconColorOnBrand('#3964fe')).toBe('#ffffff');
+    expect(iconColorOnBrand('#179299')).toBe('#ffffff'); // Catppuccin浅
+    expect(iconColorOnBrand('#E07850')).toBe('#ffffff'); // Claude深
+  });
+
+  it('浅粉彩品牌色 → 深灰图标（白图标对比不足）', () => {
+    expect(iconColorOnBrand('#89b4fa')).toBe('#18181b'); // Catppuccin深
+    expect(iconColorOnBrand('#bd93f9')).toBe('#18181b'); // Dracula
+    expect(iconColorOnBrand('#61afef')).toBe('#18181b'); // OneHalf
+    expect(iconColorOnBrand('#D98A6A')).toBe('#18181b'); // Claude浅
+  });
+
+  it('无效输入不抛错（按黑底处理 → 白图标）', () => {
+    expect(iconColorOnBrand('')).toBe('#ffffff');
+    expect(iconColorOnBrand('#zz')).toBe('#ffffff');
   });
 });

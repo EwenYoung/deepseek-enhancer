@@ -250,6 +250,18 @@ function isDarkMode(): boolean {
   return document.body.classList.contains('dark');
 }
 
+/** 品牌底色上的图标颜色：按相对亮度取白/深灰，避免浅粉彩品牌上白图标对比不足 */
+export function iconColorOnBrand(hex: string): string {
+  const n = hex.replace('#', '');
+  const channel = (i: number) => parseInt(n.slice(i, i + 2), 16) / 255;
+  const linearize = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const luminance =
+    0.2126 * linearize(channel(0)) +
+    0.7152 * linearize(channel(2)) +
+    0.0722 * linearize(channel(4));
+  return luminance > 0.32 ? '#18181b' : '#ffffff';
+}
+
 function getTheme(idx: number, dark: boolean) {
   const list = dark ? DARK_THEMES : LIGHT_THEMES;
   return list[idx % list.length];
@@ -300,6 +312,14 @@ export async function applyTheme(idx: number) {
       /* 原生 hover 色是写死的 DeepSeek 蓝（--dsw-static-deepseek-450/500），
          从品牌色派生：浅色提亮、深色压暗 */
       --dsw-alias-button-primary-hover: color-mix(in srgb, ${theme.brandColor} 86%, ${dark ? 'black' : 'white'}) !important;
+    }
+    /* 官方多选复选框选中色：原生把 --dsl-checkbox-color 写死在元素级（deepseek 蓝），
+       不随 dsw-alias 变量链，须同级覆盖；对勾按品牌亮度取对比色（浅粉彩品牌上白勾对比不足） */
+    #root .ds-checkbox--active {
+      --dsl-checkbox-color: ${theme.brandColor} !important;
+    }
+    #root .ds-checkbox--active svg path {
+      fill: ${iconColorOnBrand(theme.brandColor)} !important;
     }
     /* 精确着色：仅对标记了蓝色的原生图标位置 */
     /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/

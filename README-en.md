@@ -32,7 +32,9 @@
 - 🧩 **Skill System** — 8 built-in skills (deep thinking, code review, writing, translation, etc.) with custom creation and GitHub import
 - 🔄 **Agent Loop** — SSE stream parsing → tool call detection → background execution → DOM submit, driving multi-step reasoning
 - 🎨 **UI Enhancements** — Widescreen mode, multi-theme switching, font customization, scrollbar hiding, auto-hide input
+- 🗂️ **Chat Categories** — Sidebar conversation categorization with bulk organizing
 - 📤 **Chat Export** — One-click Markdown / HTML export, tool results wrapped as code blocks
+- 💾 **Data Backup** — One-click config export / import (skills, categories, themes, API keys)
 - ⌨️ **Quick Input** — `/` triggers skill selection dropdown, React 18 re-render compatible
 
 ## Quick Start
@@ -151,6 +153,7 @@ deepseek-enhancer/
 │   │   ├── content.ts              # Isolated layer (content script)
 │   │   └── background.ts           # Background (service worker)
 │   ├── core/                 # Core logic
+│   │   ├── __tests__/              # Unit tests (vitest)
 │   │   ├── main-xhr-inject.ts      # XHR interception + prompt augmentation + SSE parsing
 │   │   ├── context-builder.ts      # Tool definition XML builder + skill injection
 │   │   ├── sse-parser.ts           # SSE stream parsing + tool call extraction
@@ -162,17 +165,21 @@ deepseek-enhancer/
 │   │   ├── ui-panel.ts             # Floating management panel
 │   │   ├── ui-autocomplete.ts      # / triggered skill dropdown
 │   │   ├── ui-tool-blocks.ts       # Tool call result UI + DOM submit
-│   │   ├── ui-categories.ts        # Panel category tabs
+│   │   ├── ui-categories.ts        # Chat category management
 │   │   ├── chat-exporter.ts        # Markdown/HTML export
 │   │   ├── enhancer-features.ts    # Widescreen/theme/font/scrollbar
 │   │   ├── fetch-hook.ts           # Fetch interception (backup path)
 │   │   ├── conversation-store.ts   # Conversation state management
+│   │   ├── artifact.ts             # Artifact downloads
+│   │   ├── data-backup.ts          # Config backup & restore
+│   │   ├── markdown.ts             # Markdown rendering helpers
 │   │   └── types.ts                # Shared type definitions
+│   ├── public/               # Extension static assets (icons)
 │   └── env.d.ts
-├── public/                   # Static assets
 ├── docs/                     # Documentation
 │   ├── adr/                  # Architecture Decision Records
-│   └── specs/                # Feature specifications
+│   ├── CLEAN-CODE.md         # Mandatory code rules
+│   └── CONTEXT.md            # Domain glossary
 ├── wxt.config.ts             # WXT extension config
 ├── vitest.config.ts          # Test config
 └── package.json
@@ -209,7 +216,6 @@ deepseek-enhancer/
 | WXT | Chrome MV3 extension framework |
 | Chrome Storage API | Skill / config persistence |
 | Tavily API | Search + webpage extraction |
-| js-sha3 | SHA-3 hashing (WASM) |
 | Vitest | Unit testing |
 | ESLint + Prettier | Code standards |
 
@@ -238,4 +244,4 @@ Ensure `pnpm typecheck`, `pnpm lint`, and `pnpm format:check` all pass before co
 
 ## License
 
-[MIT](.agents/skills/LICENSE)
+[MIT](LICENSE)

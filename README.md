@@ -32,7 +32,9 @@
 - 🧩 **技能系统** — 内置 8 个技能（深度思考、代码审查、写作、翻译等），支持自定义创建和 GitHub 导入
 - 🔄 **Agent 循环** — SSE 流解析 → 工具调用检测 → 后台执行 → DOM 提交，驱动模型多步推理
 - 🎨 **UI 增强** — 宽屏模式、多主题切换、字体自定义、滚动条隐藏、自动隐藏输入框
+- 🗂️ **会话分类** — 侧边栏会话分类管理，批量归类整理
 - 📤 **会话导出** — 一键导出 Markdown / HTML，工具结果自动包装为代码块
+- 💾 **数据备份** — 配置一键导出 / 导入（技能、分类、主题、API Key）
 - ⌨️ **快捷输入** — `/` 触发技能选择下拉，React 18 重渲染兼容
 
 ## 快速开始
@@ -151,6 +153,7 @@ deepseek-enhancer/
 │   │   ├── content.ts              # Isolated 层（content script）
 │   │   └── background.ts           # Background（service worker）
 │   ├── core/                 # 核心逻辑
+│   │   ├── __tests__/              # 单元测试（vitest）
 │   │   ├── main-xhr-inject.ts      # XHR 拦截 + prompt 增强 + SSE 解析
 │   │   ├── context-builder.ts      # 工具定义 XML 构建 + skill 注入
 │   │   ├── sse-parser.ts           # SSE 流解析 + 工具调用提取
@@ -162,17 +165,21 @@ deepseek-enhancer/
 │   │   ├── ui-panel.ts             # 浮层管理面板
 │   │   ├── ui-autocomplete.ts      # / 触发技能下拉
 │   │   ├── ui-tool-blocks.ts       # 工具调用结果 UI + DOM 提交
-│   │   ├── ui-categories.ts        # 面板分类标签
+│   │   ├── ui-categories.ts        # 会话分类管理
 │   │   ├── chat-exporter.ts        # Markdown/HTML 导出
 │   │   ├── enhancer-features.ts    # 宽屏/主题/字体/滚动条
 │   │   ├── fetch-hook.ts           # fetch 拦截（备用路径）
 │   │   ├── conversation-store.ts   # 会话状态管理
+│   │   ├── artifact.ts             # 产出物下载
+│   │   ├── data-backup.ts          # 配置备份与恢复
+│   │   ├── markdown.ts             # Markdown 渲染辅助
 │   │   └── types.ts                # 共享类型定义
+│   ├── public/               # 扩展静态资源（图标）
 │   └── env.d.ts
-├── public/                   # 静态资源
 ├── docs/                     # 文档
 │   ├── adr/                  # 架构决策记录
-│   └── specs/                # 功能规格
+│   ├── CLEAN-CODE.md         # 强制代码规则
+│   └── CONTEXT.md            # 领域术语表
 ├── wxt.config.ts             # WXT 扩展配置
 ├── vitest.config.ts          # 测试配置
 └── package.json
@@ -209,7 +216,6 @@ deepseek-enhancer/
 | WXT | Chrome MV3 扩展框架 |
 | Chrome Storage API | 技能 / 配置持久化 |
 | Tavily API | 搜索 + 网页抓取 |
-| js-sha3 | SHA-3 哈希（WASM） |
 | Vitest | 单元测试 |
 | ESLint + Prettier | 代码规范 |
 
@@ -238,4 +244,4 @@ deepseek-enhancer/
 
 ## 许可证
 
-[MIT](.agents/skills/LICENSE)
+[MIT](LICENSE)

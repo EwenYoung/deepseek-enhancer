@@ -303,7 +303,12 @@ export async function applyTheme(idx: number) {
     ${
       theme.brandColor
         ? `
-    body { --dsw-alias-brand-primary: ${theme.brandColor} !important; }
+    body {
+      --dsw-alias-brand-primary: ${theme.brandColor} !important;
+      /* 原生 hover 色是写死的 DeepSeek 蓝（--dsw-static-deepseek-450/500），
+         从品牌色派生：浅色提亮、深色压暗 */
+      --dsw-alias-button-primary-hover: color-mix(in srgb, ${theme.brandColor} 86%, ${dark ? 'black' : 'white'}) !important;
+    }
     /* 精确着色：仅对标记了蓝色的原生图标位置 */
     /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/
     #root .the-header .ds-icon,

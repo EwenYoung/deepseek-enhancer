@@ -55,3 +55,5 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 
 - 元素级 CSS 变量声明永远赢过继承：主题变量别声明在面板元素上再用 html 内联覆盖；合成值（透明度）拆成独立低层变量（如 `--panel-alpha`）下发（2026-08-24，ui-theme-vars.md）
 - ink 深色下 `--accent`/`--danger` 是浅色，按钮文字一律 `var(--accent-text,#fff)`，写死 `#fff` 会不可读（2026-08-24，ui-theme-vars.md）
+- 导出助手回复是双数据源：原始 markdown 缓存（#ds-mini-asst-raw）只覆盖本页会话生成的回复，历史会话必须走已渲染 DOM 提取+白名单净化（chat-exporter 的 extractRenderedReplyHTML），textContent 回退会丢 markdown 并混入「复制/下载」与引用角标文本（2026-08-24，chat-export.md）
+- 视觉/布局结论以计算样式+几何测量为准（DOM 顺序会骗人，justify-content 漏加即此坑）；用户报障先读真实产物（导出文件/页面实测）再动代码（2026-08-24，agent-verification.md）

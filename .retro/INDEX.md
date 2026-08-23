@@ -10,3 +10,10 @@
   - 按 title/文字找按钮会误中扩展注入的按钮，查找时排除 #ds-category-panel 等扩展容器
   - 官方多选入口在会话行三点菜单「多选」项，退出在顶部栏图标按钮
   - 自动化搞坏页面后先查输入框草稿再 location.reload() 兜底；绝不碰删除类按钮
+- [chat-export](chat-export.md) — 会话导出（2 条）
+  - 助手回复导出双数据源：#ds-mini-asst-raw 缓存只覆盖本页会话，历史会话必须走已渲染 DOM 提取+白名单净化
+  - 已渲染回复 DOM 结构：装饰=md-code-block-banner-wrap/ds-markdown-cite/[role=button]，正文是真实 h/p/strong/code/table 标签
+- [agent-verification](agent-verification.md) — Agent 自验方法（3 条）
+  - 布局验证断言计算样式+几何（justify-content/边缘重合），DOM 顺序不代表视觉方位
+  - chrome-devtools MCP 截图不回传、filePath 被拒；用 evaluate_script 程序化断言，要视觉就走本地 http + Browser Use emitImage
+  - DOM 重依赖代码端到端自验：jiti 跑 TS 源码 + CORS receiver 收真实页面 DOM + 真实管线生成预览再断言

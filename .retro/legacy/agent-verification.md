@@ -9,6 +9,15 @@
 - **首次记录**：2026-08-24（用户纠正）
 - 已升级至 AGENTS.md
 
+## 用户报障先读真实产物（导出文件/页面实测）再动代码
+
+- **症状**：用户报障（如微信风格导出气泡不靠右、历史会话 markdown 原样文本）后，agent 凭代码印象或自己「自验通过」的结论推断开改，绕了一圈才发现现象与真实产物不符。
+- **原因**：内存里的代码印象 ≠ 真实产物；「自验通过」不等于「用户看到的导出文件/页面正确」——问题可能出在验证方法（见「布局验证必须断言计算样式与几何」条目）或数据源（见 chat-export 双数据源条目），没看产物前无法区分。
+- **解法**：接到报障先打开真实产物定位现象（导出的文件内容、真实页面实测）再回代码改，不要先改代码再等用户复验；用户报障指向的真实产物就是最高优先级验收标准。
+- **置信度**：验证过（用户纠正）
+- **首次记录**：2026-08-24
+- 已升级至 AGENTS.md
+
 ## chrome-devtools MCP 截图不回传、filePath 被拒；程序化检查更可靠
 
 - **症状**：`take_screenshot` 只返回 "Took a screenshot" 文本，图像不进上下文；`filePath` 落盘报 "not within any of the configured workspace roots"（连项目根目录也拒）。Browser Use 的 `nodeRepl.emitImage` 可以回传图像，但 IAB 后端 `goto()` 不支持 `file://`。
@@ -36,3 +45,4 @@
 - **解法**：验证注入 CSS 效果前先查 `getComputedStyle(el).transitionProperty` / `transitionDuration`；有 transition 就等过渡结束（duration 之后）再断言，或临时 `el.style.transition='none'` 验证后还原。本会话靠「注入后 sleep 600ms 再读」一次确认规则生效。
 - **置信度**：验证过（同会话内被假象误导后修复验证）
 - **首次记录**：2026-08-24
+- 已升级至 AGENTS.md

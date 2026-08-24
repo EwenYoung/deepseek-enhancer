@@ -7,3 +7,4 @@
 - **解法**：读取侧 `{ ...DEFAULT_CONFIG, ...存储值 }` 合并（默认值收敛为单一常量）；导入侧 `Object.hasOwn(data, key) ? data[key] : BACKUP_KEYS[key]` 回填。给 BACKUP_KEYS 新增键时两条路径自动安全，勿回退成"只写存在的键"。回归测试见 `__tests__/enhancer-features.test.ts`（空对象/部分字段）与 `__tests__/data-backup.test.ts`（旧格式备份回填）。
 - **置信度**：验证过（两组测试锁定）
 - **首次记录**：2026-08-24
+- 已升级至 AGENTS.md

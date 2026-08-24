@@ -40,22 +40,26 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 
 **关键模式**：SSE 缓冲挂 `xhr.__ds_buf` 按实例隔离，避免并发污染；`/` 自动补全用 `ignoreNextInput` 标记应对 React 18 重渲染；从 DOM 活跃类 `_31a22b0` 读取当前模式，决定注入的工具范围；主题与品牌色逻辑集中在 `enhancer-features.ts`。
 
-## DeepSeek 页面 DOM 坑
-
-- **哈希类名会变**：`_9996a53`（输入框）、`cddfb2ed`（新对话页鲸鱼）、`_31a22b0`（活跃模式 tab）等类名由官方构建生成，随部署无通知变化。选择器失效时先用 DevTools 在真实页面重新探测再改，不猜。
-- **着色走变量链**：改主题色优先覆盖 `--dsw-alias-*` CSS 变量（如 `--dsw-alias-brand-primary`），而非逐元素写选择器；派生态可能是写死的 DeepSeek 蓝，需一并覆盖（例：hover 用 `--dsw-alias-button-primary-hover`，原生为 `--dsw-static-deepseek-450/500`）。官方新组件还可能把颜色变量声明在**元素级**（如多选复选框 `--dsl-checkbox-color`），祖先级覆盖够不着，须同级选择器覆盖；且当前会话行的 `a[data-ds-sidebar-selected] *` 涂装会给行内所有子元素（含方形 svg）刷 sidebarHighlight，覆盖须含整个子树（详见 .retro/ui-theme-vars.md）。
-
 ## 决策记录
 
 涉及已有架构决策时：查 `docs/adr/`。
 
 ## 经验教训
 
-<!-- retro:escalated 完整版见 .retro/，满 8 条时降级最旧条目 -->
-完整经验库在 **[.retro/](.retro/INDEX.md)**（按主题组织，条目含症状/原因/解法/置信度）：排查卡壳先查其 INDEX；会话收尾沉淀用 /retro 技能，写入前按 INDEX 去重合并。
+<!-- retro-managed-start -->
+<!-- retro:escalated 完整版见 .retro/INDEX.md，满 12 条时用 retro.py escalate --demote 降级最旧条目 -->
+- 元素级 CSS 变量声明永远赢过继承，html 内联覆盖无效；合成值拆成独立低层变量（如 --panel-alpha）下发 [20260824-001]
+- ink 深色下 --accent/--danger 是浅色，按钮文字一律 var(--accent-text,#fff)，写死 #fff 不可读 [20260824-002]
+- 导出助手回复是双数据源：原始 markdown 缓存只覆盖本页会话，历史会话走已渲染 DOM 提取+白名单净化 [20260824-009]
+- 视觉/布局结论以计算样式+几何测量为准，DOM 顺序不代表视觉方位 [20260824-011]
+- 用户报障先读真实产物（导出文件/页面实测）再动代码，别只凭代码印象或自验通过下结论 [20260824-012]
+- 注入 CSS 验证效果先查目标元素 transition：立即读 computed style 会撞上过渡起始帧 [20260824-015]
+- storage 配置读取一律 {...DEFAULT_CONFIG, ...存储值} 合并默认值，勿用 || 兜底；备份导入缺键回填 [20260824-005]
+- 官方新组件元素级变量不走 dsw-alias 链，须同级覆盖含整个子树 [20260824-003]
 
-- 元素级 CSS 变量声明永远赢过继承：主题变量别声明在面板元素上再用 html 内联覆盖；合成值（透明度）拆成独立低层变量（如 `--panel-alpha`）下发（2026-08-24，ui-theme-vars.md）
-- ink 深色下 `--accent`/`--danger` 是浅色，按钮文字一律 `var(--accent-text,#fff)`，写死 `#fff` 会不可读（2026-08-24，ui-theme-vars.md）
-- 导出助手回复是双数据源：原始 markdown 缓存（#ds-mini-asst-raw）只覆盖本页会话生成的回复，历史会话必须走已渲染 DOM 提取+白名单净化（chat-exporter 的 extractRenderedReplyHTML），textContent 回退会丢 markdown 并混入「复制/下载」与引用角标文本（2026-08-24，chat-export.md）
-- 视觉/布局结论以计算样式+几何测量为准（DOM 顺序会骗人，justify-content 漏加即此坑）；用户报障先读真实产物（导出文件/页面实测）再动代码（2026-08-24，agent-verification.md）
-- 注入 CSS 验证效果先查目标元素 transition：立即读 computed style 会撞上过渡起始帧（表象=规则没生效），须等过渡结束或临时禁用再断言（2026-08-24，agent-verification.md）
+- 哈希类名由官方构建生成，随部署无通知变化 [20260824-016]
+
+- 改主题色优先覆盖 --dsw-alias-* 变量链，派生态写死的品牌色一并覆盖 [20260824-017]
+<!-- retro-managed-end -->
+
+完整经验库在 **[.retro/](.retro/INDEX.md)**（脚本生成索引，条目在 `.retro/entries/`、原始摘录在 `.retro/log/`）：排查卡壳先查其 INDEX；会话收尾沉淀用 /retro 技能，跑 `retro.py check` 校验一致性。

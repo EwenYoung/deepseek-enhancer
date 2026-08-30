@@ -85,9 +85,19 @@ function scrapeMessages(): ChatMessage[] {
     return messages;
   }
 
-  // 读取缓存的原始助手响应文本（含 Markdown）
+  // 读取缓存的原始助手响应文本（含 Markdown）。缓存跨会话只增不清，
+  // 条数与当前页助手消息数不符时视为其他会话残留，弃用防错配
   const asstRawEl = document.getElementById('ds-mini-asst-raw');
   const asstRawTexts = asstRawEl ? (asstRawEl.textContent || '').split('||ASST_SEP||') : [];
+  let asstCount = 0;
+  for (let i = 0; i < msgEls.length; i++) {
+    if (msgEls[i].closest('.ds-mini-tool-block')) continue;
+    if (msgEls[i].querySelector('.ds-assistant-message-main-content')) asstCount++;
+  }
+  const cacheUsable = asstRawTexts.length === asstCount;
+  if (!cacheUsable && asstRawTexts.length > 0) {
+    console.warn('[DS-Mini] Export: raw cache count mismatch, fallback to rendered DOM');
+  }
   let asstIdx = 0;
 
   for (let i = 0; i < msgEls.length; i++) {
@@ -99,19 +109,31 @@ function scrapeMessages(): ChatMessage[] {
 
     if (replyEl) {
       // Assistant 消息 — 优先使用缓存的原始 Markdown 文本；
-      // 历史会话无缓存时退回页面已渲染 DOM 的净化 HTML（textContent 已丢失 markdown 语法）
+      // 历史会话无缓存时从页面已渲染 DOM 逆向重建 Markdown（textContent 已丢失块级结构）
       const thinking = thinkEl?.textContent?.trim() || '';
-      const raw = asstRawTexts[asstIdx];
-      const reply = raw ? raw.trim() : replyEl.textContent?.trim();
-      if (reply) {
-        messages.push({
-          role: 'assistant' as const,
-          content: reply,
-          thinking: thinking || undefined,
-          renderedHTML: raw ? undefined : extractRenderedReplyHTML(replyEl),
-        });
+      const raw = cacheUsable ? asstRawTexts[asstIdx] : undefined;
+      if (raw) {
+        asstIdx++;
+        const reply = raw.trim();
+        if (reply) {
+          messages.push({
+            role: 'assistant' as const,
+            content: reply,
+            thinking: thinking || undefined,
+          });
+        }
+      } else {
+        const renderedHTML = extractRenderedReplyHTML(replyEl);
+        const reply = htmlToMarkdown(renderedHTML).trim() || replyEl.textContent?.trim();
+        if (reply) {
+          messages.push({
+            role: 'assistant' as const,
+            content: reply,
+            thinking: thinking || undefined,
+            renderedHTML,
+          });
+        }
       }
-      if (raw) asstIdx++;
     } else {
       // User 消息 — 跳过包含 assistant 子元素的
       if (el.querySelector('.ds-markdown, .ds-think-content')) continue;
@@ -251,7 +273,7 @@ function getChatTitle(): string {
 // ============================================================
 // Markdown 渲染
 // ============================================================
-function renderMarkdown(messages: ChatMessage[], title: string): string {
+export function renderMarkdown(messages: ChatMessage[], title: string): string {
   const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
   const lines: string[] = [];
 
@@ -264,16 +286,21 @@ function renderMarkdown(messages: ChatMessage[], title: string): string {
 
   for (const msg of messages) {
     if (msg.role === 'user') {
-      lines.push('## 👤 你');
+      // 说话人行用粗体而非标题语法：渲染后字号小于正文标题，避免与回复内的 ## 标题混淆
+      lines.push('**User**');
       lines.push('');
-      lines.push(wrapToolResultMD(msg.content));
+      // 用户内容整体块引用，与 DeepSeek 回复形成明确的区域划分
+      lines.push(prefixQuoteLines(wrapToolResultMD(msg.content)));
     } else {
-      lines.push('## 🤖 DeepSeek');
+      lines.push('**Deepseek**');
       lines.push('');
       if (msg.thinking) {
-        lines.push('> 💭 **思考过程**');
-        lines.push('>');
-        lines.push('> ' + msg.thinking.split('\n').join('\n> '));
+        // 无空行的连续 HTML 块：Typora 的 HTML 块遇空行即截断，会把内容挤出折叠区；
+        // 内容以 <p>+<br> 承载（转义后原样显示），Typora/GitHub/VSCode 均可点击折叠
+        lines.push('<details>');
+        lines.push('<summary>💭 思考过程</summary>');
+        lines.push('<p>' + escapeHTML(msg.thinking).replace(/\n/g, '<br>') + '</p>');
+        lines.push('</details>');
         lines.push('');
         lines.push('---');
         lines.push('');
@@ -421,7 +448,10 @@ const WECHAT_STYLE = `  *{margin:0;padding:0;box-sizing:border-box}
   }
   .wx-content pre code{background:none;padding:0;font-size:inherit;color:inherit}
   .wx-think{background:#f6f6f6;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px}
-  .wx-think summary{cursor:pointer;color:#9a9a9a;font-weight:500;user-select:none}
+  .wx-think summary{cursor:pointer;color:#9a9a9a;font-weight:500;user-select:none;list-style:none}
+  .wx-think summary::-webkit-details-marker{display:none}
+  .wx-think summary::before{content:"❯";display:inline-block;margin-right:6px;transition:transform .15s ease}
+  .wx-think[open] summary::before{transform:rotate(90deg)}
   .wx-think-body{
     margin-top:6px;color:#8a8a8a;line-height:1.6;
     white-space:pre-wrap;word-break:break-word;max-height:340px;overflow-y:auto;
@@ -438,6 +468,14 @@ const WECHAT_STYLE = `  *{margin:0;padding:0;box-sizing:border-box}
 // ============================================================
 // 工具结果内容处理 — 防止 Markdown 渲染
 // ============================================================
+// 逐行加引用前缀（空行保留 >），使整段成为 markdown 块引用
+function prefixQuoteLines(text: string): string {
+  return text
+    .split('\n')
+    .map((l) => (l ? '> ' + l : '>'))
+    .join('\n');
+}
+
 export function wrapToolResultMD(content: string): string {
   // 将匹配到的 [工具执行结果] 区域包裹在 ``` 代码块中
   return content.replace(/(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g, function (match) {
@@ -692,6 +730,160 @@ export function sanitizeRenderedHTML(html: string): string {
         return `<${tag}>`;
       },
     );
+}
+
+// ============================================================
+// 已渲染回复 HTML → Markdown（历史会话 Markdown 导出走此路径）
+// ============================================================
+// 输入约定为 sanitizeRenderedHTML 的产物：标签小写、除 a 外无属性、
+// 标签配对、文本已 HTML 转义。顶层扫出块级结构递归，行内标签做标记替换。
+
+const TOP_BLOCK_TAGS = new Set([
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'ul',
+  'ol',
+  'blockquote',
+  'pre',
+  'table',
+]);
+
+interface TopBlock {
+  kind: 'block';
+  tag: string;
+  inner: string;
+}
+
+interface TopText {
+  kind: 'text';
+  text: string;
+}
+
+// 扫出 blockTags 中标签的顶层块（depth 计数保证嵌套完整归入 inner），块间文本单独收集
+function collectTopLevel(html: string, blockTags: Set<string>): Array<TopBlock | TopText> {
+  const parts: Array<TopBlock | TopText> = [];
+  const tagRe = /<(\/?)([a-z][a-z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+  let depth = 0;
+  let openTag = '';
+  let openEnd = 0;
+  let textStart = 0;
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(html))) {
+    const [, slash, name] = m;
+    if (depth === 0) {
+      if (!slash && blockTags.has(name)) {
+        if (m.index > textStart) parts.push({ kind: 'text', text: html.slice(textStart, m.index) });
+        depth = 1;
+        openTag = name;
+        openEnd = m.index + m[0].length;
+      }
+    } else if (!slash && name === openTag) {
+      depth++;
+    } else if (slash && name === openTag) {
+      depth--;
+      if (depth === 0) {
+        parts.push({ kind: 'block', tag: openTag, inner: html.slice(openEnd, m.index) });
+        textStart = m.index + m[0].length;
+      }
+    }
+  }
+  if (textStart < html.length) parts.push({ kind: 'text', text: html.slice(textStart) });
+  return parts;
+}
+
+export function htmlToMarkdown(html: string): string {
+  return markdownBlocks(html).join('\n\n');
+}
+
+function markdownBlocks(html: string): string[] {
+  return collectTopLevel(html, TOP_BLOCK_TAGS)
+    .map((part) =>
+      part.kind === 'text' ? inlineToMarkdown(part.text).trim() : blockToMarkdown(part),
+    )
+    .filter(Boolean);
+}
+
+function blockToMarkdown({ tag, inner }: TopBlock): string {
+  if (tag === 'pre') return codeBlockToMarkdown(inner);
+  if (tag === 'blockquote') return prefixQuoteLines(htmlToMarkdown(inner));
+  if (tag === 'ul' || tag === 'ol') return listToMarkdown(inner, tag === 'ol');
+  if (tag === 'table') return tableToMarkdown(inner);
+  if (/^h[1-6]$/.test(tag)) {
+    const level = Number(tag[1]);
+    return '#'.repeat(level) + ' ' + inlineToMarkdown(inner).replace(/\n+/g, ' ').trim();
+  }
+  return inlineToMarkdown(inner).trim();
+}
+
+function inlineToMarkdown(html: string): string {
+  return unescapeHTMLText(
+    html
+      .replace(
+        /<a href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g,
+        (_m, href: string, label: string) => `[${label}](${href})`,
+      )
+      .replace(/<br\s*\/?>/g, '\n')
+      .replace(/<hr\s*\/?>/g, '\n---\n')
+      .replace(/<\/?(strong|b)>/g, '**')
+      .replace(/<\/?(em|i)>/g, '*')
+      .replace(/<\/?del>/g, '~~')
+      .replace(/<\/?code>/g, '`')
+      .replace(/<\/?[a-z][a-z0-9]*[^>]*>/g, ''),
+  );
+}
+
+function codeBlockToMarkdown(inner: string): string {
+  const text = unescapeHTMLText(inner.replace(/<\/?code>/g, '')).replace(/^\n+|\n+$/g, '');
+  const fence = text.includes('```') ? '````' : '```';
+  return `${fence}\n${text}\n${fence}`;
+}
+
+function listToMarkdown(inner: string, ordered: boolean): string {
+  const lines: string[] = [];
+  let index = 0;
+  for (const item of collectTopLevel(inner, new Set(['li']))) {
+    if (item.kind === 'text') continue;
+    index++;
+    const marker = ordered ? `${index}. ` : '- ';
+    // 列表项内各块紧凑连接（单换行），避免渲染为松散列表
+    const itemLines = markdownBlocks(item.inner).join('\n').split('\n');
+    lines.push(marker + (itemLines[0] ?? ''));
+    for (const l of itemLines.slice(1)) lines.push(l ? '  ' + l : '');
+  }
+  return lines.join('\n');
+}
+
+function tableToMarkdown(inner: string): string {
+  const rows: string[] = [];
+  const trRe = /<tr>([\s\S]*?)<\/tr>/g;
+  let m: RegExpExecArray | null;
+  while ((m = trRe.exec(inner))) {
+    const cells: string[] = [];
+    const cellRe = /<t[hd]>([\s\S]*?)<\/t[hd]>/g;
+    let c: RegExpExecArray | null;
+    while ((c = cellRe.exec(m[1]))) {
+      cells.push(inlineToMarkdown(c[1]).replace(/\n+/g, ' ').trim() || ' ');
+    }
+    rows.push('| ' + cells.join(' | ') + ' |');
+  }
+  if (rows.length === 0) return '';
+  const cols = rows[0].split('|').length - 2;
+  rows.splice(1, 0, '| ' + Array(cols).fill('---').join(' | ') + ' |');
+  return rows.join('\n');
+}
+
+function unescapeHTMLText(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 // ============================================================

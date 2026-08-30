@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { wrapToolResultMD, slugify, renderHTML, sanitizeRenderedHTML } from '../chat-exporter';
+import {
+  wrapToolResultMD,
+  slugify,
+  renderHTML,
+  renderMarkdown,
+  sanitizeRenderedHTML,
+  htmlToMarkdown,
+} from '../chat-exporter';
 
 type ExportMessage = Parameters<typeof renderHTML>[0][number];
 
@@ -74,6 +81,16 @@ describe('renderHTML（微信对话风格）', () => {
     expect(html).toContain('wx-think');
     expect(html).toContain('思考过程');
     expect(html).toContain('先分析…');
+  });
+
+  it('思考过程 summary 去默认三角，用尖括号随开合旋转', () => {
+    const html = renderHTML(
+      makeMessages({ role: 'assistant', content: '回答', thinking: '先分析…' }),
+      '测试会话',
+    );
+    expect(html).toContain('.wx-think summary::-webkit-details-marker{display:none}');
+    expect(html).toContain('summary::before{content:"❯"');
+    expect(html).toContain('.wx-think[open] summary::before{transform:rotate(90deg)}');
   });
 
   it('导航栏展示会话标题与消息统计', () => {
@@ -183,6 +200,115 @@ describe('sanitizeRenderedHTML', () => {
   it('移除 script/style 及注释', () => {
     const input = '<p>a</p><script>alert(1)</script><style>.x{}</style><!-- note -->';
     expect(sanitizeRenderedHTML(input)).toBe('<p>a</p>');
+  });
+});
+
+describe('renderMarkdown（Markdown 导出）', () => {
+  it('说话人行是粗体（User / Deepseek），不与正文标题争层级', () => {
+    const md = renderMarkdown(
+      makeMessages({ content: '问题' }, { role: 'assistant', content: '回答' }),
+      '测试会话',
+    );
+    expect(md).toContain('**User**');
+    expect(md).toContain('**Deepseek**');
+    expect(md).not.toContain('## user');
+    expect(md).not.toContain('## Deepseek');
+    expect(md).not.toContain('👤');
+    expect(md).not.toContain('🤖');
+  });
+
+  it('用户内容整体包裹在引用块中，与回复形成区域划分', () => {
+    const md = renderMarkdown(
+      makeMessages({ content: '第一行\n\n第二行' }, { role: 'assistant', content: '回答' }),
+      '测试会话',
+    );
+    expect(md).toContain('> 第一行\n>\n> 第二行');
+    expect(md).not.toMatch(/^第一行/m);
+  });
+
+  it('助手思考过程渲染为无空行折叠块（Typora 兼容），内容转义承载', () => {
+    const md = renderMarkdown(
+      makeMessages({ role: 'assistant', content: '回答', thinking: '先分析\n再验证 <tag>' }),
+      '测试会话',
+    );
+    expect(md).toContain(
+      '<details>\n<summary>💭 思考过程</summary>\n<p>先分析<br>再验证 &lt;tag&gt;</p>\n</details>',
+    );
+    expect(md).not.toContain('> 先分析');
+  });
+});
+
+describe('htmlToMarkdown（历史会话已渲染 DOM 逆向重建）', () => {
+  it('标题与段落转为 markdown 并以空行分隔', () => {
+    const md = htmlToMarkdown('<h2>方案</h2><p>第一段</p><p>第二段</p>');
+    expect(md).toBe('## 方案\n\n第一段\n\n第二段');
+  });
+
+  it('标题层级映射到对应井号数', () => {
+    expect(htmlToMarkdown('<h1>一</h1><h4>四</h4>')).toBe('# 一\n\n#### 四');
+  });
+
+  it('行内样式与行内码、删除线', () => {
+    const md = htmlToMarkdown(
+      '<p><strong>粗</strong>与<em>斜</em>、<del>删</del>、<code>码</code></p>',
+    );
+    expect(md).toBe('**粗**与*斜*、~~删~~、`码`');
+  });
+
+  it('链接保留 href，未知标签解包保留文字', () => {
+    const md = htmlToMarkdown('<p><a href="https://x.com">文档</a><span>尾随</span></p>');
+    expect(md).toBe('[文档](https://x.com)尾随');
+  });
+
+  it('代码块剥除 code 标签、反转义实体并原样保留内容', () => {
+    const md = htmlToMarkdown('<pre><code>a &lt; b &amp;&amp; c &gt; d\n  缩进保持</code></pre>');
+    expect(md).toBe('```\na < b && c > d\n  缩进保持\n```');
+  });
+
+  it('代码内含三反引号时使用更长围栏', () => {
+    const md = htmlToMarkdown('<pre><code>```js\nx```</code></pre>');
+    expect(md).toBe('````\n```js\nx```\n````');
+  });
+
+  it('无序列表各项加短横线，嵌套列表缩进两格', () => {
+    const md = htmlToMarkdown('<ul><li>外层<ul><li>内层</li></ul></li><li>第二项</li></ul>');
+    expect(md).toBe('- 外层\n  - 内层\n- 第二项');
+  });
+
+  it('有序列表编号连续，多行项内容缩进对齐', () => {
+    const md = htmlToMarkdown('<ol><li>甲</li><li>乙</li></ol>');
+    expect(md).toBe('1. 甲\n2. 乙');
+  });
+
+  it('表格转 GFM（表头行后插分隔行，单元格内换行折叠为空格）', () => {
+    const md = htmlToMarkdown(
+      '<table><thead><tr><th>方案</th><th>成本</th></tr></thead>' +
+        '<tbody><tr><td>一</td><td>低<br>很低</td></tr></tbody></table>',
+    );
+    expect(md).toBe('| 方案 | 成本 |\n| --- | --- |\n| 一 | 低 很低 |');
+  });
+
+  it('引用块逐行加前缀，内部块级结构保留', () => {
+    const md = htmlToMarkdown('<blockquote><p>说明</p><ul><li>要点</li></ul></blockquote>');
+    expect(md).toBe('> 说明\n>\n> - 要点');
+  });
+
+  it('段落内 br 转换行，hr 转分隔线', () => {
+    expect(htmlToMarkdown('<p>第一行<br>第二行</p>')).toBe('第一行\n第二行');
+    expect(htmlToMarkdown('<p>上</p><hr><p>下</p>')).toBe('上\n\n---\n\n下');
+  });
+
+  it('顶层裸文本兜底为段落', () => {
+    expect(htmlToMarkdown('散落文本')).toBe('散落文本');
+  });
+
+  it('与 sanitizeRenderedHTML 衔接：属性剥除后仍可转换', () => {
+    const md = htmlToMarkdown(
+      sanitizeRenderedHTML(
+        '<h3 class="x">标题</h3><p style="c">正文 <strong class="b">重点</strong></p>',
+      ),
+    );
+    expect(md).toBe('### 标题\n\n正文 **重点**');
   });
 });
 

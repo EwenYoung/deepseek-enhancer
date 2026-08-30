@@ -366,13 +366,6 @@
       const xhr = event.target;
       if (!xhr || !xhr.responseText) return;
 
-      // Token 速度: 记录首次响应时间
-      if (!xhr.__ds_start) {
-        xhr.__ds_start = performance.now();
-        xhr.__ds_chars = 0;
-        xhr.__ds_lastLen = 0;
-      }
-
       var fullText = xhr.responseText;
       const pos = getBuf(xhr, 'pos');
       if (fullText.length <= pos) return;
@@ -409,42 +402,7 @@
       // 扫描双 buffer
       checkToolCallsBoth(xhr);
 
-      // Token 速度: 每 500ms 更新一次
-      if (xhr.__ds_start) {
-        xhr.__ds_chars =
-          (xhr.__ds_chars || 0) +
-          (xhr.__ds_lastLen ? getBuf(xhr, 'text').length - xhr.__ds_lastLen : 0);
-        xhr.__ds_lastLen = getBuf(xhr, 'text').length;
-        var elapsed = (performance.now() - xhr.__ds_start) / 1000;
-        if (elapsed > 0.5) {
-          const tokPerSec = ((xhr.__ds_chars || 0) * 0.35) / elapsed;
-          window.postMessage(
-            {
-              source: 'DS_MINI_MAIN',
-              type: 'DS_MINI_TOKEN_SPEED',
-              tokPerSec: tokPerSec,
-              finished: false,
-            },
-            '*',
-          );
-        }
-      }
-
       if (finished) {
-        if (xhr.__ds_start) {
-          var elapsed = (performance.now() - xhr.__ds_start) / 1000;
-          const totalChars = xhr.__ds_chars || 0;
-          const finalTokPerSec = totalChars > 0 && elapsed > 0 ? (totalChars * 0.35) / elapsed : 0;
-          window.postMessage(
-            {
-              source: 'DS_MINI_MAIN',
-              type: 'DS_MINI_TOKEN_SPEED',
-              tokPerSec: finalTokPerSec,
-              finished: true,
-            },
-            '*',
-          );
-        }
         var fullText = getBuf(xhr, 'text');
         if (fullText) saveAssistantResponse(fullText);
         flushBuffers(xhr);

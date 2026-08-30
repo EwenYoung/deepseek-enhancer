@@ -57,6 +57,9 @@ npm-debug.log*
 # Handoff documents (session-local)
 .handoff/
 
+# Retro experience base (local-only, managed by retro skill)
+.retro/
+
 # Untracked skill directories (local-only, not part of project)
 .claude/skills/banner-design/
 .claude/skills/brand/

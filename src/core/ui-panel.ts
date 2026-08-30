@@ -27,6 +27,7 @@ import {
   applyChatFontSize,
   getFontOptions,
   preloadFonts,
+  toggleMarkdownTypo,
 } from './enhancer-features';
 
 // ============================================================
@@ -422,10 +423,10 @@ function buildPanelHTML(): string {
                 </div>
               </div>
             </div>
+            ${enhToggle('ds-enh-mdtypo', '正文排版')}
             ${enhToggle('ds-enh-scrollbar', '隐藏滚动条')}
             ${enhToggle('ds-enh-autohide', '隐藏输入框')}
             ${enhToggle('ds-enh-voice', '语音输入')}
-            ${enhToggle('ds-enh-tokenspeed', 'Token 速度')}
           </div>
         </div>
 
@@ -601,21 +602,11 @@ async function bindPanelEvents(state: AppState) {
           updateEnhButton('ds-enh-voice', enhState.voiceInput);
           showToast(enhState.voiceInput ? '语音输入已开启（Ctrl+M）' : '语音输入已关闭');
         },
-        'ds-enh-tokenspeed': async () => {
-          enhState.tokenSpeed = !enhState.tokenSpeed;
-          const cfg = await getConfig();
-          cfg.tokenSpeed = enhState.tokenSpeed;
-          await chrome.storage.local.set({ ds_mini_enhancer: cfg });
-          updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
-          window.postMessage(
-            {
-              source: 'DS_MINI_ISOLATED',
-              type: 'DS_MINI_TOKEN_SPEED_TOGGLE',
-              enabled: enhState.tokenSpeed,
-            },
-            '*',
-          );
-          showToast(enhState.tokenSpeed ? 'Token 速度已开启' : 'Token 速度已关闭');
+        'ds-enh-mdtypo': async () => {
+          enhState.mdTypo = !enhState.mdTypo;
+          await toggleMarkdownTypo(enhState.mdTypo);
+          updateEnhButton('ds-enh-mdtypo', enhState.mdTypo);
+          showToast(enhState.mdTypo ? '正文排版已开启' : '正文排版已关闭');
         },
       };
       if (id) funcMap[id]?.();
@@ -650,21 +641,8 @@ async function bindPanelEvents(state: AppState) {
     updateThemeName();
   });
 
-  // 字体设置
-  const fontToggle = panelEl.querySelector('#ds-font-toggle') as HTMLElement | null;
-  const fontBody = panelEl.querySelector('#ds-font-body') as HTMLElement | null;
-  const fontArrow = panelEl.querySelector('#ds-font-arrow') as HTMLElement | null;
-  if (fontToggle && fontBody && fontArrow) {
-    // 折叠/展开
-    fontToggle.addEventListener('click', () => {
-      const wasVisible = fontBody.style.display !== 'none';
-      fontBody.style.display = wasVisible ? 'none' : 'block';
-      fontArrow.textContent = !wasVisible ? '\u2303' : '\u2304';
-    });
-    // 初始化折叠状态
-    fontBody.style.display = 'none';
-    fontArrow.textContent = '\u2304';
-  }
+  // 可折叠分组：字体设置
+  bindCollapsibleSection('ds-font-toggle', 'ds-font-body', 'ds-font-arrow');
 
   // 自定义下拉框初始化
   initCustomSelect('ds-font-chat', getFontOptions('chat'), applyChatFont);
@@ -723,6 +701,21 @@ async function bindPanelEvents(state: AppState) {
   preloadFonts(cfg.chatFont, cfg.chatMonoFont);
 
   refreshSkillList(state);
+}
+
+/** 可折叠分组：标题行点击展开/收起，箭头随状态翻转，初始收起 */
+function bindCollapsibleSection(toggleId: string, bodyId: string, arrowId: string) {
+  const toggle = panelEl?.querySelector(`#${toggleId}`) as HTMLElement | null;
+  const body = panelEl?.querySelector(`#${bodyId}`) as HTMLElement | null;
+  const arrow = panelEl?.querySelector(`#${arrowId}`) as HTMLElement | null;
+  if (!toggle || !body || !arrow) return;
+  toggle.addEventListener('click', () => {
+    const wasVisible = body.style.display !== 'none';
+    body.style.display = wasVisible ? 'none' : 'block';
+    arrow.textContent = wasVisible ? '\u2304' : '\u2303';
+  });
+  body.style.display = 'none';
+  arrow.textContent = '\u2304';
 }
 
 // 自定义下拉框
@@ -923,10 +916,10 @@ let enhState: EnhancerConfig = {
   hideScrollbar: false,
   autoHideInput: false,
   voiceInput: false,
-  tokenSpeed: false,
   chatFont: '',
   chatMonoFont: '',
   chatFontSize: 0,
+  mdTypo: false,
 };
 
 async function loadEnhancerPanel() {
@@ -935,7 +928,7 @@ async function loadEnhancerPanel() {
   updateEnhButton('ds-enh-scrollbar', enhState.hideScrollbar);
   updateEnhButton('ds-enh-autohide', enhState.autoHideInput);
   updateEnhButton('ds-enh-voice', enhState.voiceInput);
-  updateEnhButton('ds-enh-tokenspeed', enhState.tokenSpeed);
+  updateEnhButton('ds-enh-mdtypo', enhState.mdTypo);
   updateThemeName();
   // 恢复字体下拉
   if (enhState.chatFont) updateCustomSelect('ds-font-chat', enhState.chatFont);

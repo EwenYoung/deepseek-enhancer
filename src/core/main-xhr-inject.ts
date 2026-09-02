@@ -50,8 +50,6 @@
       if (prev !== next) {
         currentMode = next;
         console.log('[DS-Mini:MAIN] Mode:', prev, '→', next);
-        // 通知 content script
-        window.postMessage({ type: 'DS_MINI_MODE_CHANGED', mode: next }, '*');
       }
     }, 200);
   });
@@ -173,6 +171,8 @@
   let activeSkill = null;
   let skillInstructions = '';
   let agentModeEnabled = false;
+  let stopRequested = false; // 用户点击 Stop 后置位，吞掉后续工具事件
+  let lastIsNewUserFlow = true; // 最近一次请求是否新用户消息（非工具结果回注）
   var originalUserPrompt = '';
   const lastCtx = {
     chat_session_id: '',
@@ -221,9 +221,13 @@
             } catch (e) {}
           }
 
-          // 新用户消息（非工具结果回注）→ 重置 parentMessageId
+          // 新用户消息（非工具结果回注）→ 重置 parentMessageId + 复位停止标记
           if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
             lastCtx.parentMessageId = null;
+            stopRequested = false;
+            lastIsNewUserFlow = true;
+          } else {
+            lastIsNewUserFlow = false;
           }
 
           // 检查是否有待归类的新会话
@@ -500,6 +504,8 @@
       calls = extractFromText(rawBuf);
     }
     if (calls.length === 0) return;
+    // 用户已点击 Stop → 吞掉后续工具事件，不再触发新循环
+    if (stopRequested) return;
 
     console.log(
       '[DS-Mini:MAIN] Tool calls detected:',
@@ -518,7 +524,7 @@
         source: 'DS_MINI_MAIN',
         type: 'DS_MINI_TOOL_CALLS',
         toolCalls: calls,
-        silentDepth: 0, // legacy field kept for compatibility
+        isNewUserFlow: lastIsNewUserFlow,
         reqHeaders: lastCtx.reqHeaders,
       },
       '*',
@@ -578,8 +584,9 @@
         agentModeEnabled = event.data.enabled;
         console.log('[DS-Mini:MAIN] Agent mode:', agentModeEnabled ? 'ON' : 'OFF');
         break;
-      // DS_MINI_SILENT_RESULT — removed. Continuation now via DOM submit path.
-      case 'DS_MINI_SILENT_RESULT':
+      case 'DS_MINI_AGENT_STOP':
+        stopRequested = true;
+        console.log('[DS-Mini:MAIN] Stop requested, agent loop halted');
         break;
     }
   });

@@ -10,18 +10,15 @@ import {
 } from './sse-parser';
 import { executeToolCall } from './tool-executor';
 import { renderInlineMarkdown } from './markdown';
+import { createLoopState } from './loop-state';
 // ============================================================
 // 状态
 // ============================================================
 let toolExecutionInProgress = false;
-let loopDepth = 0;
-const MAX_LOOP = 10;
+const loopState = createLoopState(); // Agent 循环状态（深度/停止标记/阶段）
 let toolBlocksInited = false;
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
 let agentLoopRunning = false; // 并发防护
-
-// 由 content.ts 调用（agent 模式状态由 storage + MAIN 层管理，此处仅保留调用入口）
-export function setSilentMode(_enabled: boolean) {}
 
 // ============================================================
 // Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
@@ -201,7 +198,7 @@ class AgentPanel {
 // ============================================================
 export async function handleMainWorldToolCalls(
   toolCalls: ToolCall[],
-  silentDepth?: number,
+  isNewUserFlow?: boolean,
   reqHeaders?: Record<string, string> | null,
 ) {
   // 必须在 toolExecutionInProgress 检查之前存储（消息路径因锁被跳过）
@@ -216,11 +213,13 @@ export async function handleMainWorldToolCalls(
   }
   if (!toolCalls || toolCalls.length === 0) return;
 
-  // 新用户消息触发的首次工具调用 → 重置 loop 计数器 + cleanup agent panel
-  if (silentDepth === 0 || silentDepth === undefined) {
-    if (loopDepth > 0)
-      console.log('[DS-Mini:UI] New flow detected, reset loopDepth (was ' + loopDepth + ')');
-    loopDepth = 0;
+  // 新用户消息触发的首次工具调用 → 重置 loop 状态 + cleanup agent panel
+  if (isNewUserFlow) {
+    if (loopState.getState().depth > 0)
+      console.log(
+        '[DS-Mini:UI] New flow detected, reset loop state (was ' + loopState.getState().depth + ')',
+      );
+    loopState.onNewUserFlow();
     cleanupAgentPanel();
   }
 
@@ -237,20 +236,19 @@ export async function handleMainWorldToolCalls(
   const container = findChatContainer();
   if (!container) return;
 
-  loopDepth++;
-  if (loopDepth > MAX_LOOP) {
+  if (!loopState.onToolCallsDetected(1)) {
     console.warn('[DS-Mini:UI] Loop limit');
-    loopDepth = 0;
     return;
   }
 
   toolExecutionInProgress = true;
   markLastAssistantProcessed(container);
 
-  console.log('[DS-Mini:UI] Loop #' + loopDepth + ' — ' + toolCalls.length + ' call(s)');
+  const currentDepth = loopState.getState().depth;
+  console.log('[DS-Mini:UI] Loop #' + currentDepth + ' — ' + toolCalls.length + ' call(s)');
 
   // Agent Panel: 首次循环 → 创建容器 + 生成 loopId
-  if (loopDepth === 1) {
+  if (currentDepth === 1) {
     agentLoopRunning = true;
     const loopId = crypto.randomUUID();
     agentPanel = new AgentPanel(loopId);
@@ -263,8 +261,9 @@ export async function handleMainWorldToolCalls(
 
   // Agent Panel: 创建当前 step
   if (agentPanel) {
-    agentPanel.createStep(loopDepth, () => {
-      // Stop handler — 通知 MAIN world 停止循环
+    agentPanel.createStep(currentDepth, () => {
+      // Stop handler — 先标记本地停止状态，再通知 MAIN world 停止循环
+      loopState.onStopRequested();
       window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_AGENT_STOP' }, '*');
     });
   }
@@ -280,7 +279,7 @@ export async function handleMainWorldToolCalls(
 
   // Agent Panel: 添加工具结果到当前 step
   if (agentPanel) {
-    const currentStep = agentPanel.steps.get(loopDepth);
+    const currentStep = agentPanel.steps.get(currentDepth);
     if (currentStep) {
       for (const r of results) {
         const toolLabel = getLabel(r.toolName);
@@ -398,6 +397,7 @@ export function initToolBlocks(_state: AppState) {
     }
 
     if (d.type === 'DS_MINI_AGENT_STOP') {
+      loopState.onStopRequested();
       agentLoopRunning = false;
       cleanupAgentPanel();
       console.log('[DS-Mini:UI] Agent loop stopped by user');
@@ -480,8 +480,9 @@ function processNewContent(node: HTMLElement) {
 
   hideRawToolCalls(node, calls);
 
-  // 直接执行（不通过 onSSEToolCallDetected）
-  handleMainWorldToolCalls(calls);
+  // 直接执行工具调用
+  // DOM 兜底一律视为工具回注（isNewUserFlow=false），不复位 loop 状态
+  handleMainWorldToolCalls(calls, false);
 }
 
 // ============================================================
@@ -786,6 +787,3 @@ function reorderToolBlocks() {
     }
   });
 }
-
-// 遗留导出保持兼容（不被调用，保留以防 import 错误）
-export async function onSSEToolCallDetected(_text?: string, _xhr?: unknown) {}

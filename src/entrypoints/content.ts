@@ -4,10 +4,9 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { initAutocomplete } from '../core/ui-autocomplete';
 import { initPanel } from '../core/ui-panel';
-import { initToolBlocks, handleMainWorldToolCalls, setSilentMode } from '../core/ui-tool-blocks';
+import { initToolBlocks, handleMainWorldToolCalls } from '../core/ui-tool-blocks';
 import { initArtifacts } from '../core/artifact';
 import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
-import { setDisabledTools } from '../core/context-builder';
 import { initCategories } from '../core/ui-categories';
 import type { AppState } from '../core/types';
 
@@ -38,22 +37,6 @@ export default defineContentScript({
       }
     });
 
-    // 尽早启动 storage 读取，避免 silentModeEnabled 竞态
-    // .catch 消费 rejection，防止扩展热刷新后 "Extension context invalidated" 污染控制台
-    chrome.storage.local
-      .get('ds_mini_agent_mode')
-      .then((r) => {
-        if (r.ds_mini_agent_mode) setSilentMode(true);
-      })
-      .catch(() => {});
-    chrome.storage.local
-      .get('ds_mini_tools_state')
-      .then((r) => {
-        const st = (r as { ds_mini_tools_state?: unknown }).ds_mini_tools_state;
-        if (st) setDisabledTools(st as Record<string, boolean>);
-      })
-      .catch(() => {});
-
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
       if (!event.data) return;
@@ -62,23 +45,11 @@ export default defineContentScript({
         if (event.data.type === 'DS_MINI_TOOL_CALLS') {
           handleMainWorldToolCalls(
             event.data.toolCalls,
-            event.data.silentDepth,
+            event.data.isNewUserFlow,
             event.data.reqHeaders,
           );
         }
-        if (event.data.type === 'DS_MINI_FINAL_RESPONSE') {
-          renderFinalResponse(event.data.text);
-        }
-        if (event.data.type === 'DS_MINI_DOM_FALLBACK') {
-          domSubmitFallback(event.data.text);
-        }
         return;
-      }
-      if (src === 'DS_MINI_ISOLATED' && event.data.type === 'SET_AGENT_MODE') {
-        setSilentMode(event.data.enabled);
-      }
-      if (event.data.source === 'DS_MINI_ISOLATED' && event.data.type === 'SET_TOOLS_STATE') {
-        setDisabledTools(event.data.tools || {});
       }
     });
 
@@ -181,87 +152,3 @@ voiceStyle.textContent = `
   }
 `;
 document.head.appendChild(voiceStyle);
-
-// ============================================================
-// 通用 DOM 提交 — 填 textarea + 点发送按钮
-// ============================================================
-async function submitViaDOM(text: string) {
-  await new Promise((r) => setTimeout(r, 300));
-  const scope = document.getElementById('root') || document.body;
-  const ta = scope.querySelector('textarea');
-  if (!ta) return;
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-  if (setter) setter.call(ta, text);
-  else ta.value = text;
-  ta.dispatchEvent(new Event('input', { bubbles: true }));
-
-  await new Promise((r) => setTimeout(r, 200));
-
-  // 找发送按钮：优先中尺寸（20-80px），fallback 任意可见按钮
-  const root = ta.closest('form, div, section') || document.body;
-  const btns = root.querySelectorAll('button');
-  let found = false;
-  for (const btn of btns) {
-    if (btn.disabled) continue;
-    const r = btn.getBoundingClientRect();
-    if (r.width >= 20 && r.width <= 80 && r.height >= 20 && r.height <= 80) {
-      btn.click();
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    for (const btn of btns) {
-      if (btn.disabled) continue;
-      const r = btn.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) {
-        btn.click();
-        found = true;
-        break;
-      }
-    }
-  }
-  if (!found) {
-    ta.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'Enter',
-        code: 'Enter',
-        keyCode: 13,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
-  }
-}
-
-// ============================================================
-// 静默循环最终渲染 — 把模型响应插入聊天区显示
-// ============================================================
-function renderFinalResponse(text: string) {
-  if (!text.trim()) return;
-  const container = document.getElementById('root') || document.body;
-  // 插在最后一个 tool block 或最后一条消息之后
-  const toolBlocks = container.querySelectorAll('.ds-mini-tool-block');
-  const lastBlock = toolBlocks[toolBlocks.length - 1];
-  const msg = document.createElement('div');
-  msg.className = 'ds-message ds-mini-final-response';
-  msg.dataset.dsToolProcessed = 'true';
-  msg.style.cssText =
-    'padding:12px 16px;margin:8px 0;border-radius:8px;background:var(--ds-bg-subtle);border:1px solid var(--ds-border);color:var(--ds-text);font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word';
-  msg.textContent = text;
-  if (lastBlock && lastBlock.parentNode === container) {
-    lastBlock.after(msg);
-  } else {
-    const msgs = container.querySelectorAll('.ds-message');
-    const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg) lastMsg.after(msg);
-    else container.appendChild(msg);
-  }
-  console.log('[DS-Mini:UI] Final response rendered');
-}
-
-// ponytail: reuse submitViaDOM instead of duplicate Enter-only logic
-async function domSubmitFallback(text: string) {
-  await submitViaDOM(text);
-  console.log('[DS-Mini:UI] DOM fallback used');
-}

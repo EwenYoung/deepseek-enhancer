@@ -10,6 +10,10 @@ export default defineConfig({
       'https://chat.deepseek.com/*',
       'https://api.deepseek.com/*',
       'https://api.tavily.com/*',
+      'https://github.com/*',
+      'https://www.reddit.com/*',
+      'https://export.arxiv.org/*',
+      'https://hacker-news.firebaseio.com/*',
     ],
     icons: {
       '16': 'icons/icon16.png',

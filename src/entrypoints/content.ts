@@ -8,6 +8,7 @@ import { initToolBlocks, handleMainWorldToolCalls } from '../core/ui-tool-blocks
 import { initArtifacts } from '../core/artifact';
 import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
 import { initCategories } from '../core/ui-categories';
+import { isMainToIsolated } from '../core/protocol';
 import type { AppState } from '../core/types';
 
 export const state: AppState = {
@@ -39,17 +40,13 @@ export default defineContentScript({
 
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
-      if (!event.data) return;
-      const src = event.data.source;
-      if (src === 'DS_MINI_MAIN') {
-        if (event.data.type === 'DS_MINI_TOOL_CALLS') {
-          handleMainWorldToolCalls(
-            event.data.toolCalls,
-            event.data.isNewUserFlow,
-            event.data.reqHeaders,
-          );
-        }
-        return;
+      if (!isMainToIsolated(event.data)) return;
+      if (event.data.type === 'DS_MINI_TOOL_CALLS') {
+        // handleMainWorldToolCalls 内部有 try/finally 释放 toolExecutionInProgress；
+        // 此处 catch 仅吞掉 DOM 操作异常，避免 unhandled rejection 污染 console
+        handleMainWorldToolCalls(event.data.toolCalls, event.data.isNewUserFlow).catch((err) => {
+          console.error('[DS-Mini:UI] handleMainWorldToolCalls failed:', err);
+        });
       }
     });
 
@@ -80,7 +77,7 @@ export default defineContentScript({
       '[data-ds-hidden] { display: none !important; visibility: hidden !important; height: 0 !important; min-height: 0 !important; max-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; border: none !important; position: absolute !important; opacity: 0 !important; }';
     document.head.appendChild(hideStyle);
 
-    // 隐藏 [工具执行结果] 中间消息 — 找含 hash class 的消息级容器
+    // 隐藏工具结果回注中间消息 — 找含 hash class 的消息级容器（前缀与 formatResults 输出对齐）
     function isMsgComponent(el: Element) {
       const cls = el.className;
       if (!cls || typeof cls !== 'string') return false;
@@ -100,7 +97,7 @@ export default defineContentScript({
           if (
             isMsgComponent(node) &&
             node.textContent &&
-            node.textContent.indexOf('[工具执行结果]') === 0
+            node.textContent.indexOf('以下是工具执行结果') === 0
           ) {
             node.setAttribute('data-ds-hidden', '');
             console.log(
@@ -117,18 +114,21 @@ export default defineContentScript({
     const resultHider = new MutationObserver((mutations) => {
       for (const mut of mutations) {
         if (mut.type === 'characterData') {
-          if (mut.target.textContent && mut.target.textContent.indexOf('[工具执行结果]') === 0) {
+          if (
+            mut.target.textContent &&
+            mut.target.textContent.indexOf('以下是工具执行结果') === 0
+          ) {
             hideToolResultMsg(mut.target as Element);
           }
         }
         for (const node of mut.addedNodes) {
           if (!(node instanceof HTMLElement)) continue;
-          if (node.textContent && node.textContent.indexOf('[工具执行结果]') === 0) {
+          if (node.textContent && node.textContent.indexOf('以下是工具执行结果') === 0) {
             hideToolResultMsg(node);
-          } else if (node.textContent && node.textContent.indexOf('[工具执行结果]') !== -1) {
+          } else if (node.textContent && node.textContent.indexOf('以下是工具执行结果') !== -1) {
             // 文本可能在子元素中，延迟检查
             requestAnimationFrame(function () {
-              if (node.textContent && node.textContent.indexOf('[工具执行结果]') === 0) {
+              if (node.textContent && node.textContent.indexOf('以下是工具执行结果') === 0) {
                 hideToolResultMsg(node);
               }
             });

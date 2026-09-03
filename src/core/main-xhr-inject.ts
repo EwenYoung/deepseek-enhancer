@@ -2,6 +2,9 @@
 // deepseek-enhancer — 主世界 XHR 拦截脚本
 // ============================================================
 // 此文件为 raw 注入脚本（原文注入页面执行），不参与类型系统
+// 消息名与 src/core/protocol.ts 的 union 对齐，改动须同步：
+//   MAIn→Isolated: DS_MINI_TOOL_CALLS / DS_MINI_NEW_SESSION
+//   Isolated→MAIN: SET_SKILL / CLEAR_SKILL / SET_AGENT_MODE / DS_MINI_AGENT_STOP
 /* eslint-disable no-var, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 (function () {
@@ -77,22 +80,7 @@
       },
     },
   ];
-  let disabledTools = {}; // 用户禁用的工具列表
-
-  // 监听来自 isolated world 的工具状态
-  window.addEventListener('message', function (e) {
-    if (e.source !== window) return;
-    if (e.data && e.data.source === 'DS_MINI_ISOLATED' && e.data.type === 'SET_TOOLS_STATE') {
-      disabledTools = {};
-      for (const k in e.data.tools) {
-        if (!e.data.tools[k]) disabledTools[k] = true;
-      }
-      TOOL_DEFS_CACHE = {}; // 清空缓存
-      // 清空旧注入记录，避免导出时混入旧工具定义
-      const el = document.getElementById('ds-mini-injected');
-      if (el) el.textContent = '';
-    }
-  });
+  const disabledTools = {}; // 用户禁用的工具列表
 
   function buildToolDefs(mode) {
     try {
@@ -173,12 +161,10 @@
   let agentModeEnabled = false;
   let stopRequested = false; // 用户点击 Stop 后置位，吞掉后续工具事件
   let lastIsNewUserFlow = true; // 最近一次请求是否新用户消息（非工具结果回注）
-  var originalUserPrompt = '';
   const lastCtx = {
     chat_session_id: '',
     model_type: '',
     lastBody: null,
-    reqHeaders: null,
     parentMessageId: null,
   }; // 用于静默循环
 
@@ -186,14 +172,6 @@
     this.__ds_url = String(url);
     this.__ds_method = method;
     return origOpen.call(this, method, url, ...args);
-  };
-
-  const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.setRequestHeader = function (header, value, ...rest) {
-    // 保存所有 headers 到 XHR 实例，供静默循环回放
-    if (!this.__ds_headers) this.__ds_headers = {};
-    this.__ds_headers[header] = value;
-    return origSetHeader.call(this, header, value, ...rest);
   };
 
   XMLHttpRequest.prototype.send = function (body) {
@@ -208,21 +186,10 @@
           lastCtx.chat_session_id = parsedCtx.chat_session_id;
           lastCtx.model_type = parsedCtx.model_type || 'default';
           lastCtx.lastBody = parsedCtx; // 保存完整请求体供静默循环复用
-          // 保存所有请求 headers 供静默循环回放（解决 MISSING_HEADER 403）
-          if (this.__ds_headers) {
-            lastCtx.reqHeaders = {};
-            var hkeys = Object.keys(this.__ds_headers);
-            for (var hi = 0; hi < hkeys.length; hi++) {
-              lastCtx.reqHeaders[hkeys[hi]] = this.__ds_headers[hkeys[hi]];
-            }
-            // 跨 world 共享：localStorage 是 DOM API，隔离 world 可读
-            try {
-              localStorage.setItem('__ds_req_headers', JSON.stringify(lastCtx.reqHeaders));
-            } catch (e) {}
-          }
 
           // 新用户消息（非工具结果回注）→ 重置 parentMessageId + 复位停止标记
-          if (parsedCtx.prompt && parsedCtx.prompt.indexOf('[工具执行结果]') !== 0) {
+          // 回注 prompt 以「以下是工具执行结果」开头（formatResults 输出），旧前缀 [工具执行结果] 已废弃
+          if (parsedCtx.prompt && parsedCtx.prompt.indexOf('以下是工具执行结果') !== 0) {
             lastCtx.parentMessageId = null;
             stopRequested = false;
             lastIsNewUserFlow = true;
@@ -270,15 +237,6 @@
     if (!parsed.prompt || typeof parsed.prompt !== 'string') return body;
 
     const userContent = parsed.prompt;
-
-    // 保存原始用户提示（非工具回注）
-    if (
-      userContent.indexOf('[工具执行结果]') !== 0 &&
-      userContent.indexOf('以下是工具执行结果') !== 0
-    ) {
-      originalUserPrompt = userContent;
-      window.__DS_ORIGINAL_PROMPT__ = userContent;
-    }
 
     // Agent 模式关闭 → 不注入任何内容
     if (!agentModeEnabled) {
@@ -525,7 +483,6 @@
         type: 'DS_MINI_TOOL_CALLS',
         toolCalls: calls,
         isNewUserFlow: lastIsNewUserFlow,
-        reqHeaders: lastCtx.reqHeaders,
       },
       '*',
     );
@@ -591,6 +548,5 @@
     }
   });
 
-  window.__DS_MINI_MODE = currentMode;
   console.log('[DS-Mini:MAIN] Ready, mode:', currentMode);
 })();

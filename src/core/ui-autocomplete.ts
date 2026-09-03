@@ -1,5 +1,6 @@
 import type { AppState, Skill } from './types';
 import { matchSkills, getSkillByName } from './skill-registry';
+import { postToMain } from './protocol';
 
 let dropdownEl: HTMLElement | null = null;
 let selectedIndex = 0;
@@ -12,7 +13,7 @@ async function applySkillFromText(text: string) {
   if (!text || !text.startsWith('/')) {
     if (currentSkillId) {
       currentSkillId = '';
-      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'CLEAR_SKILL' }, '*');
+      postToMain({ type: 'CLEAR_SKILL' });
     }
     return;
   }
@@ -20,7 +21,7 @@ async function applySkillFromText(text: string) {
   if (!afterSlash) {
     if (currentSkillId) {
       currentSkillId = '';
-      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'CLEAR_SKILL' }, '*');
+      postToMain({ type: 'CLEAR_SKILL' });
     }
     return;
   }
@@ -28,22 +29,18 @@ async function applySkillFromText(text: string) {
   if (!skill || !skill.enabled) {
     if (currentSkillId) {
       currentSkillId = '';
-      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'CLEAR_SKILL' }, '*');
+      postToMain({ type: 'CLEAR_SKILL' });
     }
     return;
   }
   if (currentSkillId === skill.id) return;
   currentSkillId = skill.id;
-  window.postMessage(
-    {
-      source: 'DS_MINI_ISOLATED',
-      type: 'SET_SKILL',
-      skillName: skill.name,
-      skill,
-      instructions: skill.instructions,
-    },
-    '*',
-  );
+  postToMain({
+    type: 'SET_SKILL',
+    skillName: skill.name,
+    skill,
+    instructions: skill.instructions,
+  });
 }
 
 export function initAutocomplete(_state: AppState) {

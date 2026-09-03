@@ -29,6 +29,7 @@ import {
   preloadFonts,
   toggleMarkdownTypo,
 } from './enhancer-features';
+import { postToMain, sendToBackground } from './protocol';
 
 // ============================================================
 // DOM
@@ -787,14 +788,13 @@ async function loadAPIKey() {
     updateAPIKeyStatus(!!r.ds_mini_tavily_key);
   } catch {
     try {
-      chrome.runtime.sendMessage({ type: 'GET_API_KEY' }, (resp) => {
-        if (resp?.key) {
-          input.value = resp.key;
-          updateAPIKeyStatus(true);
-        } else {
-          updateAPIKeyStatus(false);
-        }
-      });
+      const resp = await sendToBackground({ type: 'GET_API_KEY' });
+      if (resp?.key) {
+        input.value = resp.key;
+        updateAPIKeyStatus(true);
+      } else {
+        updateAPIKeyStatus(false);
+      }
     } catch {
       /* ignore */
     }
@@ -816,7 +816,8 @@ function saveAPIKey() {
   chrome.storage.local
     .set({ ds_mini_tavily_key: key })
     .then(() => {
-      chrome.runtime.sendMessage({ type: 'SET_API_KEY', key });
+      // 通知后台冗余更新；fire-and-forget，失败不影响本地保存
+      sendToBackground({ type: 'SET_API_KEY', key }).catch(() => {});
       updateAPIKeyStatus(!!key);
       showToast(key ? 'API Key 已保存' : 'API Key 已清除');
     })
@@ -833,15 +834,14 @@ async function testTavilyConnection() {
   testBtn.textContent = '测试中...';
 
   try {
-    chrome.runtime.sendMessage({ type: 'TEST_TAVILY' }, (resp) => {
-      testBtn.disabled = false;
-      testBtn.textContent = '测试';
-      if (resp?.ok) {
-        showToast('Tavily 连接正常');
-      } else {
-        showToast(`Tavily 测试失败: ${resp?.message || '未知错误'}`);
-      }
-    });
+    const resp = await sendToBackground({ type: 'TEST_TAVILY' });
+    testBtn.disabled = false;
+    testBtn.textContent = '测试';
+    if (resp?.ok) {
+      showToast('Tavily 连接正常');
+    } else {
+      showToast(`Tavily 测试失败: ${resp?.message || '未知错误'}`);
+    }
   } catch (err) {
     testBtn.disabled = false;
     testBtn.textContent = '测试';
@@ -891,14 +891,7 @@ function toggleAgentMode() {
 }
 
 function postAgentMode(enabled: boolean) {
-  window.postMessage(
-    {
-      source: 'DS_MINI_ISOLATED',
-      type: 'SET_AGENT_MODE',
-      enabled,
-    },
-    '*',
-  );
+  postToMain({ type: 'SET_AGENT_MODE', enabled });
   console.log('[DS-Mini:UI] Agent mode:', enabled ? 'ON' : 'OFF');
 }
 

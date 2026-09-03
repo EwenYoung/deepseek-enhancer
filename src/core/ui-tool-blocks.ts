@@ -2,15 +2,10 @@
 // deepseek-enhancer — 工具调用折叠块 UI
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
-import {
-  extractToolCalls,
-  extractTaskComplete,
-  stripTaskComplete,
-  stripToolCalls,
-} from './sse-parser';
+import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-parser';
 import { executeToolCall } from './tool-executor';
-import { renderInlineMarkdown } from './markdown';
 import { createLoopState } from './loop-state';
+import { postToMain } from './protocol';
 // ============================================================
 // 状态
 // ============================================================
@@ -18,7 +13,6 @@ let toolExecutionInProgress = false;
 const loopState = createLoopState(); // Agent 循环状态（深度/停止标记/阶段）
 let toolBlocksInited = false;
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
-let agentLoopRunning = false; // 并发防护
 
 // ============================================================
 // Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
@@ -196,24 +190,11 @@ class AgentPanel {
 // ============================================================
 // 来自主世界（Main World）的工具调用入口
 // ============================================================
-export async function handleMainWorldToolCalls(
-  toolCalls: ToolCall[],
-  isNewUserFlow?: boolean,
-  reqHeaders?: Record<string, string> | null,
-) {
-  // 必须在 toolExecutionInProgress 检查之前存储（消息路径因锁被跳过）
-  void reqHeaders;
-  if (toolExecutionInProgress) {
-    console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
-    return;
-  }
-  if (agentLoopRunning) {
-    console.log('[DS-Mini:UI] Skipped — agent loop already running');
-    return;
-  }
+export async function handleMainWorldToolCalls(toolCalls: ToolCall[], isNewUserFlow?: boolean) {
   if (!toolCalls || toolCalls.length === 0) return;
 
-  // 新用户消息触发的首次工具调用 → 重置 loop 状态 + cleanup agent panel
+  // 新用户消息触发的首次工具调用 → 先重置 loop 状态 + cleanup agent panel
+  // 注意：必须放在锁检查之前——否则上一轮循环残留的状态会永久卡死后续工具调用
   if (isNewUserFlow) {
     if (loopState.getState().depth > 0)
       console.log(
@@ -221,6 +202,11 @@ export async function handleMainWorldToolCalls(
       );
     loopState.onNewUserFlow();
     cleanupAgentPanel();
+  }
+
+  if (toolExecutionInProgress) {
+    console.log('[DS-Mini:UI] Skipped — tool execution already in progress');
+    return;
   }
 
   // doc_generate 直接在 isolated world 中处理（不需要 background worker）
@@ -242,72 +228,74 @@ export async function handleMainWorldToolCalls(
   }
 
   toolExecutionInProgress = true;
-  markLastAssistantProcessed(container);
+  try {
+    markLastAssistantProcessed(container);
 
-  const currentDepth = loopState.getState().depth;
-  console.log('[DS-Mini:UI] Loop #' + currentDepth + ' — ' + toolCalls.length + ' call(s)');
+    const currentDepth = loopState.getState().depth;
+    console.log('[DS-Mini:UI] Loop #' + currentDepth + ' — ' + toolCalls.length + ' call(s)');
 
-  // Agent Panel: 首次循环 → 创建容器 + 生成 loopId
-  if (currentDepth === 1) {
-    agentLoopRunning = true;
-    const loopId = crypto.randomUUID();
-    agentPanel = new AgentPanel(loopId);
-    const msgs = container.querySelectorAll('.ds-message');
-    const lastMsg = msgs[msgs.length - 1];
-    if (lastMsg) agentPanel.mount(lastMsg);
-    // loopId 存储在 agentPanel 实例中，通过 postMessage 传递给 MAIN world
-    console.log('[DS-Mini:UI] Agent panel created, loopId=' + loopId);
-  }
+    // Agent Panel: 首次循环 → 创建容器 + 生成 loopId
+    if (currentDepth === 1) {
+      const loopId = crypto.randomUUID();
+      agentPanel = new AgentPanel(loopId);
+      const msgs = container.querySelectorAll('.ds-message');
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg) agentPanel.mount(lastMsg);
+      // loopId 存储在 agentPanel 实例中，通过 postMessage 传递给 MAIN world
+      console.log('[DS-Mini:UI] Agent panel created, loopId=' + loopId);
+    }
 
-  // Agent Panel: 创建当前 step
-  if (agentPanel) {
-    agentPanel.createStep(currentDepth, () => {
-      // Stop handler — 先标记本地停止状态，再通知 MAIN world 停止循环
-      loopState.onStopRequested();
-      window.postMessage({ source: 'DS_MINI_ISOLATED', type: 'DS_MINI_AGENT_STOP' }, '*');
-    });
-  }
+    // Agent Panel: 创建当前 step
+    if (agentPanel) {
+      agentPanel.createStep(currentDepth, () => {
+        // Stop handler — 先标记本地停止状态，再通知 MAIN world 停止循环
+        loopState.onStopRequested();
+        postToMain({ type: 'DS_MINI_AGENT_STOP' });
+      });
+    }
 
-  const results: ToolResult[] = [];
-  for (const call of toolCalls) {
-    const block = createLoadingBlock(call, container);
-    insertBlockIntoChat(block, container);
-    const result = await executeToolCall(call);
-    results.push(result);
-    block.replaceWith(createResultBlock(call, result));
-  }
+    const results: ToolResult[] = [];
+    for (const call of toolCalls) {
+      const block = createLoadingBlock(call, container);
+      insertBlockIntoChat(block, container);
+      const result = await executeToolCall(call);
+      results.push(result);
+      block.replaceWith(createResultBlock(call, result));
+    }
 
-  // Agent Panel: 添加工具结果到当前 step
-  if (agentPanel) {
-    const currentStep = agentPanel.steps.get(currentDepth);
-    if (currentStep) {
-      for (const r of results) {
-        const toolLabel = getLabel(r.toolName);
-        agentPanel.addToolResultToStep(
+    // Agent Panel: 添加工具结果到当前 step
+    if (agentPanel) {
+      const currentStep = agentPanel.steps.get(currentDepth);
+      if (currentStep) {
+        for (const r of results) {
+          const toolLabel = getLabel(r.toolName);
+          agentPanel.addToolResultToStep(
+            currentStep,
+            toolLabel,
+            r.success,
+            r.summary || r.result || '',
+          );
+        }
+        agentPanel.updateStepStatus(
           currentStep,
-          toolLabel,
-          r.success,
-          r.summary || r.result || '',
+          'Completed (' + results.length + ' tool' + (results.length > 1 ? 's' : '') + ')',
+          'complete',
         );
       }
-      agentPanel.updateStepStatus(
-        currentStep,
-        'Completed (' + results.length + ' tool' + (results.length > 1 ? 's' : '') + ')',
-        'complete',
-      );
     }
-  }
 
-  const ok = results.filter((r) => r.success);
-  console.log('[DS-Mini:UI] Tool results:', results.length + ' total, ' + ok.length + ' OK');
-  if (ok.length > 0) {
-    // 续接 prompt 通过 DOM submit 发送 → 页面自然渲染 → 消息链完整可见
-    await domSubmitText(formatResults(ok));
-    scanAndHideToolResults();
+    const ok = results.filter((r) => r.success);
+    console.log('[DS-Mini:UI] Tool results:', results.length + ' total, ' + ok.length + ' OK');
+    if (ok.length > 0) {
+      // 续接 prompt 通过 DOM submit 发送 → 页面自然渲染 → 消息链完整可见
+      await domSubmitText(formatResults(ok));
+      scanAndHideToolResults();
+    }
+  } finally {
+    // 无论成功或异常都必须释放锁，否则后续工具调用被永久跳过
+    await delay(800);
+    toolExecutionInProgress = false;
   }
-
-  await delay(800);
-  toolExecutionInProgress = false;
 }
 
 function cleanupAgentPanel() {
@@ -315,7 +303,6 @@ function cleanupAgentPanel() {
     agentPanel.unmount();
     agentPanel = null;
   }
-  agentLoopRunning = false;
   console.log('[DS-Mini:UI] Agent panel cleaned up');
 }
 
@@ -351,58 +338,6 @@ export function initToolBlocks(_state: AppState) {
 
   const container = findChatContainer();
   if (!container) return;
-
-  // Agent panel 消息监听
-  window.addEventListener('message', (event) => {
-    if (event.source !== window) return;
-    const d = event.data;
-    if (!d || d.source !== 'DS_MINI_MAIN') return;
-
-    if (d.type === 'DS_MINI_AGENT_STEP_STARTED' && agentPanel) {
-      const step = agentPanel.steps.get(d.stepIndex);
-      if (step) agentPanel.updateStepStatus(step, 'streaming...', 'streaming');
-    }
-
-    if (d.type === 'DS_MINI_AGENT_STREAM_CHUNK' && agentPanel) {
-      const step = agentPanel.steps.get(d.stepIndex);
-      if (step) {
-        const body = step.querySelector<HTMLElement>('.ds-agent-step-body');
-        if (body) {
-          // 过滤工具 XML + Markdown 渲染
-          body.innerHTML = renderInlineMarkdown(stripToolCalls(d.fullText || ''));
-        }
-        agentPanel.scrollStepBodyToBottom(step);
-      }
-    }
-
-    if (d.type === 'DS_MINI_AGENT_LOOP_COMPLETE' && agentPanel) {
-      agentLoopRunning = false;
-      const step = agentPanel.steps.get(d.stepIndex);
-      if (step) agentPanel.updateStepStatus(step, 'Complete', 'complete');
-      // Footer with stats
-      const totalSteps = agentPanel.steps.size;
-      let totalTools = 0;
-      agentPanel.steps.forEach((s) => {
-        const items = s.querySelectorAll('.ds-agent-step-tool-item');
-        totalTools += items.length;
-      });
-      agentPanel.addFooter(totalSteps, totalTools, false);
-      // Auto-collapse last step after 800ms
-      if (step) {
-        setTimeout(() => {
-          step.setAttribute('data-collapsed', '');
-          agentPanel!.updateCollapsedState(step);
-        }, 800);
-      }
-    }
-
-    if (d.type === 'DS_MINI_AGENT_STOP') {
-      loopState.onStopRequested();
-      agentLoopRunning = false;
-      cleanupAgentPanel();
-      console.log('[DS-Mini:UI] Agent loop stopped by user');
-    }
-  });
 
   new MutationObserver((mutations) => {
     for (const mut of mutations) {
@@ -555,23 +490,12 @@ function formatResults(results: ToolResult[]): string {
     };
   });
 
-  let originalTask = '';
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    originalTask = (window as any).__DS_ORIGINAL_PROMPT__ || '';
-  } catch {
-    /* cross-world access may fail, that's ok */
-  }
-
-  let task = originalTask || '';
-  if (task.length > 8000) task = task.slice(0, 8000);
-
   return [
     '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
     '如果结果已经足够，请输出最终结论；只有确实需要更多信息时才继续调用工具。',
     '',
     '<original_task>',
-    task,
+    '',
     '</original_task>',
     '',
     '<tool_results>',
@@ -712,7 +636,7 @@ function findChatContainer(): HTMLElement | null {
   return document.getElementById('root') || document.body;
 }
 
-// 多帧扫描隐藏 [工具执行结果] 消息（应对虚拟列表渲染副本）
+// 多帧扫描隐藏工具结果回注消息（应对虚拟列表渲染副本；前缀与 formatResults 输出对齐）
 function scanAndHideToolResults() {
   let frames = 0;
   const maxFrames = 30;
@@ -733,7 +657,7 @@ function scanAndHideToolResults() {
     let textNode;
     let found = false;
     while ((textNode = walker.nextNode())) {
-      if (textNode.textContent && textNode.textContent.indexOf('[工具执行结果]') === 0) {
+      if (textNode.textContent && textNode.textContent.indexOf('以下是工具执行结果') === 0) {
         // 从文本节点向上找 hash class 消息容器（限步 8 层）
         let p = textNode.parentElement;
         let steps = 0;

@@ -5,6 +5,7 @@
 // 使用 Tavily API 进行搜索和网页抓取
 
 import { defineBackground } from 'wxt/utils/define-background';
+import { isIsolatedToBackground } from '../core/protocol';
 
 const TAVILY_BASE = 'https://api.tavily.com';
 const STORAGE_KEY = 'ds_mini_tavily_key';
@@ -15,25 +16,26 @@ export default defineBackground(() => {
     if (!sender.url?.startsWith('https://chat.deepseek.com/')) {
       return false;
     }
-    if (message.type === 'EXECUTE_TOOL') {
-      handleToolExecution(message.payload).then(sendResponse);
-      return true;
+    if (!isIsolatedToBackground(message)) {
+      return false;
     }
-    if (message.type === 'SET_API_KEY') {
-      chrome.storage.local
-        .set({ [STORAGE_KEY]: message.key })
-        .then(() => sendResponse({ ok: true }));
-      return true;
-    }
-    if (message.type === 'GET_API_KEY') {
-      chrome.storage.local
-        .get(STORAGE_KEY)
-        .then((r) => sendResponse({ key: r[STORAGE_KEY] || '' }));
-      return true;
-    }
-    if (message.type === 'TEST_TAVILY') {
-      testTavily().then(sendResponse);
-      return true;
+    switch (message.type) {
+      case 'EXECUTE_TOOL':
+        handleToolExecution(message.payload).then(sendResponse);
+        return true;
+      case 'SET_API_KEY':
+        chrome.storage.local
+          .set({ [STORAGE_KEY]: message.key })
+          .then(() => sendResponse({ ok: true }));
+        return true;
+      case 'GET_API_KEY':
+        chrome.storage.local
+          .get(STORAGE_KEY)
+          .then((r) => sendResponse({ key: r[STORAGE_KEY] || '' }));
+        return true;
+      case 'TEST_TAVILY':
+        testTavily().then(sendResponse);
+        return true;
     }
   });
 });

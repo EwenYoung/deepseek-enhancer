@@ -17,6 +17,7 @@ import {
   reorderCategory,
   type CategoryState,
 } from './conversation-store';
+import { isMainToIsolated } from './protocol';
 
 let catState: CategoryState = {
   categories: { order: [], items: {}, sessionCategory: {} },
@@ -957,7 +958,9 @@ function createSessionInCategory(catName: string) {
 
 function setupNewSessionListener() {
   window.addEventListener('message', (event) => {
-    if (event.data?.source === 'DS_MINI_MAIN' && event.data?.type === 'DS_MINI_NEW_SESSION') {
+    if (event.source !== window) return;
+    if (!isMainToIsolated(event.data)) return;
+    if (event.data.type === 'DS_MINI_NEW_SESSION') {
       const { sessionId, categoryName } = event.data;
       if (!sessionId || !categoryName) return;
       pendingNewSessions.push({ sessionId, catName: categoryName });

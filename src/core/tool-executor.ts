@@ -3,6 +3,7 @@
 // ============================================================
 // 将工具执行委托给 Background Service Worker 处理（绕过 CORS）
 import type { ToolCall, ToolResult } from './types';
+import { sendToBackground } from './protocol';
 
 // ============================================================
 // 工具执行入口 — 通过消息委托给 Background
@@ -11,7 +12,7 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
   const startTime = performance.now();
 
   try {
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendToBackground({
       type: 'EXECUTE_TOOL',
       payload: {
         name: call.name,
@@ -26,10 +27,10 @@ export async function executeToolCall(call: ToolCall): Promise<ToolResult> {
         success: false,
         error: response?.error || 'Unknown error',
         duration: performance.now() - startTime,
-        summary: response?.summary || '',
-        detail: response?.detail || '',
-        output: response?.output || null,
-        truncated: response?.truncated || false,
+        summary: '',
+        detail: '',
+        output: null,
+        truncated: false,
       };
     }
 

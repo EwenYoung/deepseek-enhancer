@@ -2,6 +2,8 @@
 // deepseek-enhancer — 会话导出 (Markdown / HTML)
 // ============================================================
 
+import { escapeHTML, downloadBlob } from './ui-kit';
+
 export type ExportFormat = 'markdown' | 'html';
 
 interface ChatMessage {
@@ -890,32 +892,12 @@ function unescapeHTMLText(s: string): string {
 // 下载
 // ============================================================
 function download(content: string, filename: string, mime: string) {
-  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  downloadBlob(new Blob([content], { type: `${mime};charset=utf-8` }), filename);
 }
 
 // ============================================================
 // 工具函数
 // ============================================================
-function escapeHTML(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 export function slugify(text: string): string {
   return text
     .toLowerCase()

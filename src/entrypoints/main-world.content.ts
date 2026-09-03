@@ -13,7 +13,9 @@ function escapeRegExp(s: string): string {
 
 function buildToolRegex(): string {
   const names = TOOL_DESCRIPTORS.map((t) => escapeRegExp(t.name)).join('|');
-  return `/<(${names})>\\s*(\\{[\\s\\S]*?\\})\\s*(?:<\\/\\1>)?/g`;
+  // 只匹配标签本身；JSON 主体含嵌套花括号（content 里的代码/公式），
+  // 由 extractFromText 的平衡扫描提取，不能用非贪婪正则截取
+  return `/<(${names})>/g`;
 }
 
 export default defineContentScript({

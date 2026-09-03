@@ -52,6 +52,13 @@ function emptyState(): CategoryState {
 
 const STORAGE_KEY_TITLES = 'ds_mini_session_titles';
 
+/** 备份默认值（供 data-backup 聚合） */
+export const conversationBackupDefaults: Record<string, unknown> = {
+  ds_mini_categories: { order: [], items: {}, sessionCategory: {} },
+  ds_mini_hidden_sessions: [],
+  ds_mini_session_titles: {},
+};
+
 /** 加载分类数据 */
 export async function loadCategories(): Promise<CategoryState> {
   try {

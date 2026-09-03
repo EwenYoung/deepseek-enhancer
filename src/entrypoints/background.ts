@@ -6,9 +6,9 @@
 
 import { defineBackground } from 'wxt/utils/define-background';
 import { isIsolatedToBackground } from '../core/protocol';
+import { getTavilyKey, setTavilyKey } from '../core/tavily-key';
 
 const TAVILY_BASE = 'https://api.tavily.com';
-const STORAGE_KEY = 'ds_mini_tavily_key';
 
 export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -24,14 +24,10 @@ export default defineBackground(() => {
         handleToolExecution(message.payload).then(sendResponse);
         return true;
       case 'SET_API_KEY':
-        chrome.storage.local
-          .set({ [STORAGE_KEY]: message.key })
-          .then(() => sendResponse({ ok: true }));
+        setTavilyKey(message.key).then(() => sendResponse({ ok: true }));
         return true;
       case 'GET_API_KEY':
-        chrome.storage.local
-          .get(STORAGE_KEY)
-          .then((r) => sendResponse({ key: r[STORAGE_KEY] || '' }));
+        getTavilyKey().then((key) => sendResponse({ key }));
         return true;
       case 'TEST_TAVILY':
         testTavily().then(sendResponse);
@@ -102,8 +98,7 @@ async function handleToolExecution(req: ToolExecRequest) {
 }
 
 async function getAPIKey(): Promise<string> {
-  const r = await chrome.storage.local.get(STORAGE_KEY);
-  return (r[STORAGE_KEY] as string) || '';
+  return getTavilyKey();
 }
 
 // ============================================================

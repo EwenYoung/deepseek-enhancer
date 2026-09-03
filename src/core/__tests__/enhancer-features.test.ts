@@ -18,7 +18,7 @@ vi.stubGlobal('chrome', {
   },
 });
 
-const { getConfig, textColorOnBrand, buildMarkdownStyleRules, hexToRgbTriplet } =
+const { getConfig, textColorOnBrand, buildMarkdownStyleRules, hexToRgbTriplet, brandWithAlpha } =
   await import('../enhancer-features');
 
 const FULL_DEFAULTS = {
@@ -108,6 +108,18 @@ describe('hexToRgbTriplet', () => {
   it('无 # 前缀与官方蓝同样正确', () => {
     expect(hexToRgbTriplet('4d6bfe')).toBe('77, 107, 254'); // 默认品牌蓝
     expect(hexToRgbTriplet('#4d6bfe')).toBe('77, 107, 254');
+  });
+});
+
+describe('brandWithAlpha', () => {
+  it('输出走 --ds-brand-rgb 变量，带 fallback 官方蓝与透明度', () => {
+    expect(brandWithAlpha(0.3)).toBe('rgba(var(--ds-brand-rgb, 77, 107, 254), 0.3)');
+    expect(brandWithAlpha(0.1)).toBe('rgba(var(--ds-brand-rgb, 77, 107, 254), 0.1)');
+  });
+
+  it('alpha=0 与整数透明度同样正确', () => {
+    expect(brandWithAlpha(0)).toBe('rgba(var(--ds-brand-rgb, 77, 107, 254), 0)');
+    expect(brandWithAlpha(1)).toBe('rgba(var(--ds-brand-rgb, 77, 107, 254), 1)');
   });
 });
 

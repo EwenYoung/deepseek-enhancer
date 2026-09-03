@@ -7,6 +7,7 @@ import { executeToolCall } from './tool-executor';
 import { createLoopState } from './loop-state';
 import { postToMain } from './protocol';
 import { applyGuardedCSS } from './enhancer-features';
+import { esc, downloadBlob } from './ui-kit';
 // ============================================================
 // 状态
 // ============================================================
@@ -14,6 +15,11 @@ let toolExecutionInProgress = false;
 const loopState = createLoopState(); // Agent 循环状态（深度/停止标记/阶段）
 let toolBlocksInited = false;
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
+
+// doc_generate 去重：同一 raw（MAIN 消息路径 + DOM 兜底路径会各触发一次）
+// 只保留最近处理的 raw，避免无限增长
+const processedDocRaws = new Set<string>();
+const MAX_PROCESSED_DOC_RAWS = 50;
 
 // ============================================================
 // Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
@@ -150,9 +156,9 @@ class AgentPanel {
       '<span style="font-weight:600">' +
       label +
       '</span> ' +
-      escapeHTML(toolName) +
+      esc(toolName) +
       ' — ' +
-      escapeHTML(shortSummary);
+      esc(shortSummary);
     tools.appendChild(item);
   }
 
@@ -163,7 +169,7 @@ class AgentPanel {
       'margin-top:8px;padding:6px 0;border-top:1px solid var(--ds-border);font-size:12px;color:var(--ds-text-secondary);display:flex;align-items:center;gap:4px;';
     if (isError) {
       footer.innerHTML =
-        '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + escapeHTML(errorMsg || '');
+        '<span style="color:#f53f3f">[ERR]</span> Agent error: ' + esc(errorMsg || '');
     } else {
       footer.innerHTML =
         '<span style="color:#00b42a">[OK]</span> Agent complete (' +
@@ -512,26 +518,57 @@ function clampText(text: string, maxLen: number): string {
 }
 
 function handleDocGenerate(call: import('./types').ToolCall) {
+  // 去重：MAIN 消息路径与 DOM 兜底路径可能对同一工具调用各触发一次，
+  // 同一 raw 只下载一次（浏览器会自动加 (1) 后缀产生重复文件）
+  if (call.raw && processedDocRaws.has(call.raw)) {
+    console.log('[DS-Mini:UI] doc_generate: duplicate raw skipped');
+    return;
+  }
   const title = String(call.payload.title || 'document');
-  const format = String(call.payload.format || 'md');
-  const content = String(call.payload.content || '');
-  if (!content) return;
-  const ext = format === 'html' ? '.html' : '.md';
-  const mime = format === 'html' ? 'text/html' : 'text/markdown';
-  const fn = title.replace(/[^a-zA-Z0-9一-鿿\s_-]/g, '') + ext;
+  const format = String(call.payload.format || 'md').toLowerCase();
+  let content = String(call.payload.content || '');
+  if (!content) {
+    // 兜底：从 raw 里尝试再提取一次（避免 payload 解析失败导致静默丢失）
+    content = extractContentFromRaw(call.raw);
+  }
+  if (!content) {
+    console.warn(
+      '[DS-Mini:UI] doc_generate: payload missing content, raw:',
+      call.raw?.slice(0, 120),
+    );
+    return;
+  }
+  const isHtml = format === 'html';
+  const ext = isHtml ? '.html' : '.md';
+  const mime = isHtml ? 'text/html' : 'text/markdown';
+  const safeTitle = title.replace(/[^a-zA-Z0-9一-鿿\s_-]/g, '').trim();
+  const fn = (safeTitle || 'document') + ext;
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fn;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  downloadBlob(blob, fn);
+  if (call.raw) {
+    processedDocRaws.add(call.raw);
+    if (processedDocRaws.size > MAX_PROCESSED_DOC_RAWS) {
+      const oldest = processedDocRaws.values().next().value;
+      if (oldest !== undefined) processedDocRaws.delete(oldest);
+    }
+  }
   console.log('[DS-Mini:UI] doc_generate:', fn);
+}
+
+/**
+ * 兜底提取：从原始 XML 中找 "content" 字段（payload 解析失败时用）
+ * 仅处理合法的 JSON 字符串值；找不到返回空串
+ */
+function extractContentFromRaw(raw: string | undefined): string {
+  if (!raw) return '';
+  // 宽松匹配 "content" 键后的 JSON 字符串值（含转义）
+  const m = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
+  if (!m) return '';
+  try {
+    return JSON.parse('"' + m[1] + '"') as string;
+  } catch {
+    return '';
+  }
 }
 
 // ============================================================
@@ -609,7 +646,7 @@ function createResultBlock(call: ToolCall, result: ToolResult): HTMLElement {
   const bc = ok ? 'var(--ds-border)' : 'var(--ds-border-error)';
   const bg = ok ? 'var(--ds-bg-subtle)' : 'var(--ds-bg-error)';
   const id = `ds-tool-${call.id.slice(0, 8)}`;
-  const c = ok ? escapeHTML(result.result || '(空)') : `ERR: ${escapeHTML(result.error || '')}`;
+  const c = ok ? esc(result.result || '(空)') : `ERR: ${esc(result.error || '')}`;
   const w = document.createElement('div');
   w.className = 'ds-mini-tool-block';
   w.setAttribute('data-ds-tool-status', ok ? 'done' : 'error');
@@ -684,12 +721,6 @@ function scanAndHideToolResults() {
     }
   }
   requestAnimationFrame(scan);
-}
-
-function escapeHTML(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
 }
 
 function delay(ms: number): Promise<void> {

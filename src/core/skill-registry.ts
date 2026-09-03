@@ -10,6 +10,11 @@ import { BUILTIN_SKILLS } from './skill-builtin';
 // ============================================================
 const STORAGE_KEY = 'ds_mini_skills';
 
+/** 备份默认值（供 data-backup 聚合） */
+export const skillBackupDefaults: Record<string, unknown> = {
+  ds_mini_skills: [],
+};
+
 // ponytail: Chrome Storage API，不需要单独的持久化层
 
 // ============================================================

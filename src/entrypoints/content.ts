@@ -10,6 +10,7 @@ import {
   loadEnhancerFeatures,
   initThemeAutoSwitch,
   applyGuardedCSS,
+  brandWithAlpha,
 } from '../core/enhancer-features';
 import { initCategories } from '../core/ui-categories';
 import { isMainToIsolated } from '../core/protocol';
@@ -87,9 +88,9 @@ export default defineContentScript({
       'voice-pulse',
       `
       @keyframes ds-voice-pulse {
-        0% { box-shadow: 0 0 0 0 rgba(var(--ds-brand-rgb, 77, 107, 254), 0.4); }
-        70% { box-shadow: 0 0 0 8px rgba(var(--ds-brand-rgb, 77, 107, 254), 0); }
-        100% { box-shadow: 0 0 0 0 rgba(var(--ds-brand-rgb, 77, 107, 254), 0); }
+        0% { box-shadow: 0 0 0 0 ${brandWithAlpha(0.4)}; }
+        70% { box-shadow: 0 0 0 8px ${brandWithAlpha(0)}; }
+        100% { box-shadow: 0 0 0 0 ${brandWithAlpha(0)}; }
       }
     `,
     );

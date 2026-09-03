@@ -3,6 +3,8 @@
 // ============================================================
 // 在模型回复的代码块上添加下载按钮
 
+import { downloadBlob } from './ui-kit';
+
 // ============================================================
 // 初始化
 // ============================================================
@@ -77,20 +79,7 @@ function addDownloadButton(codeBlock: HTMLElement) {
 // 下载文件
 // ============================================================
 function downloadFile(content: string, filename: string) {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  downloadBlob(new Blob([content], { type: 'text/plain;charset=utf-8' }), filename);
 }
 
 // ============================================================

@@ -379,7 +379,27 @@
   function extractTextFromData(data) {
     if (!data || typeof data !== 'object') return '';
 
-    if (typeof data.v === 'string') return data.v;
+    // 新格式：fragments 数组行（{"p":"response/fragments","o":"APPEND","v":[{type,content,...}]}）
+    // 开标签 `<` 等字符可能以数组形式到达，旧实现只处理 string v 会漏掉
+    if (data.o === 'APPEND' && Array.isArray(data.v)) {
+      var arrText = '';
+      for (var ai = 0; ai < data.v.length; ai++) {
+        const fr = data.v[ai];
+        if (
+          fr &&
+          typeof fr.content === 'string' &&
+          (fr.type === 'RESPONSE' || fr.type === 'TEXT' || !fr.type)
+        ) {
+          arrText += fr.content;
+        }
+      }
+      return arrText;
+    }
+
+    // 裸 string v 行（新格式主体）：排除 o === 'SET' 状态行（FINISHED 等），
+    // 否则状态值会被当作文本追加进 buffer，污染 saveAssistantResponse 落盘数据
+    // ponytail: 与 sse-parser.ts extractContent 方式0a 保持一致
+    if (typeof data.v === 'string' && data.o !== 'SET') return data.v;
 
     if (Array.isArray(data.choices)) {
       var text = '';
@@ -420,9 +440,17 @@
   function isStreamFinished(data) {
     if (!data || typeof data !== 'object') return false;
     if (data.v && data.v.response && data.v.response.status === 'FINISHED') return true;
+    // 新格式：{"p":"response/status","o":"SET","v":"FINISHED"}
+    if (data.o === 'SET' && data.p === 'response/status' && data.v === 'FINISHED') return true;
     if (Array.isArray(data.choices)) {
       for (let i = 0; i < data.choices.length; i++) {
-        if (data.choices[i].finish_reason === 'stop') return true;
+        // ponytail: 与 sse-parser.ts 一致，length（token 上限）也是结束
+        if (
+          data.choices[i].finish_reason === 'stop' ||
+          data.choices[i].finish_reason === 'length'
+        ) {
+          return true;
+        }
       }
     }
     return false;
@@ -435,24 +463,18 @@
     let textBuf = getBuf(xhr, 'text');
     let rawBuf = getBuf(xhr, 'raw');
 
-    // FR-5: 先检测 task_complete 标记
-    var taskCompleteRe = /<task_complete>(\{[\s\S]*?\})<\/task_complete>/;
-    var tcMatchText = taskCompleteRe.exec(textBuf);
-    var tcMatchRaw = taskCompleteRe.exec(rawBuf);
-    if (tcMatchText || tcMatchRaw) {
-      var tcMatch = tcMatchText || tcMatchRaw;
-      taskCompleteRe.lastIndex = 0;
-      var summary = '任务完成';
-      try {
-        var parsedSummary = JSON.parse(tcMatch[1]);
-        if (parsedSummary.summary) summary = parsedSummary.summary;
-      } catch (e) {}
-      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', summary);
+    // FR-5: 先检测 task_complete 标记（平衡扫描，summary 含嵌套花括号不截断）
+    // 注意：移除标记后不 return——同一 buffer 可能既有工具调用又有 task_complete
+    // （异常输出顺序），继续走下方工具检出，与 ui-tool-blocks DOM 兜底行为对齐
+    var tc = extractTaskCompleteFrom(textBuf) || extractTaskCompleteFrom(rawBuf);
+    if (tc) {
+      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', tc.summary);
 
       // 移除标记（DOM submit 下页面自己渲染最终回复，不额外注入）
-      setBuf(xhr, 'text', textBuf.replace(/<task_complete>\{[\s\S]*?\}<\/task_complete>/g, ''));
-      setBuf(xhr, 'raw', rawBuf.replace(/<task_complete>\{[\s\S]*?\}<\/task_complete>/g, ''));
-      return;
+      setBuf(xhr, 'text', stripTaskCompleteFrom(textBuf));
+      setBuf(xhr, 'raw', stripTaskCompleteFrom(rawBuf));
+      textBuf = getBuf(xhr, 'text');
+      rawBuf = getBuf(xhr, 'raw');
     }
 
     // 路径A: 从文本 buffer 中检测
@@ -490,6 +512,122 @@
 
   // 每次调用创建新正则，避免 /g 标记的 lastIndex 问题
   // ponytail: regex built from TOOL_DESCRIPTORS, injected at build time by main-world.content.ts
+  // JSON 主体用平衡扫描提取（content 可能含嵌套花括号，非贪婪正则会提前截断）
+  function extractBalancedJson(text, startIndex) {
+    if (text[startIndex] !== '{') return null;
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var i = startIndex; i < text.length; i++) {
+      var ch = text[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) return text.slice(startIndex, i + 1);
+      }
+    }
+    return null;
+  }
+
+  // 宽松解析模型输出的 JSON：先严格 parse，失败后修复字符串值内未转义的控制字符
+  // （真实换行/回车/Tab）与尾逗号重试，仍失败返回 null
+  function parseToolJsonLoose(body) {
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      return null;
+    } catch (e) {}
+
+    let fixed = '';
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < body.length; i++) {
+      const ch = body[i];
+      if (inString) {
+        if (escaped) {
+          fixed += ch;
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') {
+          fixed += ch;
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          fixed += ch;
+          inString = false;
+          continue;
+        }
+        const code = ch.charCodeAt(0);
+        if (code < 0x20) {
+          fixed +=
+            ch === '\n'
+              ? '\\n'
+              : ch === '\r'
+                ? '\\r'
+                : ch === '\t'
+                  ? '\\t'
+                  : '\\u' + code.toString(16).padStart(4, '0');
+          continue;
+        }
+        fixed += ch;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      fixed += ch;
+    }
+    fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+
+    try {
+      const parsed = JSON.parse(fixed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return null;
+  }
+
+  // task_complete：平衡扫描定位 JSON 主体（summary 含嵌套花括号不截断）
+  function extractTaskCompleteFrom(text) {
+    if (!text) return null;
+    var tagStart = text.indexOf('<task_complete>');
+    if (tagStart < 0) return null;
+    var jsonStart = tagStart + '<task_complete>'.length;
+    var body = extractBalancedJson(text, jsonStart);
+    if (!body) return null;
+    var parsed = parseToolJsonLoose(body);
+    return { summary: (parsed && parsed.summary) || '任务完成' };
+  }
+
+  function stripTaskCompleteFrom(text) {
+    if (!text) return '';
+    var result = text;
+    while (true) {
+      var tagStart = result.indexOf('<task_complete>');
+      if (tagStart < 0) break;
+      var jsonStart = tagStart + '<task_complete>'.length;
+      var body = extractBalancedJson(result, jsonStart);
+      if (!body) break;
+      var end = jsonStart + body.length;
+      var close = result.slice(end).match(/^\s*<\/task_complete>/);
+      if (close) end += close[0].length;
+      result = result.slice(0, tagStart) + result.slice(end);
+    }
+    return result.trim();
+  }
+
   function extractFromText(text) {
     const regex = __DS_TOOL_NAMES_REGEX__;
     const calls = [];
@@ -497,20 +635,35 @@
     regex.lastIndex = 0;
     while ((match = regex.exec(text)) !== null) {
       const name = match[1];
-      const body = match[2].trim();
-      let payload = {};
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) payload = parsed;
-      } catch (e) {}
+      const tagEnd = match.index + match[0].length;
+
+      // 跳过标签与 JSON 之间的空白
+      let jsonStart = tagEnd;
+      while (jsonStart < text.length && /\s/.test(text[jsonStart])) jsonStart++;
+      const body = extractBalancedJson(text, jsonStart);
+      if (!body) continue;
+
+      // raw = 标签 + 空白 + JSON（闭合标签可选）
+      let rawEnd = jsonStart + body.length;
+      const afterRaw = text.slice(rawEnd).match(new RegExp('^\\s*</' + name + '>'));
+      let raw = text.slice(match.index, rawEnd);
+      if (afterRaw) {
+        raw += afterRaw[0];
+        rawEnd += afterRaw[0].length;
+      }
+
+      const payload = parseToolJsonLoose(body) || {};
       calls.push({
         name: name,
         payload: payload,
-        raw: match[0],
+        raw: raw,
         id: crypto.randomUUID
           ? crypto.randomUUID()
           : Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       });
+
+      // 跳过已消费的 raw，避免重复匹配
+      regex.lastIndex = rawEnd;
     }
     return calls;
   }

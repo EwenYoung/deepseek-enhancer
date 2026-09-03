@@ -31,6 +31,10 @@ import {
   applyGuardedCSS,
 } from './enhancer-features';
 import { postToMain, sendToBackground } from './protocol';
+import { getPanelOpacity, setPanelOpacity } from './panel-config';
+import { getAgentMode, setAgentMode } from './agent-mode';
+import { getTavilyKey, setTavilyKey } from './tavily-key';
+import { esc, showToast, overlayStyle } from './ui-kit';
 
 // ============================================================
 // DOM
@@ -295,16 +299,13 @@ function createPanel(state: AppState) {
       ? '0 0 14px rgba(228,228,231,0.35)'
       : '0 0 14px rgba(24,24,27,0.3)';
     // 切换透明度值
-    chrome.storage.local
-      .get([isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'])
-      .then((r) => {
-        const val = r[isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light'];
-        const slider = document.getElementById('ds-enh-opacity') as HTMLInputElement | null;
-        const label = document.getElementById('ds-enh-opacity-val');
-        if (slider) slider.value = val ? String(val) : '100';
-        if (label) label.textContent = val ? val + '%' : '100%';
-        applyOpacity((val as number) || 100);
-      });
+    getPanelOpacity(isDark).then((val) => {
+      const slider = document.getElementById('ds-enh-opacity') as HTMLInputElement | null;
+      const label = document.getElementById('ds-enh-opacity-val');
+      if (slider) slider.value = val ? String(val) : '100';
+      if (label) label.textContent = val ? val + '%' : '100%';
+      applyOpacity(val || 100);
+    });
   });
   darkObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
@@ -433,7 +434,7 @@ function buildPanelHTML(): string {
             ${enhToggle('ds-enh-mdtypo', '正文排版')}
             ${enhToggle('ds-enh-scrollbar', '隐藏滚动条')}
             ${enhToggle('ds-enh-autohide', '隐藏输入框')}
-            ${enhToggle('ds-enh-voice', '语音输入', '按 Ctrl + M 开始/停止录音')}
+            ${enhToggle('ds-enh-voice', '语音输入')}
           </div>
         </div>
 
@@ -630,9 +631,7 @@ async function bindPanelEvents(state: AppState) {
       applyOpacity(val);
       // 保存
       const isDark = document.body.classList.contains('dark');
-      chrome.storage.local.set({
-        [isDark ? 'ds_panel_opacity_dark' : 'ds_panel_opacity_light']: val,
-      });
+      setPanelOpacity(isDark, val);
     });
   }
 
@@ -787,11 +786,9 @@ async function loadAPIKey() {
   if (!input) return;
 
   try {
-    const r = (await chrome.storage.local.get('ds_mini_tavily_key')) as {
-      ds_mini_tavily_key?: string;
-    };
-    input.value = r.ds_mini_tavily_key || '';
-    updateAPIKeyStatus(!!r.ds_mini_tavily_key);
+    const key = await getTavilyKey();
+    input.value = key;
+    updateAPIKeyStatus(!!key);
   } catch {
     try {
       const resp = await sendToBackground({ type: 'GET_API_KEY' });
@@ -819,8 +816,7 @@ function saveAPIKey() {
   if (!input) return;
 
   const key = input.value.trim();
-  chrome.storage.local
-    .set({ ds_mini_tavily_key: key })
+  setTavilyKey(key)
     .then(() => {
       // 通知后台冗余更新；fire-and-forget，失败不影响本地保存
       sendToBackground({ type: 'SET_API_KEY', key }).catch(() => {});
@@ -858,7 +854,6 @@ async function testTavilyConnection() {
 // ============================================================
 // Agent 模式管理
 // ============================================================
-const AGENT_MODE_KEY = 'ds_mini_agent_mode';
 
 function updateAgentSlider(enabled: boolean) {
   const slider = panelEl?.querySelector('#ds-mini-agent-slider') as HTMLElement | null;
@@ -872,8 +867,7 @@ async function loadAgentMode() {
   if (!checkbox) return;
 
   try {
-    const r = await chrome.storage.local.get(AGENT_MODE_KEY);
-    const enabled = !!r[AGENT_MODE_KEY];
+    const enabled = await getAgentMode();
     checkbox.checked = enabled;
     updateAgentSlider(enabled);
     postAgentMode(enabled);
@@ -890,7 +884,7 @@ function toggleAgentMode() {
   const enabled = !checkbox.checked;
   checkbox.checked = enabled;
   updateAgentSlider(enabled);
-  chrome.storage.local.set({ [AGENT_MODE_KEY]: enabled });
+  setAgentMode(enabled);
   postAgentMode(enabled);
   toggleSkillsSection(enabled);
   showToast(enabled ? 'Agent 模式已开启' : 'Agent 模式已关闭');
@@ -1003,28 +997,6 @@ function updateThemeName() {
   if (el) el.textContent = names[enhState.themeIdx % names.length];
 }
 
-function showToast(msg: string) {
-  const toast = document.createElement('div');
-  toast.textContent = msg;
-  toast.style.cssText = `
-    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-    z-index:9999999;background:var(--panel-bg, #1f2937);color:var(--panel-text, #fff);border:1px solid var(--panel-border);
-    padding:8px 20px;
-    border-radius:8px;font-size:13px;font-family:'DM Sans',-apple-system,sans-serif;
-    backdrop-filter:var(--panel-blur);
-    -webkit-backdrop-filter:var(--panel-blur);
-    box-shadow:0 4px 16px rgba(0,0,0,0.15);
-    transition:opacity 0.3s;
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-  }, 2000);
-  setTimeout(() => {
-    toast.remove();
-  }, 2500);
-}
-
 // ============================================================
 // 面板开关
 // ============================================================
@@ -1075,15 +1047,6 @@ async function refreshSkillList(state: AppState) {
   });
 }
 
-// ============================================================
-// HTML 转义（防止 XSS）
-// ============================================================
-function esc(str: string): string {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
-
 function skillCardHTML(skill: Skill): string {
   const sourceLabel =
     {
@@ -1132,14 +1095,9 @@ function showModalEditor(state: AppState, skill?: Skill) {
   // 遮罩层
   const overlay = document.createElement('div');
   overlay.id = 'ds-mini-modal-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:999997;
-    background:var(--overlay-bg, rgba(0,0,0,0.3));
-    backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-    transition:opacity 0.2s;
-  `;
+  overlay.style.cssText = overlayStyle(
+    'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:opacity 0.2s;',
+  );
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.remove();
   });
@@ -1307,12 +1265,7 @@ function showConfirm(options: {
 
     const overlay = document.createElement('div');
     overlay.id = 'ds-mini-modal-overlay';
-    overlay.style.cssText = `
-      position:fixed;inset:0;z-index:999997;
-      background:var(--overlay-bg, rgba(0,0,0,0.3));
-      backdrop-filter:blur(4px);
-      display:flex;align-items:center;justify-content:center;
-    `;
+    overlay.style.cssText = overlayStyle('backdrop-filter:blur(4px);');
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
         overlay.remove();

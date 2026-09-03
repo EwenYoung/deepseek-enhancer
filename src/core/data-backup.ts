@@ -2,6 +2,13 @@
 // deepseek-enhancer — 数据导入导出（配置备份）
 // ============================================================
 // 导出/导入全部 chrome.storage.local 配置数据
+import { skillBackupDefaults } from './skill-registry';
+import { conversationBackupDefaults } from './conversation-store';
+import { enhancerBackupDefaults } from './enhancer-features';
+import { panelBackupDefaults } from './panel-config';
+import { agentModeBackupDefaults } from './agent-mode';
+import { tavilyKeyBackupDefaults } from './tavily-key';
+import { downloadBlob } from './ui-kit';
 
 export const BACKUP_VERSION = 1;
 
@@ -12,17 +19,14 @@ export interface BackupPayload {
   data: BackupData;
 }
 
-/** 全部需要备份的 storage key 及其默认值 */
+/** 全部需要备份的 storage key 及其默认值（聚合自各 key owner） */
 const BACKUP_KEYS: Record<string, unknown> = {
-  ds_mini_skills: [],
-  ds_mini_categories: { order: [], items: {}, sessionCategory: {} },
-  ds_mini_hidden_sessions: [],
-  ds_mini_session_titles: {},
-  ds_mini_enhancer: {},
-  ds_mini_tavily_key: '',
-  ds_mini_agent_mode: false,
-  ds_panel_opacity_light: 100,
-  ds_panel_opacity_dark: 100,
+  ...skillBackupDefaults,
+  ...conversationBackupDefaults,
+  ...enhancerBackupDefaults,
+  ...tavilyKeyBackupDefaults,
+  ...agentModeBackupDefaults,
+  ...panelBackupDefaults,
 };
 
 export type BackupData = typeof BACKUP_KEYS;
@@ -98,17 +102,7 @@ export function serializeBackup(payload: BackupPayload): string {
 
 export function downloadBackup(json: string): void {
   const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `deepseek-enhancer-backup-${dateStamp()}.json`;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  downloadBlob(blob, `deepseek-enhancer-backup-${dateStamp()}.json`);
 }
 
 export function readFileAsText(file: File): Promise<string> {

@@ -19,6 +19,7 @@ import {
 } from './conversation-store';
 import { isMainToIsolated } from './protocol';
 import { applyGuardedCSS } from './enhancer-features';
+import { esc, escAttr, overlayStyle } from './ui-kit';
 
 let catState: CategoryState = {
   categories: { order: [], items: {}, sessionCategory: {} },
@@ -583,7 +584,7 @@ function buildCategoryListHTML(): string {
         '"><div class="ds-cat-item-header"><span class="ds-cat-toggle-icon">' +
         (open ? chevronDownSVG() : chevronRightSVG()) +
         '</span><span class="ds-cat-name">' +
-        escHtml(n) +
+        esc(n) +
         '</span><button class="ds-cat-sort-btn" title="' +
         getSortLabel(item.sortBy) +
         '">' +
@@ -605,7 +606,7 @@ function buildCategoryListHTML(): string {
                   '<div class="ds-cat-session" data-session-id="' +
                   escAttr(sid) +
                   '"><span class="ds-cat-session-title">' +
-                  escHtml(getSessionTitleFromDOM(sid)) +
+                  esc(getSessionTitleFromDOM(sid)) +
                   '</span><button class="ds-cat-session-remove" title="移出分类">✕</button></div>',
               )
               .join('')) +
@@ -832,8 +833,7 @@ function showCategoryDialog(mode: 'new' | 'rename', oldName?: string) {
   const isNew = mode === 'new';
   const overlay = document.createElement('div');
   overlay.id = 'ds-cat-dialog-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;z-index:999997;background:var(--overlay-bg,rgba(0,0,0,0.3));display:flex;align-items:center;justify-content:center;';
+  overlay.style.cssText = overlayStyle();
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.remove();
   });
@@ -1176,8 +1176,7 @@ function showBatchCategorizeDialog(ids: string[]) {
   const cats = catState.categories;
   const overlay = document.createElement('div');
   overlay.id = 'ds-cat-dialog-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;z-index:999997;background:var(--overlay-bg,rgba(0,0,0,0.3));display:flex;align-items:center;justify-content:center;';
+  overlay.style.cssText = overlayStyle();
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.remove();
   });
@@ -1197,7 +1196,7 @@ function showBatchCategorizeDialog(ids: string[]) {
               '<label style="display:block;padding:6px 8px;cursor:pointer;border-radius:6px;font-size:13px;" onmouseover="this.style.background=\'var(--card-border)\'" onmouseout="this.style.background=\'transparent\'"><input type="radio" name="ds-batch-cat" value="' +
               escAttr(n) +
               '" style="margin-right:6px;vertical-align:middle;">' +
-              escHtml(n) +
+              esc(n) +
               ' (' +
               (cats.items[n]?.sessions.length || 0) +
               ')</label>',
@@ -1279,16 +1278,4 @@ async function ensurePanelRendered() {
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-function escHtml(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-function escAttr(s: string): string {
-  return s
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }

@@ -10,6 +10,11 @@
 
 const ENHANCER_KEY = 'ds_mini_enhancer';
 
+/** 备份默认值（供 data-backup 聚合） */
+export const enhancerBackupDefaults: Record<string, unknown> = {
+  ds_mini_enhancer: {},
+};
+
 export interface EnhancerConfig {
   wideScreen: boolean;
   themeIdx: number; // 0=默认, 1-4 对应各主题
@@ -313,6 +318,11 @@ function isDarkMode(): boolean {
 export function hexToRgbTriplet(hex: string): string {
   const n = hex.replace('#', '');
   return `${parseInt(n.slice(0, 2), 16)}, ${parseInt(n.slice(2, 4), 16)}, ${parseInt(n.slice(4, 6), 16)}`;
+}
+
+/** 品牌色带透明度（供 style 字符串消费）：走 --ds-brand-rgb 变量，默认主题无该变量时 fallback 官方蓝 */
+export function brandWithAlpha(alpha: number): string {
+  return `rgba(var(--ds-brand-rgb, 77, 107, 254), ${alpha})`;
 }
 
 /** 品牌底色上的对勾前景色：按相对亮度取白/深灰，避免浅粉彩品牌上白对勾对比不足 */
@@ -1107,7 +1117,7 @@ function startRecording(btn: HTMLElement) {
 
   isRecording = true;
   // 录音中背景：品牌色 30%（默认主题 fallback 官方蓝），与脉冲波同源
-  btn.style.background = 'rgba(var(--ds-brand-rgb, 77, 107, 254), 0.3)';
+  btn.style.background = brandWithAlpha(0.3);
   btn.style.animation = 'ds-voice-pulse 1.5s infinite';
 
   const startLen = ta.value.length;
@@ -1140,7 +1150,7 @@ function stopRecording(btn: HTMLElement) {
       recognition.stop();
     } catch {}
   }
-  btn.style.background = 'rgba(var(--ds-brand-rgb, 77, 107, 254), 0.1)';
+  btn.style.background = brandWithAlpha(0.1);
   btn.style.animation = '';
   isRecording = false;
 }

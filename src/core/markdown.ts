@@ -4,13 +4,7 @@
 // 移植自 deepseek-pp core/inline-agent/markdown.ts
 // 支持基础语法: headers, bold, italic, code, links, tables, lists
 
-function escapeHTML(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { escapeHTML } from './ui-kit';
 
 /**
  * 将 Markdown 文本转换为 HTML，适合内联流式渲染

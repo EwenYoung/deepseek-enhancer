@@ -18,6 +18,7 @@ import {
   type CategoryState,
 } from './conversation-store';
 import { isMainToIsolated } from './protocol';
+import { applyGuardedCSS } from './enhancer-features';
 
 let catState: CategoryState = {
   categories: { order: [], items: {}, sessionCategory: {} },
@@ -334,11 +335,8 @@ function findSidebar(): HTMLElement | null {
 }
 
 function injectPanelCSS() {
-  if (document.getElementById('ds-cat-panel-styles')) return;
-  const s = document.createElement('style');
-  s.id = 'ds-cat-panel-styles';
-  s.textContent = CAT_PANEL_CSS;
-  document.head.appendChild(s);
+  // applyGuardedCSS 自身幂等：同 id 更新 textContent，不重复建标签
+  applyGuardedCSS('cat-panel', CAT_PANEL_CSS);
 }
 
 // ============================================================

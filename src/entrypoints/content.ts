@@ -6,7 +6,11 @@ import { initAutocomplete } from '../core/ui-autocomplete';
 import { initPanel } from '../core/ui-panel';
 import { initToolBlocks, handleMainWorldToolCalls } from '../core/ui-tool-blocks';
 import { initArtifacts } from '../core/artifact';
-import { loadEnhancerFeatures, initThemeAutoSwitch } from '../core/enhancer-features';
+import {
+  loadEnhancerFeatures,
+  initThemeAutoSwitch,
+  applyGuardedCSS,
+} from '../core/enhancer-features';
 import { initCategories } from '../core/ui-categories';
 import { isMainToIsolated } from '../core/protocol';
 import type { AppState } from '../core/types';
@@ -72,10 +76,23 @@ export default defineContentScript({
     bodyObserver.observe(document.body, { childList: true, subtree: true });
 
     // 注入防覆盖 CSS：用 !important 防止 React 重写
-    const hideStyle = document.createElement('style');
-    hideStyle.textContent =
-      '[data-ds-hidden] { display: none !important; visibility: hidden !important; height: 0 !important; min-height: 0 !important; max-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; border: none !important; position: absolute !important; opacity: 0 !important; }';
-    document.head.appendChild(hideStyle);
+    applyGuardedCSS(
+      'hide',
+      '[data-ds-hidden] { display: none !important; visibility: hidden !important; height: 0 !important; min-height: 0 !important; max-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; border: none !important; position: absolute !important; opacity: 0 !important; }',
+    );
+
+    // 注入语音脉冲 CSS（模块级不碰 DOM，统一在 main 内注册）
+    // 颜色走主题品牌色变量 --ds-brand-rgb（applyTheme 注入）；默认主题无该变量时 fallback 官方蓝
+    applyGuardedCSS(
+      'voice-pulse',
+      `
+      @keyframes ds-voice-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(var(--ds-brand-rgb, 77, 107, 254), 0.4); }
+        70% { box-shadow: 0 0 0 8px rgba(var(--ds-brand-rgb, 77, 107, 254), 0); }
+        100% { box-shadow: 0 0 0 0 rgba(var(--ds-brand-rgb, 77, 107, 254), 0); }
+      }
+    `,
+    );
 
     // 隐藏工具结果回注中间消息 — 找含 hash class 的消息级容器（前缀与 formatResults 输出对齐）
     function isMsgComponent(el: Element) {
@@ -141,14 +158,3 @@ export default defineContentScript({
     console.log('[DS-Mini:UI] Ready');
   },
 });
-
-// 注入语音脉冲 CSS
-const voiceStyle = document.createElement('style');
-voiceStyle.textContent = `
-  @keyframes ds-voice-pulse {
-    0% { box-shadow: 0 0 0 0 rgba(77, 107, 254, 0.4); }
-    70% { box-shadow: 0 0 0 8px rgba(77, 107, 254, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(77, 107, 254, 0); }
-  }
-`;
-document.head.appendChild(voiceStyle);

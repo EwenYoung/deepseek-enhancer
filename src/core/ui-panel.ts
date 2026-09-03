@@ -28,6 +28,7 @@ import {
   getFontOptions,
   preloadFonts,
   toggleMarkdownTypo,
+  applyGuardedCSS,
 } from './enhancer-features';
 import { postToMain, sendToBackground } from './protocol';
 
@@ -63,9 +64,9 @@ export async function initPanel(state: AppState) {
 // ============================================================
 function createPanel(state: AppState) {
   // 注入 CSS 变量（浅色/深色主题）
-  const panelVars = document.createElement('style');
-  panelVars.id = 'ds-panel-vars';
-  panelVars.textContent = `
+  applyGuardedCSS(
+    'panel-vars',
+    `
     :root {
       --panel-bg: rgba(255,255,255,var(--panel-alpha,0.92));
       --panel-blur: blur(20px);
@@ -206,8 +207,8 @@ function createPanel(state: AppState) {
       --overlay-bg: rgba(0,0,0,0.5);
     }
 
-  `;
-  document.head.appendChild(panelVars);
+  `,
+  );
 
   // 面板主体（玻璃风格）
   panelEl = document.createElement('div');
@@ -321,10 +322,15 @@ function buildPanelHTML(): string {
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.5-4.5-10-10-10Z"/></svg>';
   const keySVG =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3Z"/></svg>';
-  function enhToggle(id: string, label: string) {
+  function enhToggle(id: string, label: string, hint?: string) {
     return (
       '<div class="ds-switch-row"><span>' +
       label +
+      (hint
+        ? '<span style="font-size:10px;color:var(--panel-text-secondary);margin-left:6px;">' +
+          hint +
+          '</span>'
+        : '') +
       '</span><span class="ds-enh-toggle" data-id="' +
       id +
       '" style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0;background:var(--toggle-off);border-radius:20px;transition:background 0.2s;"><span class="ds-enh-knob" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--toggle-knob);border-radius:50%;transition:left 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></span></span></div>'
@@ -427,7 +433,7 @@ function buildPanelHTML(): string {
             ${enhToggle('ds-enh-mdtypo', '正文排版')}
             ${enhToggle('ds-enh-scrollbar', '隐藏滚动条')}
             ${enhToggle('ds-enh-autohide', '隐藏输入框')}
-            ${enhToggle('ds-enh-voice', '语音输入')}
+            ${enhToggle('ds-enh-voice', '语音输入', '按 Ctrl + M 开始/停止录音')}
           </div>
         </div>
 

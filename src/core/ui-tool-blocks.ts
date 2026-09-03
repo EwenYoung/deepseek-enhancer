@@ -6,6 +6,7 @@ import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-
 import { executeToolCall } from './tool-executor';
 import { createLoopState } from './loop-state';
 import { postToMain } from './protocol';
+import { applyGuardedCSS } from './enhancer-features';
 // ============================================================
 // 状态
 // ============================================================
@@ -313,9 +314,10 @@ export function initToolBlocks(_state: AppState) {
   if (toolBlocksInited) return;
   toolBlocksInited = true;
 
-  // 注入 hover 样式 + CSS 变量（深色/浅色主题）
-  const style = document.createElement('style');
-  style.textContent = `
+  // 注入 hover 样式 + CSS 变量（深色/浅色主题）；守卫注册表保证幂等
+  applyGuardedCSS(
+    'tool-blocks',
+    `
     .ds-mini-tool-block > div:first-child > div[onclick]:hover { background: rgba(0,0,0,0.04); }
     :root {
       --ds-text: #1d2129;
@@ -333,8 +335,8 @@ export function initToolBlocks(_state: AppState) {
       --ds-border: rgba(255,255,255,0.12);
       --ds-border-error: rgba(245,63,63,0.4);
     }
-  `;
-  document.head.appendChild(style);
+  `,
+  );
 
   const container = findChatContainer();
   if (!container) return;

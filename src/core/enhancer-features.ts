@@ -2,6 +2,11 @@
 // deepseek-enhancer — 增强器功能（宽屏/主题/滚动条/语音）
 // ============================================================
 // 从油猴脚本迁移的 UI 增强功能
+//
+// 样式标签唯一入口：本模块的 applyGuardedCSS / removeGuardedCSS 是全扩展
+// 样式标签注入/移除的唯二通道，其余模块不得自行 createElement('style')。
+// 所有规则挂 data-rule 属性，由 activeStyles 注册表 + head 守卫统一自愈
+// （React/Emotion 重渲染移除或重排标签时自动重建/归位）。
 
 const ENHANCER_KEY = 'ds_mini_enhancer';
 
@@ -54,7 +59,7 @@ async function saveConfig(cfg: EnhancerConfig) {
 // theme 规则靠 500ms 重建自愈，其余规则靠 reassertStyles + head 守卫统一自愈
 const activeStyles = new Map<string, string>();
 
-function applyCSS(id: string, css: string) {
+export function applyGuardedCSS(id: string, css: string) {
   // 查找或创建 <style data-rule="id"> 标签（挂在 head 下）
   let rule = document.querySelector(`[data-rule="${id}"]`) as HTMLStyleElement | null;
   if (!rule) {
@@ -66,7 +71,7 @@ function applyCSS(id: string, css: string) {
   activeStyles.set(id, css);
 }
 
-function removeCSS(id: string) {
+export function removeGuardedCSS(id: string) {
   const el = document.querySelector(`[data-rule="${id}"]`);
   if (el) el.remove();
   activeStyles.delete(id);
@@ -74,15 +79,16 @@ function removeCSS(id: string) {
 
 /** 重申全部生效规则：被移除的标签重建；已存在的物理移到 head 末尾。theme 必须
     最先归位——它与正文染色规则存在同特异性竞争（后定义胜出），而"切到默认主题"
-    会删除 theme 标签，再切回非默认时重建的新标签会落到正文样式之后破坏顺序 */
-function reassertStyles() {
+    会删除 theme 标签，再切回非默认时重建的新标签会落到正文样式之后破坏顺序。
+    @internal 仅供测试导出；生产由 head 守卫自动触发，不对外暴露 */
+export function reassertStyles() {
   const ordered = [...activeStyles.entries()].sort(([a], [b]) =>
     a === 'theme' ? -1 : b === 'theme' ? 1 : 0,
   );
   for (const [id, css] of ordered) {
     const existing = document.querySelector(`[data-rule="${id}"]`);
     if (existing) document.head.appendChild(existing);
-    applyCSS(id, css);
+    applyGuardedCSS(id, css);
   }
 }
 
@@ -182,7 +188,7 @@ export async function toggleWideScreen(enabled: boolean) {
     }
 
     // CSS 覆盖 — 只限制消息容器宽度适配剩余空间
-    applyCSS(
+    applyGuardedCSS(
       'wide',
       `
       #root [class*="ds-virtual-list-items"] {
@@ -213,7 +219,7 @@ export async function toggleWideScreen(enabled: boolean) {
     `,
     );
   } else {
-    removeCSS('wide');
+    removeGuardedCSS('wide');
     // 恢复聊天面板原始样式
     document.querySelectorAll('[style*="flex: 1 1 auto"]').forEach((el) => {
       (el as HTMLElement).style.removeProperty('flex');
@@ -303,6 +309,12 @@ function isDarkMode(): boolean {
   return document.body.classList.contains('dark');
 }
 
+/** hex 颜色转 "r, g, b" 三元组（供 CSS var 消费，如 rgba(var(--ds-brand-rgb), 0.4)） */
+export function hexToRgbTriplet(hex: string): string {
+  const n = hex.replace('#', '');
+  return `${parseInt(n.slice(0, 2), 16)}, ${parseInt(n.slice(2, 4), 16)}, ${parseInt(n.slice(4, 6), 16)}`;
+}
+
 /** 品牌底色上的对勾前景色：按相对亮度取白/深灰，避免浅粉彩品牌上白对勾对比不足 */
 export function textColorOnBrand(hex: string): string {
   const n = hex.replace('#', '');
@@ -338,7 +350,7 @@ export async function applyTheme(idx: number) {
   currentBrandColor = theme.brandColor || '#4d6bfe';
 
   if (idx === 0 || !theme.bg) {
-    removeCSS('theme');
+    removeGuardedCSS('theme');
     clearInlineBg();
     // 切回默认主题：配色与精修跟随摘除（正文排版不受影响）
     syncMarkdownStyles(cfg);
@@ -353,7 +365,7 @@ export async function applyTheme(idx: number) {
   // 延时补打惯例自检修复
   scheduleLayoutMarkRetry();
 
-  applyCSS(
+  applyGuardedCSS(
     'theme',
     `
     html, body, #root {
@@ -364,6 +376,8 @@ export async function applyTheme(idx: number) {
         ? `
     body {
       --dsw-alias-brand-primary: ${theme.brandColor} !important;
+      /* 语音脉冲等需要带透明度消费品牌色的场合：提供 rgb 三元组（CSS var 无法拆 hex） */
+      --ds-brand-rgb: ${hexToRgbTriplet(theme.brandColor)} !important;
       /* 原生 hover 色是写死的 DeepSeek 蓝（--dsw-static-deepseek-450/500），
          从品牌色派生：浅色提亮、深色压暗 */
       --dsw-alias-button-primary-hover: color-mix(in srgb, ${theme.brandColor} 86%, ${dark ? 'black' : 'white'}) !important;
@@ -627,7 +641,7 @@ export async function applyTheme(idx: number) {
   }
 
   // 禁用磨砂玻璃效果：CSS 全局禁用 backdrop-filter（排除面板）
-  applyCSS(
+  applyGuardedCSS(
     'frosted',
     `
     *:not(#ds-mini-panel):not(#ds-mini-panel *) {
@@ -666,7 +680,7 @@ function clearInlineBg() {
       el.removeAttribute('data-ds-no-bg');
       el.removeAttribute('data-ds-sidebar-selected');
     });
-  removeCSS('frosted');
+  removeGuardedCSS('frosted');
 }
 
 function findLayoutElements(): { sidebar: HTMLElement | null; chatPanel: HTMLElement | null } {
@@ -755,7 +769,7 @@ export async function toggleScrollbar(hidden: boolean) {
   await saveConfig(cfg);
 
   if (hidden) {
-    applyCSS(
+    applyGuardedCSS(
       'scrollbar',
       `
       #root [class*="ds-virtual-list"]::-webkit-scrollbar,
@@ -776,7 +790,7 @@ export async function toggleScrollbar(hidden: boolean) {
     `,
     );
   } else {
-    removeCSS('scrollbar');
+    removeGuardedCSS('scrollbar');
   }
 }
 
@@ -1092,7 +1106,8 @@ function startRecording(btn: HTMLElement) {
   if (!ta) return;
 
   isRecording = true;
-  btn.style.background = 'rgba(77,107,254,0.3)';
+  // 录音中背景：品牌色 30%（默认主题 fallback 官方蓝），与脉冲波同源
+  btn.style.background = 'rgba(var(--ds-brand-rgb, 77, 107, 254), 0.3)';
   btn.style.animation = 'ds-voice-pulse 1.5s infinite';
 
   const startLen = ta.value.length;
@@ -1125,7 +1140,7 @@ function stopRecording(btn: HTMLElement) {
       recognition.stop();
     } catch {}
   }
-  btn.style.background = 'rgba(77,107,254,0.1)';
+  btn.style.background = 'rgba(var(--ds-brand-rgb, 77, 107, 254), 0.1)';
   btn.style.animation = '';
   isRecording = false;
 }
@@ -1246,7 +1261,7 @@ async function _loadFontCSS(urls: string[] | null) {
 }
 
 function _injectChatFont(family: string) {
-  applyCSS(
+  applyGuardedCSS(
     CHAT_ID,
     `
     #root { font-family: ${family} !important; }
@@ -1257,7 +1272,7 @@ function _injectChatFont(family: string) {
 }
 
 function _injectMonoFont(family: string) {
-  applyCSS(
+  applyGuardedCSS(
     MONO_ID,
     `
     #root code, #root pre, #root [class*="code"],
@@ -1273,7 +1288,7 @@ export async function applyChatFont(key: string) {
   await saveConfig(cfg);
 
   if (!key) {
-    removeCSS(CHAT_ID);
+    removeGuardedCSS(CHAT_ID);
     return;
   }
   const def = FONT_PRESETS.chat[key];
@@ -1288,7 +1303,7 @@ export async function applyChatMonoFont(key: string) {
   await saveConfig(cfg);
 
   if (!key) {
-    removeCSS(MONO_ID);
+    removeGuardedCSS(MONO_ID);
     return;
   }
   const def = FONT_PRESETS.mono[key];
@@ -1323,10 +1338,10 @@ export async function applyChatFontSize(size: number) {
   await saveConfig(cfg);
 
   if (!size) {
-    removeCSS(SIZE_ID);
+    removeGuardedCSS(SIZE_ID);
     return;
   }
-  applyCSS(
+  applyGuardedCSS(
     SIZE_ID,
     `
     #root .ds-markdown, #root .ds-message, #root .ds-message > div { font-size: ${size}px !important; }
@@ -1503,8 +1518,8 @@ function syncMarkdownStyles(cfg: EnhancerConfig) {
   const cssById = new Map(buildMarkdownStyleRules(cfg).map((r) => [r.id, r.css]));
   for (const id of MARKDOWN_STYLE_RULE_IDS) {
     const css = cssById.get(id);
-    if (css) applyCSS(id, css);
-    else removeCSS(id);
+    if (css) applyGuardedCSS(id, css);
+    else removeGuardedCSS(id);
   }
 }
 
@@ -1581,7 +1596,7 @@ export async function loadEnhancerFeatures() {
   syncMarkdownStyles(cfg);
 
   // 始终应用（不依赖主题）
-  applyCSS(
+  applyGuardedCSS(
     'voice-btn',
     `
     #root button[style*="border"][style*="rgba(77"] {

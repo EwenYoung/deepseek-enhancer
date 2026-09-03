@@ -18,7 +18,7 @@ vi.stubGlobal('chrome', {
   },
 });
 
-const { getConfig, textColorOnBrand, buildMarkdownStyleRules } =
+const { getConfig, textColorOnBrand, buildMarkdownStyleRules, hexToRgbTriplet } =
   await import('../enhancer-features');
 
 const FULL_DEFAULTS = {
@@ -95,6 +95,19 @@ describe('textColorOnBrand', () => {
   it('无效输入不抛错（按黑底处理 → 白前景）', () => {
     expect(textColorOnBrand('')).toBe('#ffffff');
     expect(textColorOnBrand('#zz')).toBe('#ffffff');
+  });
+});
+
+describe('hexToRgbTriplet', () => {
+  it('hex 转 "r, g, b" 三元组（供 rgba(var(--ds-brand-rgb), α) 消费）', () => {
+    expect(hexToRgbTriplet('#D98A6A')).toBe('217, 138, 106'); // Claude浅
+    expect(hexToRgbTriplet('#179299')).toBe('23, 146, 153'); // Catppuccin浅
+    expect(hexToRgbTriplet('#bd93f9')).toBe('189, 147, 249'); // Dracula
+  });
+
+  it('无 # 前缀与官方蓝同样正确', () => {
+    expect(hexToRgbTriplet('4d6bfe')).toBe('77, 107, 254'); // 默认品牌蓝
+    expect(hexToRgbTriplet('#4d6bfe')).toBe('77, 107, 254');
   });
 });
 

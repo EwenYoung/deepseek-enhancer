@@ -2,6 +2,7 @@
 // deepseek-enhancer — 工具调用折叠块 UI
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
+import { getToolByName } from './tool-descriptors';
 import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-parser';
 import { executeToolCall } from './tool-executor';
 import { createLoopState } from './loop-state';
@@ -216,11 +217,11 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[], isNewUserF
     return;
   }
 
-  // doc_generate 直接在 isolated world 中处理（不需要 background worker）
-  const docCalls = toolCalls.filter((c) => c.name === 'doc_generate');
-  const otherCalls = toolCalls.filter((c) => c.name !== 'doc_generate');
+  // execution==='local' 的工具直接在 isolated world 中处理（不需要 background worker）
+  const localCalls = toolCalls.filter((c) => getToolByName(c.name)?.execution === 'local');
+  const otherCalls = toolCalls.filter((c) => getToolByName(c.name)?.execution !== 'local');
 
-  for (const call of docCalls) {
+  for (const call of localCalls) {
     handleDocGenerate(call);
   }
 
@@ -481,14 +482,8 @@ function markLastAssistantProcessed(container: HTMLElement) {
 
 function formatResults(results: ToolResult[]): string {
   const structured = results.map((r) => {
-    const label =
-      r.toolName === 'web_search'
-        ? '联网搜索'
-        : r.toolName === 'web_fetch'
-          ? '网页抓取'
-          : r.toolName;
     return {
-      tool: label,
+      tool: getLabel(r.toolName),
       ok: r.success,
       summary: r.summary || '',
       detail: clampText(r.detail || r.result || '', 4000),
@@ -667,8 +662,7 @@ function insertBlockIntoChat(block: HTMLElement, container: HTMLElement) {
 }
 
 function getLabel(name: string): string {
-  const m: Record<string, string> = { web_search: '网络搜索', web_fetch: '网页抓取' };
-  return m[name] || name;
+  return getToolByName(name)?.label ?? name;
 }
 
 function findChatContainer(): HTMLElement | null {

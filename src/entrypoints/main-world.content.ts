@@ -5,10 +5,11 @@
 // 只能使用原生浏览器 API 和 window.postMessage 通信
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import mainXHRCode from '../core/main-xhr-inject?raw';
-import { TOOL_DESCRIPTORS } from '../core/tool-descriptors';
+import { TOOL_DESCRIPTORS, buildToolDefsJson } from '../core/tool-descriptors';
 
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // `/` 也必须转义：工具名会拼进正则字面量 `/<(...)>/g`，裸 `/` 会提前终止字面量
+  return s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 }
 
 function buildToolRegex(): string {
@@ -23,7 +24,11 @@ export default defineContentScript({
   world: 'MAIN',
 
   main() {
-    const code = mainXHRCode.replace('__DS_TOOL_NAMES_REGEX__', buildToolRegex());
+    // replaceAll 而非 replace：只要源文件任何位置（含注释）出现占位符字面量，
+    // replace 只替换第一处就会放走真正的注入点 → 运行时 JSON.parse 抛错、IIFE 中断
+    const code = mainXHRCode
+      .replaceAll('__DS_TOOL_NAMES_REGEX__', () => buildToolRegex())
+      .replaceAll('__DS_TOOL_DEFS__', () => buildToolDefsJson());
     const script = document.createElement('script');
     script.textContent = code;
     (document.head || document.documentElement).appendChild(script);

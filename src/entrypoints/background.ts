@@ -7,6 +7,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { isIsolatedToBackground } from '../core/protocol';
 import { getTavilyKey, setTavilyKey } from '../core/tavily-key';
+import { BACKGROUND_TOOLS } from '../core/tool-descriptors';
 
 const TAVILY_BASE = 'https://api.tavily.com';
 
@@ -56,6 +57,11 @@ async function handleToolExecution(req: ToolExecRequest) {
   const startTime = performance.now();
 
   try {
+    // 白名单前置检查：只放行 BACKGROUND_TOOLS 定义的工具，未知工具在读取 API Key 前直接拒绝
+    if (!BACKGROUND_TOOLS.some((t) => t.name === req.name)) {
+      return { success: false, error: 'Unknown tool: ' + req.name, duration: 0 };
+    }
+
     const apiKey = await getAPIKey();
 
     let toolOutput: ToolOutput;

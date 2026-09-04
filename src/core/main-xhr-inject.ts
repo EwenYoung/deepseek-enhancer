@@ -59,27 +59,10 @@
   if (document.body) modeObserver.observe(document.body, { childList: true, subtree: true });
 
   // ==========================================================
-  // 工具定义
+  // 工具定义 — 由构建期 seam 生成（main-world.content.ts 注入时替换占位符）
+  // 注意：注释中不得出现占位符字面量，否则 replace 只替换第一处会放走真正的注入点
   // ==========================================================
-  const TOOL_DEFS = [
-    { name: 'web_search', label: '联网搜索', params: { query: { desc: '搜索关键词' } } },
-    { name: 'web_fetch', label: '网页抓取', params: { url: { desc: '目标网页的完整 URL' } } },
-    { name: 'news_hub', label: '新闻聚合', params: { sources: { desc: '搜索源（可选）' } } },
-    {
-      name: 'github_trending',
-      label: 'GitHub热门',
-      params: { language: { desc: '语言' }, since: { desc: '周期' } },
-    },
-    {
-      name: 'doc_generate',
-      label: '生成文档',
-      params: {
-        title: { desc: '文件名' },
-        format: { desc: '格式: md/html' },
-        content: { desc: '文档内容（Markdown）' },
-      },
-    },
-  ];
+  const TOOL_DEFS = JSON.parse('__DS_TOOL_DEFS__');
   const disabledTools = {}; // 用户禁用的工具列表
 
   function buildToolDefs(mode) {

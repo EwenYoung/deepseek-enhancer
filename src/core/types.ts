@@ -14,6 +14,8 @@ export interface ToolDescriptor {
   description: string;
   /** JSON Schema 参数定义 */
   parameters: Record<string, ToolParameter>;
+  /** 执行位置：background（经 Background 代理）或 local（Isolated 本地执行） */
+  execution: 'background' | 'local';
 }
 
 export interface ToolParameter {

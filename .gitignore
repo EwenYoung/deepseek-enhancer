@@ -30,6 +30,8 @@ Desktop.ini
 # Tooling cache / local-only
 .playwright-mcp/
 .serena/
+.vera/
+.vera.lock
 
 # Generated assets
 logos/

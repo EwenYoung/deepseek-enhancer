@@ -3,7 +3,7 @@
 // ============================================================
 // 从页面右侧滑出的管理面板
 import type { AppState, Skill } from './types';
-import { loadSkills, saveSkill, deleteSkill } from './skill-registry';
+import { loadSkills, saveSkill, deleteSkill, isNameTaken } from './skill-registry';
 import { importFromLocal, importAndSave } from './skill-importer';
 import { exportChat } from './chat-exporter';
 import {
@@ -1127,8 +1127,7 @@ function showModalEditor(state: AppState, skill?: Skill) {
     <div style="padding:16px 20px;flex:1;overflow-y:auto;">
       <label style="font-size:12px;font-weight:500;color:var(--panel-text-secondary);display:block;margin-bottom:4px;">名称（如 my-skill）</label>
       <input id="ds-modal-name" value="${esc(skill?.name || '')}" placeholder="my-skill"
-        style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;margin-bottom:12px;box-sizing:border-box;"
-        ${isEdit ? 'disabled' : ''}>
+        style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;background:var(--input-bg);color:var(--panel-text);font-size:13px;margin-bottom:12px;box-sizing:border-box;">
 
       <label style="font-size:12px;font-weight:500;color:var(--panel-text-secondary);display:block;margin-bottom:4px;">描述</label>
       <input id="ds-modal-desc" value="${esc(skill?.description || '')}" placeholder="一句话描述"
@@ -1221,6 +1220,11 @@ function showModalEditor(state: AppState, skill?: Skill) {
 
     if (!name || !instructions) {
       alert('名称和指令内容不能为空');
+      return;
+    }
+
+    if (await isNameTaken(name, skill?.id)) {
+      alert(`名称 /${name} 已被其他技能使用`);
       return;
     }
 

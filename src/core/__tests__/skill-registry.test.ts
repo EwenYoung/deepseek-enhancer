@@ -163,6 +163,30 @@ describe('skill-registry', () => {
     });
   });
 
+  describe('isNameTaken', () => {
+    it('returns true when name exists on another skill', async () => {
+      await skillRegistry.saveSkill(makeSkill({ id: 'a', name: 'taken' }));
+      expect(await skillRegistry.isNameTaken('taken')).toBe(true);
+    });
+
+    it('returns false when name is free', async () => {
+      await skillRegistry.saveSkill(makeSkill({ id: 'a', name: 'mine' }));
+      expect(await skillRegistry.isNameTaken('other')).toBe(false);
+    });
+
+    it('excludes the given skill id when editing', async () => {
+      await skillRegistry.saveSkill(makeSkill({ id: 'a', name: 'mine' }));
+      expect(await skillRegistry.isNameTaken('mine', 'a')).toBe(false);
+      expect(await skillRegistry.isNameTaken('mine', 'b')).toBe(true);
+    });
+
+    it('matches builtin skill names too', async () => {
+      const builtin = (await skillRegistry.loadSkills()).find((s) => s.source === 'builtin');
+      expect(builtin).toBeDefined();
+      expect(await skillRegistry.isNameTaken(builtin!.name)).toBe(true);
+    });
+  });
+
   describe('matchSkills', () => {
     it('returns all enabled skills when prefix is empty', async () => {
       const result = await skillRegistry.matchSkills('');

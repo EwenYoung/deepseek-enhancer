@@ -76,6 +76,12 @@ export async function getSkillByName(name: string): Promise<Skill | undefined> {
   return all.find((s) => s.name === name && s.enabled);
 }
 
+/** 名称是否已被其他技能占用（excludeId 用于编辑时排除自身） */
+export async function isNameTaken(name: string, excludeId?: string): Promise<boolean> {
+  const all = await loadSkills();
+  return all.some((s) => s.name === name && s.id !== excludeId);
+}
+
 // ============================================================
 // 匹配（用于 /autocomplete）
 // ============================================================

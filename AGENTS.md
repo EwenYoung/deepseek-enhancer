@@ -20,6 +20,10 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 **用完即断**：任务结束前执行 `chrome-devtools stop`，并确认无残留进程（`Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome-devtools' }` 为空，含 telemetry watchdog 孤儿进程）；残留会干扰其他调试任务。
 </important>
 
+<important if="你准备调用 aoci_update_entry 提交受管批次">
+**AOCI 批量提交走桥接脚本**：ZCode 宿主校验层误判 `aoci_update_entry` 的 `entries[]` 形状（path+source_sha256+candidate_id 三件套被客户端拒收），直接调用必失败。改用 `node scripts/aoci-mcp-bridge.mjs <候选JSON> [仓库根]`，经 stdio JSON-RPC 直连 aoci MCP server 提交；候选 JSON 按 `aoci_maintain` 返回原样组装（`code_batch_id` + `entries` 数组），aoci 二进制路径可用环境变量 `AOCI_BIN` 覆盖。
+</important>
+
 ## 参考文档
 
 - **[docs/CONTEXT.md](docs/CONTEXT.md)（术语表，长期维护）**——命名或行文涉及领域概念时以它为准：拦截（Hook）、增强（Augment）、工具（Tool）、技能（Skill）、面板（Panel）、工具结果块（Tool Blocks）。任务收尾时回查：出现新概念就补录，重命名或含义变化就同步该表。
@@ -93,3 +97,15 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 <!-- retro-managed-end -->
 
 完整经验库在 **[.retro/](.retro/INDEX.md)**（脚本生成索引，条目在 `.retro/entries/`、原始摘录在 `.retro/log/`）：排查卡壳先查其 INDEX；会话收尾沉淀用 /retro 技能，跑 `retro.py check` 校验一致性。
+
+<!-- aoci:begin -->
+
+## AOCI 仓库认知
+
+本项目使用 AOCI 维护仓库级认知索引（aoci.txt / aoci.code.txt）。认知使用与维护规则见 `aoci` skill，按以下时机加载并遵循：
+
+- **会话开始**或上下文压缩恢复后：先判断认知是否需要加载/重载（详见 skill"会话开始"与"上下文压缩恢复"两节）；
+- **代码变更收尾**：受 AOCI 管理的对象达到最终稳定状态后，必须按 skill"收尾维护"流程操作（MCP 可用时调 `aoci_maintain` + `aoci_update_entry`）；
+- **只读任务**：无需处理认知；用户明确禁止写入认知资产时，只报告状态与剩余不一致。
+
+<!-- aoci:end -->

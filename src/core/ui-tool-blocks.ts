@@ -9,6 +9,7 @@ import { createLoopState } from './loop-state';
 import { postToMain } from './protocol';
 import { applyGuardedCSS } from './enhancer-features';
 import { esc, downloadBlob } from './ui-kit';
+import { isCompleteHtmlDocument, markdownToHtmlDoc } from './markdown';
 // ============================================================
 // 状态
 // ============================================================
@@ -536,9 +537,13 @@ function handleDocGenerate(call: import('./types').ToolCall) {
   const isHtml = format === 'html';
   const ext = isHtml ? '.html' : '.md';
   const mime = isHtml ? 'text/html' : 'text/markdown';
+  // html：完整 HTML 文档（复杂版式页面）原样落盘；
+  // 模型给了 Markdown 时兜底渲染，避免产出改了扩展名的"假 html"
+  const out =
+    isHtml && !isCompleteHtmlDocument(content) ? markdownToHtmlDoc(title, content) : content;
   const safeTitle = title.replace(/[^a-zA-Z0-9一-鿿\s_-]/g, '').trim();
   const fn = (safeTitle || 'document') + ext;
-  const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  const blob = new Blob([out], { type: `${mime};charset=utf-8` });
   downloadBlob(blob, fn);
   if (call.raw) {
     processedDocRaws.add(call.raw);

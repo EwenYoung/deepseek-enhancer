@@ -110,7 +110,9 @@
         lines.push(
           '生成文档：<doc_generate>{"title": "文件名","format": "md","content": "..."}</doc_generate>',
         );
-        lines.push('将内容生成为可下载的文件，支持 Markdown 和 HTML');
+        lines.push(
+          'format=md 时 content 为 Markdown；format=html 时 content 为完整 HTML 文档（<!DOCTYPE html> 开头、内联 <style> 样式，适合复杂版式页面），content 为 Markdown 时会自动转成 HTML',
+        );
         lines.push(
           '例如：<doc_generate>{"title": "报告","format": "md","content": "# 报告标题\\n内容"}</doc_generate>',
         );

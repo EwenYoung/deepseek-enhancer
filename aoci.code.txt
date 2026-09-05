@@ -2,7 +2,7 @@
 
 ===D:/project/deepseek-enhancer/===
 .gitattributes[FC5T]: F:Git 换行策略：文本文件一律以 LF 检出，二进制自动识别不处理 | R:- | A:- | S:AOCI 基线按原始字节比对，本规则保证各平台检出字节一致；Windows 默认 autocrlf 改写行尾会致全树判 stale，勿删
-.gitignore[FC3T]: F:Git 忽略清单：排除依赖、构建产物、WXT 缓存及本地工具/会话目录（.vera、.retro、.handoff、.scratch 等） | R:- | A:- | S:aoci*.txt 与 AGENTS.md 勿加入本清单，否则 AOCI scan 静默跳过
+.gitignore[FC3T]: F:Git 忽略清单：排除依赖、构建产物、WXT 缓存、宿主配置 .zcode 及本地工具/会话目录（.vera、.retro、.handoff 等） | R:- | A:- | S:aoci*.txt 与 AGENTS.md 勿加入本清单，否则 AOCI scan 静默跳过
 .prettierignore[FQ2T]: F:Prettier 忽略清单：格式化排除 dist、node_modules、锁文件及本地目录 | R:code:.prettierrc | A:- | S:-
 .prettierrc[FQ3T]: F:Prettier 格式配置：单引号、分号、2 空格缩进、行宽 100、尾逗号 all | R:code:package.json,code:.prettierignore | A:- | S:-
 AGENTS.md[SG8S]: F:AI 助手工作规则中枢：if= 条件触发规则、五步开发工作流、pnpm 环境、vera 检索约定、三层运行时与 Agent 循环架构、经验教训与 AOCI 托管区块 | R:code:docs/CLEAN-CODE.md,code:docs/CONTEXT.md,code:scripts/aoci-mcp-bridge.mjs,code:src/entrypoints/main-world.content.ts,code:src/core/main-xhr-inject.ts,code:src/entrypoints/content.ts,code:src/entrypoints/background.ts,code:src/core/enhancer-features.ts | A:改代码前必读 CLEAN-CODE.md（未限定规则按 MUST）；提交过 typecheck→lint→format:check，中文 conventional commits；五步完成前代码停未提交；包管理器一律 pnpm；检索先 vera；AOCI 批量提交走 scripts/aoci-mcp-bridge.mjs | S:retro-managed 与 aoci:begin/end 区块由脚本/流程托管，勿手改；chrome-devtools 调试结束须 stop 并确认无残留进程
@@ -18,13 +18,9 @@ tsconfig.json[FC4T]: F:TypeScript 编译配置：strict 全开、bundler 解析�
 vitest.config.ts[TQ3T]: F:Vitest 测试配置：node 环境跑纯逻辑测试，@ 别名对齐 tsconfig，globals 开启免导入 | R:code:tsconfig.json,code:package.json | A:resolve.alias @→src；test.globals true；test.environment node | S:environment 为 node 非 DOM，DOM 重依赖测试因此跳过
 wxt.config.ts[FV5T]: F:WXT 构建配置：手写 manifest（权限、host_permissions、图标、web_accessible_resources）与目录布局，产出 chrome-mv3 | R:code:src/entrypoints/main-world.content.ts,code:src/entrypoints/background.ts,code:package.json | A:manifest.permissions [storage]；host_permissions 7 个域；web_accessible_resources 暴露 content-scripts/main-world.js；srcDir/outDir/publicDir 目录布局 | S:host_permissions 须与 background 的 fetch 目标一一对应，新增数据源要同步；web_accessible_resources 引构建产物 main-world.js
 
-===D:/project/deepseek-enhancer/.zcode/===
-config.json[FC4T]: F:ZCode 工作区 MCP 配置：声明 aoci stdio 服务器（D:\AISoftware\aoci.exe mcp） | R:- | A:向宿主暴露 aoci_* 九个 MCP 工具 | S:args 不带 --repo，依赖宿主以仓库根为 cwd；固定 cwd 宿主须显式加 --repo
-
 ===D:/project/deepseek-enhancer/docs/===
 CLEAN-CODE.md[SG8M]: F:仓库强制编码规范（OBEY Clean Code）：未限定规则一律 MUST，覆盖优先级、命名、函数、注释、对象与类、错误处理、边界、测试与 TDD、并发、坏味道清单与硬规则 | R:- | A:未限定规则 MUST、Prefer 为 SHOULD、Do not/Avoid/Never 为 MUST NOT；非平凡任务走 8 步 Change Process；收尾过 Review checklist | S:硬规则：不留无强理由的重复、不混查询与变更、不悄悄扩大任务范围；修 bug 尽量补一个本可抓住它的测试
 CONTEXT.md[SG8S]: F:领域术语权威表（长期维护事实源）：按架构层、核心机制、核心概念、UI 组件、数据处理登记正式名+英文名+定义+弃用说法，命名与行文以本表为准 | R:code:src/entrypoints/main-world.content.ts,code:src/core/tool-executor.ts,code:src/core/loop-state.ts,code:src/core/panel-config.ts,code:src/core/agent-mode.ts,code:src/core/tavily-key.ts,code:src/core/data-backup.ts,code:src/core/skill-registry.ts | A:概念新增/重命名/含义变化必须先登记本表；条目格式为正式名(English)+定义+_Avoid_ 弃用说法 | S:构建 seam 铁律：源文件任何位置（含注释）不得出现 __DS_TOOL_DEFS__ 等占位符字面量，replaceAll 会连带替换，曾致运行时 JSON.parse 抛错
-architecture-review-20260831.html[SG4L]: F:2026-08-31 架构审查报告（9,675 行 TS、三路探查）：9 项重构候选——loop-state 状态机、protocol 收口、SSE 单一同源、样式守卫 seam、工具注册表、品牌色 seam、配置 key 归主、ui-kit、导出线格式 | R:code:src/entrypoints/content.ts,code:src/core/main-xhr-inject.ts,code:src/core/enhancer-features.ts,code:src/core/ui-tool-blocks.ts | A:候选按 Strong/Worth exploring/Speculative 分级；每项附 file:line 证据、Before/After mermaid 图 | S:快照报告：结论对应 2026-08-31 代码，重构落地后即过时，引用前须对照现状核实
 
 ===D:/project/deepseek-enhancer/docs/adr/===
 0001-terminology-hook-augment.md[SG6T]: F:架构决策记录 0001：拦截→上下文组装流程统一为 Hook（拦截）/Augment（增强）两个术语，退役 Inject；inject-context.ts 更名 context-builder.ts | R:code:src/core/context-builder.ts | A:Hook 只指拦截，Augment 只指内容组装与插入，Inject 不再使用 | S:弃用 Inject 因其安全语境特指 prompt injection，本项目操作不跨信任边界；后续命名勿再引入 Inject 相关词

@@ -73,3 +73,9 @@ npm-debug.log*
 .claude/skills/to-tickets/
 .claude/skills/ui-styling/
 .claude/skills/ui-ux-pro-max/
+
+# ZCode workspace host config (machine-specific absolute paths)
+.zcode/
+
+# Session-scoped architecture review snapshot (20260831)
+docs/architecture-review-20260831.html

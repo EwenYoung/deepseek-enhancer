@@ -9,7 +9,7 @@ import { createLoopState } from './loop-state';
 import { postToMain } from './protocol';
 import { applyGuardedCSS } from './enhancer-features';
 import { esc, downloadBlob } from './ui-kit';
-import { isCompleteHtmlDocument, markdownToHtmlDoc } from './markdown';
+import { resolveDocPlan } from './doc-generate';
 // ============================================================
 // 状态
 // ============================================================
@@ -18,10 +18,11 @@ const loopState = createLoopState(); // Agent 循环状态（深度/停止标记
 let toolBlocksInited = false;
 let agentPanel: AgentPanel | null = null; // Agent loop UI panel
 
-// doc_generate 去重：同一 raw（MAIN 消息路径 + DOM 兜底路径会各触发一次）
-// 只保留最近处理的 raw，避免无限增长
-const processedDocRaws = new Set<string>();
-const MAX_PROCESSED_DOC_RAWS = 50;
+// doc_generate 去重：SSE 主路径与 DOM 兜底路径在流式过程中会对同一调用各触发一次
+// （raw 随流式截断而不同，不能拿 raw 当键），去重键由解析结果决定，见 doc-generate.ts。
+// 只保留最近处理的键，避免无限增长
+const processedDocKeys = new Set<string>();
+const MAX_PROCESSED_DOC_KEYS = 50;
 
 // ============================================================
 // Agent Panel — 可视化 agent loop 步骤 (deepseek-pp style)
@@ -353,8 +354,10 @@ export function initToolBlocks(_state: AppState) {
     for (const mut of mutations) {
       for (const node of mut.addedNodes) {
         if (node instanceof HTMLElement) {
-          // 续接消息隐藏：在任何新增元素中检测（不限 .ds-message）
-          if (isContinuationMessage(node.textContent || '')) {
+          // 续接消息隐藏：在任何新增元素中检测（不限 .ds-message），
+          // 但只允许气泡内节点——domSubmitText 填入续接文本时输入框容器/镜像
+          // 节点也会命中文本特征，误隐藏会把输入框压扁
+          if (isContinuationMessage(node.textContent || '') && node.closest('.ds-message')) {
             node.setAttribute('data-ds-continuation', 'true');
             node.style.display = 'none';
             console.log('[DS-Mini:UI] Continuation message hidden');
@@ -362,7 +365,11 @@ export function initToolBlocks(_state: AppState) {
           }
 
           // 虚拟列表重渲染：恢复隐藏已标记的续接消息
-          if (node.hasAttribute && node.hasAttribute('data-ds-continuation')) {
+          if (
+            node.hasAttribute &&
+            node.hasAttribute('data-ds-continuation') &&
+            !node.querySelector('textarea')
+          ) {
             node.style.display = 'none';
             continue;
           }
@@ -402,6 +409,9 @@ function processNewContent(node: HTMLElement) {
   // 跳过续接消息（已被隐藏）
   if (node.hasAttribute && node.hasAttribute('data-ds-continuation')) return;
   if (node.closest && node.closest('[data-ds-tool-processed]')) return;
+  // 扩展自渲染的 UI（工具块、折叠条）里含原始调用文本，扫到会把已执行的调用再执行一遍
+  if (node.closest && (node.closest('.ds-mini-tool-block') || node.closest('[data-ds-collapse]')))
+    return;
   if (!node.closest || !node.closest('.ds-message')) return;
 
   const container = findChatContainer();
@@ -514,61 +524,26 @@ function clampText(text: string, maxLen: number): string {
 }
 
 function handleDocGenerate(call: import('./types').ToolCall) {
-  // 去重：MAIN 消息路径与 DOM 兜底路径可能对同一工具调用各触发一次，
-  // 同一 raw 只下载一次（浏览器会自动加 (1) 后缀产生重复文件）
-  if (call.raw && processedDocRaws.has(call.raw)) {
-    console.log('[DS-Mini:UI] doc_generate: duplicate raw skipped');
-    return;
-  }
-  const title = String(call.payload.title || 'document');
-  const format = String(call.payload.format || 'md').toLowerCase();
-  let content = String(call.payload.content || '');
-  if (!content) {
-    // 兜底：从 raw 里尝试再提取一次（避免 payload 解析失败导致静默丢失）
-    content = extractContentFromRaw(call.raw);
-  }
-  if (!content) {
+  const plan = resolveDocPlan(call.raw, call.payload);
+  if (!plan) {
     console.warn(
       '[DS-Mini:UI] doc_generate: payload missing content, raw:',
       call.raw?.slice(0, 120),
     );
     return;
   }
-  const isHtml = format === 'html';
-  const ext = isHtml ? '.html' : '.md';
-  const mime = isHtml ? 'text/html' : 'text/markdown';
-  // html：完整 HTML 文档（复杂版式页面）原样落盘；
-  // 模型给了 Markdown 时兜底渲染，避免产出改了扩展名的"假 html"
-  const out =
-    isHtml && !isCompleteHtmlDocument(content) ? markdownToHtmlDoc(title, content) : content;
-  const safeTitle = title.replace(/[^a-zA-Z0-9一-鿿\s_-]/g, '').trim();
-  const fn = (safeTitle || 'document') + ext;
-  const blob = new Blob([out], { type: `${mime};charset=utf-8` });
-  downloadBlob(blob, fn);
-  if (call.raw) {
-    processedDocRaws.add(call.raw);
-    if (processedDocRaws.size > MAX_PROCESSED_DOC_RAWS) {
-      const oldest = processedDocRaws.values().next().value;
-      if (oldest !== undefined) processedDocRaws.delete(oldest);
-    }
+  if (processedDocKeys.has(plan.key)) {
+    console.log('[DS-Mini:UI] doc_generate: duplicate call skipped');
+    return;
   }
-  console.log('[DS-Mini:UI] doc_generate:', fn);
-}
-
-/**
- * 兜底提取：从原始 XML 中找 "content" 字段（payload 解析失败时用）
- * 仅处理合法的 JSON 字符串值；找不到返回空串
- */
-function extractContentFromRaw(raw: string | undefined): string {
-  if (!raw) return '';
-  // 宽松匹配 "content" 键后的 JSON 字符串值（含转义）
-  const m = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw);
-  if (!m) return '';
-  try {
-    return JSON.parse('"' + m[1] + '"') as string;
-  } catch {
-    return '';
+  const blob = new Blob([plan.out], { type: `${plan.mime};charset=utf-8` });
+  downloadBlob(blob, plan.filename);
+  processedDocKeys.add(plan.key);
+  if (processedDocKeys.size > MAX_PROCESSED_DOC_KEYS) {
+    const oldest = processedDocKeys.values().next().value;
+    if (oldest !== undefined) processedDocKeys.delete(oldest);
   }
+  console.log('[DS-Mini:UI] doc_generate:', plan.filename);
 }
 
 // ============================================================
@@ -704,7 +679,9 @@ function scanAndHideToolResults() {
           const pCls = String(p.className || '');
           // 跳过虚拟列表容器
           if (pCls.indexOf('virtual-list') !== -1) break;
-          if (isMsgComponent(p) && !p.hasAttribute('data-ds-hidden')) {
+          // 只隐藏气泡内组件：domSubmitText 填入续接文本时输入框容器/镜像
+          // 节点也会命中前缀特征，误隐藏会把输入框压扁（与 content.ts resultHider 对齐）
+          if (isMsgComponent(p) && p.closest('.ds-message') && !p.hasAttribute('data-ds-hidden')) {
             p.setAttribute('data-ds-hidden', '');
             found = true;
             break;

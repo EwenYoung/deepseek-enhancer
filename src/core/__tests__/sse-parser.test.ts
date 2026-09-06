@@ -3,7 +3,6 @@ import {
   parseSSEChunk,
   extractToolCalls,
   stripToolCalls,
-  extractTaskComplete,
   stripTaskComplete,
   accumulateText,
   resetAccumulator,
@@ -290,25 +289,7 @@ describe('extractToolCalls 宽松解析兜底（doc_generate 下载链路）', (
   });
 });
 
-describe('task_complete 嵌套花括号', () => {
-  it('summary 含嵌套花括号 → 完整提取', () => {
-    const text = '<task_complete>{"summary":"完成 {3} 项 {任务}"}</task_complete>';
-    const r = extractTaskComplete(text);
-    expect(r.found).toBe(true);
-    expect(r.summary).toBe('完成 {3} 项 {任务}');
-  });
-
-  it('summary 含转义引号 → 完整提取', () => {
-    const text = '<task_complete>{"summary":"他说 \\"OK\\" 了"}</task_complete>';
-    const r = extractTaskComplete(text);
-    expect(r.found).toBe(true);
-    expect(r.summary).toBe('他说 "OK" 了');
-  });
-
-  it('无标记 → found=false', () => {
-    expect(extractTaskComplete('普通文本')).toEqual({ found: false, summary: '' });
-  });
-
+describe('stripTaskComplete（旧数据兜底）', () => {
   it('stripTaskComplete 完整移除含花括号的标记', () => {
     const text = '前置 <task_complete>{"summary":"a {b} c"}</task_complete> 后置';
     expect(stripTaskComplete(text)).toBe('前置  后置');

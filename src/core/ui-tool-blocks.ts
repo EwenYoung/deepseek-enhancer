@@ -3,7 +3,7 @@
 // ============================================================
 import type { AppState, ToolCall, ToolResult } from './types';
 import { getToolByName } from './tool-descriptors';
-import { extractToolCalls, extractTaskComplete, stripTaskComplete } from './sse-parser';
+import { extractToolCalls } from './sse-parser';
 import { executeToolCall } from './tool-executor';
 import { createLoopState } from './loop-state';
 import { postToMain } from './protocol';
@@ -396,10 +396,14 @@ export function initToolBlocks(_state: AppState) {
 // ============================================================
 function isContinuationMessage(text: string): boolean {
   if (!text) return false;
-  // 检测续接 prompt 的两种形式：原始 XML 或被 HTML 转义
+  // 检测续接 prompt：现行 XML 格式以 <tool_results> 开头（含 HTML 转义形态）。
+  // 用开头匹配：用户/模型在正文中引用该标签词不应误伤整条气泡（漏判由
+  // content.ts resultHider 与 scanAndHideToolResults 两条前缀路径兜底）；
+  // 旧版中文前缀格式（历史会话）保留 original_task 判据
+  const head = text.trimStart();
   return (
-    (text.includes('<original_task>') && text.includes('<tool_results>')) ||
-    (text.includes('&lt;original_task&gt;') && text.includes('&lt;tool_results&gt;')) ||
+    head.indexOf('<tool_results>') === 0 ||
+    head.indexOf('&lt;tool_results&gt;') === 0 ||
     (text.includes('以下是工具执行结果') && text.includes('original_task'))
   );
 }
@@ -421,14 +425,6 @@ function processNewContent(node: HTMLElement) {
   if (node.closest('.ds-message') !== asstMsgs[asstMsgs.length - 1]) return;
 
   const text = node.textContent || '';
-
-  // FR-5: 检查 task_complete 标记
-  const complete = extractTaskComplete(text);
-  if (complete.found) {
-    console.log('[DS-Mini:UI] Task complete marker detected, summary:', complete.summary);
-    // 从可见文本移除标记
-    hideRawTaskComplete(node, complete);
-  }
 
   const calls = extractToolCalls(text);
   if (!calls.length) return;
@@ -460,28 +456,6 @@ function hideRawToolCalls(container: HTMLElement, toolCalls: ToolCall[]) {
   }
 }
 
-/**
- * FR-5: 从可见 DOM 文本中移除 task_complete 标记
- */
-function hideRawTaskComplete(
-  container: HTMLElement,
-  taskComplete: { found: boolean; summary: string },
-) {
-  if (!taskComplete.found) return;
-  const asstMsgs = container.querySelectorAll('.ds-message:not(.d29f3d7d)');
-  if (!asstMsgs.length) return;
-  const target = asstMsgs[asstMsgs.length - 1];
-
-  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
-  let n: Text | null;
-  while ((n = walker.nextNode() as Text | null)) {
-    const stripped = stripTaskComplete(n.textContent || '');
-    if (stripped !== n.textContent) {
-      n.textContent = stripped;
-    }
-  }
-}
-
 // ============================================================
 // 辅助
 // ============================================================
@@ -504,17 +478,13 @@ function formatResults(results: ToolResult[]): string {
     };
   });
 
+  // <tool_results> 开头的续接 prompt：回注判定（main-xhr-inject / content.ts）
+  // 按同前缀识别，导出侧提取正则 <tool_results>…</tool_results> 与此格式对齐
   return [
-    '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
-    '如果结果已经足够，请输出最终结论；只有确实需要更多信息时才继续调用工具。',
-    '',
-    '<original_task>',
-    '',
-    '</original_task>',
-    '',
     '<tool_results>',
     JSON.stringify(structured, null, 2),
     '</tool_results>',
+    '以上是工具执行结果。请基于原始任务继续推进；结果已足够时输出最终结论，只有确实需要更多信息时才继续调用工具。',
   ].join('\n');
 }
 
@@ -649,7 +619,8 @@ function findChatContainer(): HTMLElement | null {
   return document.getElementById('root') || document.body;
 }
 
-// 多帧扫描隐藏工具结果回注消息（应对虚拟列表渲染副本；前缀与 formatResults 输出对齐）
+// 多帧扫描隐藏工具结果回注消息（应对虚拟列表渲染副本；前缀与 formatResults 输出
+// 对齐：现行 <tool_results> 开头 + 旧版中文前缀，历史会话气泡仍为旧格式）
 function scanAndHideToolResults() {
   let frames = 0;
   const maxFrames = 30;
@@ -670,7 +641,11 @@ function scanAndHideToolResults() {
     let textNode;
     let found = false;
     while ((textNode = walker.nextNode())) {
-      if (textNode.textContent && textNode.textContent.indexOf('以下是工具执行结果') === 0) {
+      if (
+        textNode.textContent &&
+        (textNode.textContent.indexOf('<tool_results>') === 0 ||
+          textNode.textContent.indexOf('以下是工具执行结果') === 0)
+      ) {
         // 从文本节点向上找 hash class 消息容器（限步 8 层）
         let p = textNode.parentElement;
         let steps = 0;

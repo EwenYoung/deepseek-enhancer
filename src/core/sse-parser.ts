@@ -354,26 +354,9 @@ export function stripToolCalls(text: string): string {
 }
 
 // ============================================================
-// 任务完成标记（FR-5）
+// 旧数据兜底 — task_complete 标记已从提示词生成端移除，仅历史会话缓存
+// （助手原文含该标记）经导出路径时需要剥离
 // ============================================================
-
-// ============================================================
-// 任务完成标记（FR-5）
-// ============================================================
-
-/**
- * 从文本中检测 task_complete 标记，提取 summary
- * 与工具调用同理：JSON 主体用平衡扫描提取，summary 含嵌套花括号也不会截断
- */
-export function extractTaskComplete(text: string): { found: boolean; summary: string } {
-  const tagStart = text.indexOf('<task_complete>');
-  if (tagStart < 0) return { found: false, summary: '' };
-  const jsonStart = tagStart + '<task_complete>'.length;
-  const body = extractBalancedJson(text, jsonStart);
-  if (!body) return { found: false, summary: '' };
-  const parsed = parseToolJsonLoose(body);
-  return { found: true, summary: (parsed?.summary as string) || '任务完成' };
-}
 
 /**
  * 从文本中移除 task_complete 标记（平衡扫描定位，summary 含花括号也能完整移除）

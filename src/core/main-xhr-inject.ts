@@ -108,14 +108,9 @@
         lines.push('例如：<github_trending>{"since": "daily"}</github_trending>');
       } else if (t.name === 'doc_generate') {
         lines.push(
-          '生成文档：<doc_generate>{"title": "文件名","format": "md","content": "..."}</doc_generate>',
+          '生成文档：<doc_generate>{"title": "文件名","format": "md 或 html","content": "正文"}</doc_generate>',
         );
-        lines.push(
-          'format=md 时 content 为 Markdown；format=html 时 content 为完整 HTML 文档（<!DOCTYPE html> 开头、内联 <style> 样式，适合复杂版式页面），content 为 Markdown 时会自动转成 HTML',
-        );
-        lines.push(
-          '例如：<doc_generate>{"title": "报告","format": "md","content": "# 报告标题\\n内容"}</doc_generate>',
-        );
+        lines.push('format=md 时 content 为 Markdown；format=html 时 content 为完整 HTML 文档');
       }
       lines.push('');
     }
@@ -124,10 +119,7 @@
     lines.push('- 必须替换 query/url 为真实内容，不要使用占位符');
     lines.push('- 一次只输出一个 XML 标签，放到回复末尾');
     lines.push('- 收到工具结果后，如有需要可以再次调用工具，直到完成全部需求后再回复用户');
-    lines.push(
-      '- 任务完成后请输出 <task_complete>{"summary": "完成总结"}</task_complete> 标记结束',
-    );
-    return lines.join('\n');
+    return '<tool_defs>\n' + lines.join('\n') + '\n</tool_defs>';
   }
 
   var TOOL_DEFS_CACHE = {};
@@ -175,8 +167,13 @@
           lastCtx.lastBody = parsedCtx; // 保存完整请求体供静默循环复用
 
           // 新用户消息（非工具结果回注）→ 重置 parentMessageId + 复位停止标记
-          // 回注 prompt 以「以下是工具执行结果」开头（formatResults 输出），旧前缀 [工具执行结果] 已废弃
-          if (parsedCtx.prompt && parsedCtx.prompt.indexOf('以下是工具执行结果') !== 0) {
+          // 回注 prompt 以 <tool_results> 开头（formatResults 输出）；旧中文前缀
+          // 仍识别（历史会话粘贴等场景），防止回注被误判为新用户消息
+          if (
+            parsedCtx.prompt &&
+            parsedCtx.prompt.indexOf('<tool_results>') !== 0 &&
+            parsedCtx.prompt.indexOf('以下是工具执行结果') !== 0
+          ) {
             lastCtx.parentMessageId = null;
             stopRequested = false;
             lastIsNewUserFlow = true;
@@ -237,7 +234,9 @@
     // 页面刷新后集合清空会再补一次，重复定义无害）。工具结果回注（循环续接）一律
     // 不注入，定义留在会话历史里，续接轮次依赖它继续调用工具。
     // 不编入模式指纹：页面切换时模式检测会误读。
-    const isToolResultEcho = userContent.indexOf('以下是工具执行结果') === 0;
+    const isToolResultEcho =
+      userContent.indexOf('<tool_results>') === 0 ||
+      userContent.indexOf('以下是工具执行结果') === 0;
     const sid = parsed.chat_session_id || '';
     const needToolDefs =
       !isToolResultEcho && (!parsed.parent_message_id || (sid !== '' && !injectedSessions[sid]));
@@ -245,18 +244,21 @@
     const toolDefs = needToolDefs ? getToolDefs(currentMode) : '';
     let prefix = '';
 
+    // 注入块与用户原文各包一层 XML，模型据此区分消息类型；无注入块时不包装，
+    // 保持裸用户消息
     // 检测 /skill 命令
     const skillCmd = parseSkillCommand(userContent);
     if (skillCmd && skillInstructions) {
       const parts = [];
       if (toolDefs) parts.push(toolDefs);
-      if (skillInstructions) parts.push(skillInstructions);
-      prefix = parts.join('\n') + '\n---\n';
+      parts.push('<skill_instructions>\n' + skillInstructions + '\n</skill_instructions>');
+      prefix = parts.join('\n\n');
       const userArgs = skillCmd.args || userContent.slice(skillCmd.skillName.length + 1).trim();
-      parsed.prompt = prefix + (userArgs || userContent);
+      parsed.prompt =
+        prefix + '\n\n<user_message>\n' + (userArgs || userContent) + '\n</user_message>';
     } else if (toolDefs) {
-      prefix = toolDefs + '\n---\n';
-      parsed.prompt = prefix + userContent;
+      prefix = toolDefs;
+      parsed.prompt = prefix + '\n\n<user_message>\n' + userContent + '\n</user_message>';
     }
 
     if (toolDefs && sid) injectedSessions[sid] = true;
@@ -324,7 +326,7 @@
   }
 
   // 每条完成请求恰落一条助手响应记录（progress 命中 FINISHED 或 load 兜底时调用）。
-  // 纯工具调用/纯 task_complete 轮的正文剥空但确有响应，落占位记录保持
+  // 纯工具调用轮的正文剥空但确有响应，落占位记录保持
   // 请求↔记录一一对应：缺失会让缓存条数与页面气泡数出现差口，导出配对整体错位
   function saveAssistantFinal(xhr) {
     if (xhr.__ds_saved) return;
@@ -500,20 +502,6 @@
     let textBuf = getBuf(xhr, 'text');
     let rawBuf = getBuf(xhr, 'raw');
 
-    // FR-5: 先检测 task_complete 标记（平衡扫描，summary 含嵌套花括号不截断）
-    // 注意：移除标记后不 return——同一 buffer 可能既有工具调用又有 task_complete
-    // （异常输出顺序），继续走下方工具检出，与 ui-tool-blocks DOM 兜底行为对齐
-    var tc = extractTaskCompleteFrom(textBuf) || extractTaskCompleteFrom(rawBuf);
-    if (tc) {
-      console.log('[DS-Mini:MAIN] Task complete marker detected, summary:', tc.summary);
-
-      // 移除标记（DOM submit 下页面自己渲染最终回复，不额外注入）
-      setBuf(xhr, 'text', stripTaskCompleteFrom(textBuf));
-      setBuf(xhr, 'raw', stripTaskCompleteFrom(rawBuf));
-      textBuf = getBuf(xhr, 'text');
-      rawBuf = getBuf(xhr, 'raw');
-    }
-
     // 路径A: 从文本 buffer 中检测
     let calls = extractFromText(textBuf);
     if (calls.length === 0) {
@@ -634,35 +622,6 @@
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
     } catch (e) {}
     return null;
-  }
-
-  // task_complete：平衡扫描定位 JSON 主体（summary 含嵌套花括号不截断）
-  function extractTaskCompleteFrom(text) {
-    if (!text) return null;
-    var tagStart = text.indexOf('<task_complete>');
-    if (tagStart < 0) return null;
-    var jsonStart = tagStart + '<task_complete>'.length;
-    var body = extractBalancedJson(text, jsonStart);
-    if (!body) return null;
-    var parsed = parseToolJsonLoose(body);
-    return { summary: (parsed && parsed.summary) || '任务完成' };
-  }
-
-  function stripTaskCompleteFrom(text) {
-    if (!text) return '';
-    var result = text;
-    while (true) {
-      var tagStart = result.indexOf('<task_complete>');
-      if (tagStart < 0) break;
-      var jsonStart = tagStart + '<task_complete>'.length;
-      var body = extractBalancedJson(result, jsonStart);
-      if (!body) break;
-      var end = jsonStart + body.length;
-      var close = result.slice(end).match(/^\s*<\/task_complete>/);
-      if (close) end += close[0].length;
-      result = result.slice(0, tagStart) + result.slice(end);
-    }
-    return result.trim();
   }
 
   function extractFromText(text) {

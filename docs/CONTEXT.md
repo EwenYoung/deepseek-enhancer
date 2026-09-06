@@ -71,7 +71,7 @@ _Avoid_: 预设、模板
 _Avoid_: AI 模式、智能模式
 
 **Agent 循环** (Agent Loop)：
-Agent 模式下模型多步调用工具直至完成任务的执行循环：MAIN 检出工具标记 → postMessage → Isolated 执行 → 结果回注 prompt → 新 XHR → 下一轮，直到模型输出 `<task_complete>` 或自然回复。状态由 `loop-state.ts` 维护（深度/停止标记/阶段），并发防护用 `toolExecutionInProgress` + `data-ds-tool-processed`。
+Agent 模式下模型多步调用工具直至完成任务的执行循环：MAIN 检出工具标记 → postMessage → Isolated 执行 → 结果以 `<tool_results>` 开头的续接消息回注 prompt → 新 XHR → 下一轮，直到模型自然回复（回复中无工具标记）即终止。状态由 `loop-state.ts` 维护（深度/停止标记/阶段），并发防护用 `toolExecutionInProgress` + `data-ds-tool-processed`。
 _Avoid_: 工具循环、多步循环
 
 **扩展增强** (Extension Enhancer)：

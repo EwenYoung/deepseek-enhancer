@@ -2,7 +2,7 @@
 // deepseek-enhancer — 内容折叠（Collapse）
 // ============================================================
 // 助手消息里的大段内容默认收起为可展开横条：
-//   1. 原始工具调用文本（<doc_generate>{...}</doc_generate>、<task_complete> 等）——
+//   1. 原始工具调用文本（<doc_generate>{...}</doc_generate> 等）——
 //      SSE 主路径检出并执行调用后，官方气泡仍会渲染原始 XML，长文档（HTML/Markdown
 //      文件内容）会铺满正文；
 //   2. 超过行数阈值的代码块（pre>code）。
@@ -12,8 +12,8 @@
 
 import { toolNames } from './tool-descriptors';
 
-// 需要从正文收起的 XML 标签：五个工具 + task_complete 结束标记
-const COLLAPSE_TAGS = toolNames.concat(['task_complete']);
+// 需要从正文收起的 XML 标签：五个工具
+const COLLAPSE_TAGS = toolNames;
 // 代码块达到该行数才折叠
 const CODE_COLLAPSE_MIN_LINES = 15;
 // 折叠态代码块保留的可见高度（px）
@@ -170,7 +170,7 @@ function hideEmptyAncestors(node: Node, root: HTMLElement) {
 }
 
 function toolCallLabel(name: string): string {
-  return name === 'task_complete' ? '✅ 任务完成标记' : '🛠 工具调用 ' + name;
+  return '🛠 工具调用 ' + name;
 }
 
 function buildToolCallBar(name: string, raw: string): HTMLElement {

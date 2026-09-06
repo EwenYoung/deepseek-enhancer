@@ -146,14 +146,25 @@ function lastPrompt(req: SentRequest): string {
 }
 
 describe('main-xhr-inject 工具定义注入门槛', () => {
-  it('会话首条消息（parent_message_id 为空）注入工具定义，原文保留在前缀之后', () => {
+  it('会话首条消息（parent_message_id 为空）注入工具定义，原文包在 <user_message> 内', () => {
     const app = loadInject();
     app.setAgentMode(true);
     const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
     const prompt = lastPrompt(req);
-    expect(prompt.indexOf('【工具调用说明】')).toBe(0);
+    expect(prompt.indexOf('<tool_defs>\n【工具调用说明】')).toBe(0);
     expect(prompt).toContain('web_search');
-    expect(prompt.endsWith('---\n你好')).toBe(true);
+    expect(prompt).toContain('</tool_defs>');
+    expect(prompt.endsWith('<user_message>\n你好\n</user_message>')).toBe(true);
+  });
+
+  it('工具定义不含 task_complete 规则，doc_generate 描述精简', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const prompt = lastPrompt(req);
+    expect(prompt).not.toContain('task_complete');
+    expect(prompt).not.toContain('例如：<doc_generate>');
+    expect(prompt).toContain('format=html 时 content 为完整 HTML 文档');
   });
 
   it('带 parent_message_id 的后续消息不再注入工具定义', () => {
@@ -188,7 +199,7 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     expect(lastPrompt(req2)).toBe('第三条');
   });
 
-  it('工具结果回注消息不注入（双保险）', () => {
+  it('工具结果回注消息不注入（旧中文前缀仍识别，双保险）', () => {
     const app = loadInject();
     app.setAgentMode(true);
     const req = app.post(COMPLETION_URL, {
@@ -196,6 +207,14 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
       prompt: '以下是工具执行结果。请基于原始任务和这些结果继续推进。',
     });
     expect(lastPrompt(req)).toBe('以下是工具执行结果。请基于原始任务和这些结果继续推进。');
+  });
+
+  it('现行 XML 格式的回注消息（<tool_results> 开头）同样不注入', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    const echo = '<tool_results>\n[]\n</tool_results>\n以上是工具执行结果。';
+    const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: echo });
+    expect(lastPrompt(req)).toBe(echo);
   });
 
   it('编辑后的首条消息（新分支，parent 仍为空）重新注入', () => {
@@ -222,10 +241,12 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
       parent_message_id: 'm2',
       prompt: '/mycat 处理参数',
     });
-    expect(lastPrompt(req)).toBe('技能指令文本\n---\n处理参数');
+    expect(lastPrompt(req)).toBe(
+      '<skill_instructions>\n技能指令文本\n</skill_instructions>\n\n<user_message>\n处理参数\n</user_message>',
+    );
     const el = app.injectedRecordEl();
     expect((el as { textContent: string }).textContent).toContain(
-      '技能指令文本\n---\n||SEP||/mycat 处理参数||MSG_SEP||',
+      '<skill_instructions>\n技能指令文本\n</skill_instructions>||SEP||/mycat 处理参数||MSG_SEP||',
     );
   });
 
@@ -235,9 +256,10 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     app.setSkill('技能指令文本');
     const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '/mycat 处理参数' });
     const prompt = lastPrompt(req);
-    expect(prompt.indexOf('【工具调用说明】')).toBe(0);
-    expect(prompt).toContain('技能指令文本');
-    expect(prompt.endsWith('---\n处理参数')).toBe(true);
+    expect(prompt.indexOf('<tool_defs>\n【工具调用说明】')).toBe(0);
+    expect(prompt).toContain('<skill_instructions>\n技能指令文本\n</skill_instructions>');
+    expect(prompt).toContain('</tool_defs>');
+    expect(prompt.endsWith('<user_message>\n处理参数\n</user_message>')).toBe(true);
   });
 
   it('注入记录与注入次数一致（导出对齐依赖）', () => {
@@ -256,7 +278,9 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     app.setSkill('技能指令文本');
     app.store['ds_mini_tools_state'] = JSON.stringify({ web_search: false, doc_generate: false });
     const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '/mycat 处理参数' });
-    expect(lastPrompt(req)).toBe('技能指令文本\n---\n处理参数');
+    expect(lastPrompt(req)).toBe(
+      '<skill_instructions>\n技能指令文本\n</skill_instructions>\n\n<user_message>\n处理参数\n</user_message>',
+    );
   });
 
   it('非 chat/completion 请求不做任何改写', () => {

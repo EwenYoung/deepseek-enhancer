@@ -97,7 +97,8 @@ export default defineContentScript({
     `,
     );
 
-    // 隐藏工具结果回注中间消息 — 找含 hash class 的消息级容器（前缀与 formatResults 输出对齐）
+    // 隐藏工具结果回注中间消息 — 找含 hash class 的消息级容器
+    // （前缀与 formatResults 输出对齐：现行 <tool_results> 开头 + 旧版中文前缀）
     function isMsgComponent(el: Element) {
       const cls = el.className;
       if (!cls || typeof cls !== 'string') return false;
@@ -106,6 +107,19 @@ export default defineContentScript({
         if (/^[_a-zA-Z][a-zA-Z0-9]{5,9}$/.test(parts[i])) return true;
       }
       return false;
+    }
+
+    function echoStartsWith(text: string | null | undefined): boolean {
+      return (
+        !!text && (text.indexOf('<tool_results>') === 0 || text.indexOf('以下是工具执行结果') === 0)
+      );
+    }
+
+    function echoContains(text: string | null | undefined): boolean {
+      return (
+        !!text &&
+        (text.indexOf('<tool_results>') !== -1 || text.indexOf('以下是工具执行结果') !== -1)
+      );
     }
 
     function hideToolResultMsg(el: Element) {
@@ -119,8 +133,7 @@ export default defineContentScript({
           if (
             isMsgComponent(node) &&
             node.closest('.ds-message') &&
-            node.textContent &&
-            node.textContent.indexOf('以下是工具执行结果') === 0
+            echoStartsWith(node.textContent)
           ) {
             node.setAttribute('data-ds-hidden', '');
             console.log(
@@ -137,21 +150,18 @@ export default defineContentScript({
     const resultHider = new MutationObserver((mutations) => {
       for (const mut of mutations) {
         if (mut.type === 'characterData') {
-          if (
-            mut.target.textContent &&
-            mut.target.textContent.indexOf('以下是工具执行结果') === 0
-          ) {
+          if (echoStartsWith(mut.target.textContent)) {
             hideToolResultMsg(mut.target as Element);
           }
         }
         for (const node of mut.addedNodes) {
           if (!(node instanceof HTMLElement)) continue;
-          if (node.textContent && node.textContent.indexOf('以下是工具执行结果') === 0) {
+          if (echoStartsWith(node.textContent)) {
             hideToolResultMsg(node);
-          } else if (node.textContent && node.textContent.indexOf('以下是工具执行结果') !== -1) {
+          } else if (echoContains(node.textContent)) {
             // 文本可能在子元素中，延迟检查
             requestAnimationFrame(function () {
-              if (node.textContent && node.textContent.indexOf('以下是工具执行结果') === 0) {
+              if (echoStartsWith(node.textContent)) {
                 hideToolResultMsg(node);
               }
             });

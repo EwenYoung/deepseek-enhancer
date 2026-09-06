@@ -33,18 +33,11 @@ describe('findToolCallRegion', () => {
     expect(findToolCallRegion('</doc_generate> 前缀 <doc_generate>')).toBeNull();
   });
 
-  it('识别 task_complete 标记', () => {
-    const text = '结论 <task_complete>{"summary":"完成"}</task_complete>';
-    const region = findToolCallRegion(text);
-    expect(region?.name).toBe('task_complete');
-    expect(region?.start).toBe(3);
-  });
-
   it('无任何标签时返回 null', () => {
     expect(findToolCallRegion('普通回复文本')).toBeNull();
   });
 
-  it('默认标签表覆盖全部工具与 task_complete', () => {
+  it('默认标签表覆盖全部工具', () => {
     // 通过行为验证：每个工具名都能被检出
     for (const name of toolNames) {
       const text = 'x <' + name + '>{}</' + name + '> y';

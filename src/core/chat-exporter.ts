@@ -102,7 +102,8 @@ export function filterAsstCache(raw: string, sessionId: string): string[] {
 
 /**
  * 纯函数（测试覆盖）：缓存的助手原文含工具调用 XML（页面上由折叠条展示），
- * 导出时替换为单行标记保持正文可读；task_complete 标记同样剥离
+ * 导出时替换为单行标记保持正文可读；stripTaskComplete 兜底剥离历史会话缓存
+ * 里残留的 task_complete 标记（生成端已移除，仅旧数据会命中）
  */
 export function assistantRawToExport(raw: string): string {
   const calls = extractToolCalls(raw);
@@ -187,12 +188,16 @@ function scrapeMessages(): ChatMessage[] {
       // User 消息 — 跳过包含 assistant 子元素的
       if (el.querySelector('.ds-markdown, .ds-think-content')) continue;
 
-      // 续接消息替换为 placeholder
+      // 续接消息：现行 XML 格式以 <tool_results> 开头（含 HTML 转义形态）。
+      // 开头匹配防正文引用该标签词被误判；漏判由 data-ds-continuation 标记
+      // 兜底。旧版中文前缀格式（历史会话）保留 original_task 判据
+      const echoText = el.textContent || '';
+      const echoHead = echoText.trimStart();
       const isContinuation =
         el.hasAttribute('data-ds-continuation') ||
-        (el.textContent &&
-          el.textContent.includes('以下是工具执行结果') &&
-          el.textContent.includes('original_task'));
+        echoHead.indexOf('<tool_results>') === 0 ||
+        echoHead.indexOf('&lt;tool_results&gt;') === 0 ||
+        (echoText.includes('以下是工具执行结果') && echoText.includes('original_task'));
 
       let text = '';
       // 找第一个有文本的直接子元素

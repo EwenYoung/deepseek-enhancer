@@ -4,6 +4,7 @@
 
 import { escapeHTML, downloadBlob } from './ui-kit';
 import { renderMarkdownToHTML } from './markdown';
+import { extractToolCalls, stripTaskComplete, stripToolCalls } from './sse-parser';
 
 export type ExportFormat = 'markdown' | 'html';
 
@@ -78,6 +79,46 @@ function delay(ms: number): Promise<void> {
 }
 
 // ============================================================
+// 助手原始响应缓存 — 按会话 ID 归档（写入侧 main-xhr-inject.ts，分隔符须同步）
+// ============================================================
+export const ASST_SID_SEP = '||ASST_SID||';
+const ASST_SEP = '||ASST_SEP||';
+
+/** 纯函数（测试覆盖）：从缓存原文解析出属于指定会话的助手响应文本列表 */
+export function filterAsstCache(raw: string, sessionId: string): string[] {
+  if (!raw) return [];
+  const texts: string[] = [];
+  for (const part of raw.split(ASST_SEP)) {
+    if (!part) continue;
+    const idx = part.indexOf(ASST_SID_SEP);
+    // 无会话标记的旧格式记录无法归属，弃用
+    if (idx === -1) continue;
+    const sid = part.slice(0, idx);
+    const text = part.slice(idx + ASST_SID_SEP.length);
+    if (sid && sid === sessionId && text) texts.push(text);
+  }
+  return texts;
+}
+
+/**
+ * 纯函数（测试覆盖）：缓存的助手原文含工具调用 XML（页面上由折叠条展示），
+ * 导出时替换为单行标记保持正文可读；task_complete 标记同样剥离
+ */
+export function assistantRawToExport(raw: string): string {
+  const calls = extractToolCalls(raw);
+  if (!calls.length) return stripTaskComplete(raw).trim();
+  const names = Array.from(new Set(calls.map((c) => c.name)));
+  const body = stripTaskComplete(stripToolCalls(raw));
+  return (body ? body + '\n\n' : '') + '> 🛠 工具调用：' + names.join('、');
+}
+
+/** 当前会话 ID（取自地址栏 /chat/s/<id>；新会话页等无法识别的场景为空串） */
+function currentChatSessionId(): string {
+  const match = /chat\/s\/([^/?#]+)/.exec(location.href);
+  return match ? match[1] : '';
+}
+
+// ============================================================
 // 从 DOM 抓取消息
 // ============================================================
 function scrapeMessages(): ChatMessage[] {
@@ -88,10 +129,12 @@ function scrapeMessages(): ChatMessage[] {
     return messages;
   }
 
-  // 读取缓存的原始助手响应文本（含 Markdown）。缓存跨会话只增不清，
-  // 条数与当前页助手消息数不符时视为其他会话残留，弃用防错配
+  // 读取缓存的原始助手响应文本（含 Markdown）。缓存跨会话只增不清，每条记录
+  // 以「会话 ID||ASST_SID||文本」归档（写入侧在 main-xhr-inject.ts，分隔符须同步）；
+  // 导出时只认当前会话（地址栏 /chat/s/<id>）的记录，条数与当前页助手消息数不符时
+  // 走渲染 DOM 兜底，防止误用其他会话的缓存
   const asstRawEl = document.getElementById('ds-mini-asst-raw');
-  const asstRawTexts = asstRawEl ? (asstRawEl.textContent || '').split('||ASST_SEP||') : [];
+  const asstRawTexts = filterAsstCache(asstRawEl?.textContent || '', currentChatSessionId());
   let asstCount = 0;
   for (let i = 0; i < msgEls.length; i++) {
     if (msgEls[i].closest('.ds-mini-tool-block')) continue;
@@ -99,7 +142,10 @@ function scrapeMessages(): ChatMessage[] {
   }
   const cacheUsable = asstRawTexts.length === asstCount;
   if (!cacheUsable && asstRawTexts.length > 0) {
-    console.warn('[DS-Mini] Export: raw cache count mismatch, fallback to rendered DOM');
+    // 会话标记后仅剩“历史会话导出”这类正常场景会走兜底，降级为普通日志
+    console.log(
+      '[DS-Mini] Export: raw cache not usable for this session, fallback to rendered DOM',
+    );
   }
   let asstIdx = 0;
 
@@ -117,7 +163,7 @@ function scrapeMessages(): ChatMessage[] {
       const raw = cacheUsable ? asstRawTexts[asstIdx] : undefined;
       if (raw) {
         asstIdx++;
-        const reply = raw.trim();
+        const reply = assistantRawToExport(raw);
         if (reply) {
           messages.push({
             role: 'assistant' as const,

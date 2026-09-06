@@ -6,6 +6,8 @@ import {
   renderMarkdown,
   sanitizeRenderedHTML,
   htmlToMarkdown,
+  filterAsstCache,
+  assistantRawToExport,
 } from '../chat-exporter';
 
 type ExportMessage = Parameters<typeof renderHTML>[0][number];
@@ -341,5 +343,53 @@ describe('slugify', () => {
 
   it('handles empty string', () => {
     expect(slugify('')).toBe('');
+  });
+});
+
+describe('filterAsstCache（助手原始响应缓存按会话归档）', () => {
+  it('提取属于当前会话的记录', () => {
+    const raw =
+      's1||ASST_SID||回复一||ASST_SEP||s2||ASST_SID||回复二||ASST_SEP||s1||ASST_SID||回复三';
+    expect(filterAsstCache(raw, 's1')).toEqual(['回复一', '回复三']);
+  });
+
+  it('跳过未打会话标记的旧格式记录', () => {
+    const raw = '旧格式无标记||ASST_SEP||s1||ASST_SID||新格式';
+    expect(filterAsstCache(raw, 's1')).toEqual(['新格式']);
+  });
+
+  it('当前会话无记录时返回空数组', () => {
+    const raw = 's2||ASST_SID||别会话的回复';
+    expect(filterAsstCache(raw, 's1')).toEqual([]);
+  });
+
+  it('空输入返回空数组', () => {
+    expect(filterAsstCache('', 's1')).toEqual([]);
+  });
+
+  it('会话 ID 为空串时不匹配任何记录', () => {
+    const raw = '||ASST_SID||无主记录';
+    expect(filterAsstCache(raw, '')).toEqual([]);
+  });
+});
+
+describe('assistantRawToExport（缓存原文 → 导出文本）', () => {
+  it('无工具调用时原样返回（仅剥 task_complete、去首尾空白）', () => {
+    expect(assistantRawToExport('正文\n')).toBe('正文');
+    expect(assistantRawToExport('完成\n<task_complete>{"summary": "ok"}</task_complete>')).toBe(
+      '完成',
+    );
+  });
+
+  it('工具调用 XML 折叠为单行标记，正文保留', () => {
+    const raw =
+      '好的，我来生成。\n\n<doc_generate>{"title": "示例文档", "format": "md", "content": "# 示例\n正文"}</doc_generate>';
+    expect(assistantRawToExport(raw)).toBe('好的，我来生成。\n\n> 🛠 工具调用：doc_generate');
+  });
+
+  it('多次调用合并为去重后的工具名单', () => {
+    const raw =
+      '<web_search>{"query": "a"}</web_search>中间文本<web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
+    expect(assistantRawToExport(raw)).toBe('中间文本\n\n> 🛠 工具调用：web_search、github_trending');
   });
 });

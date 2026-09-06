@@ -154,6 +154,12 @@
   }
   function rememberInjected(sid) {
     injectedSessions[sid] = true;
+    // 只增不清的会话键会缓慢累积（每条约 36 字符），设置上限防止长期占用；
+    // 旧的会话记录被淘汰后若再中途开启 Agent，会重新补注入一次（无副作用）
+    const keys = Object.keys(injectedSessions);
+    if (keys.length > 200) {
+      for (var i = 0; i < keys.length - 200; i++) delete injectedSessions[keys[i]];
+    }
     try {
       localStorage.setItem(INJECTED_KEY, JSON.stringify(injectedSessions));
     } catch (e) {}

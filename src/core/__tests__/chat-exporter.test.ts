@@ -427,12 +427,12 @@ describe('assistantRawToExport（缓存原文 → 导出文本）', () => {
   it('工具调用 XML 折叠为单行标记，正文保留', () => {
     const raw =
       '好的，我来生成。\n\n<doc_generate>{"title": "示例文档", "format": "md", "content": "# 示例\n正文"}</doc_generate>';
-    expect(assistantRawToExport(raw)).toBe('好的，我来生成。\n\n> 🛠 工具调用：doc_generate');
+    expect(assistantRawToExport(raw)).toBe('好的，我来生成。\n\n🛠 工具调用：doc_generate');
   });
 
   it('多次调用合并为去重后的工具名单', () => {
     const raw =
       '<web_search>{"query": "a"}</web_search>中间文本<web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
-    expect(assistantRawToExport(raw)).toBe('中间文本\n\n> 🛠 工具调用：web_search、github_trending');
+    expect(assistantRawToExport(raw)).toBe('中间文本\n\n🛠 工具调用：web_search、github_trending');
   });
 });

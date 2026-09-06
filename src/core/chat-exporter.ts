@@ -103,14 +103,16 @@ export function filterAsstCache(raw: string, sessionId: string): string[] {
 /**
  * 纯函数（测试覆盖）：缓存的助手原文含工具调用 XML（页面上由折叠条展示），
  * 导出时替换为单行标记保持正文可读；stripTaskComplete 兜底剥离历史会话缓存
- * 里残留的 task_complete 标记（生成端已移除，仅旧数据会命中）
+ * 里残留的 task_complete 标记（生成端已移除，仅旧数据会命中）。
+ * 标记形态与 DOM 提取路径（extractRenderedReplyHTML 折叠条替换）一致：
+ * 「🛠 工具调用：名称」，不带块引用前缀
  */
 export function assistantRawToExport(raw: string): string {
   const calls = extractToolCalls(raw);
   if (!calls.length) return stripTaskComplete(raw).trim();
   const names = Array.from(new Set(calls.map((c) => c.name)));
   const body = stripTaskComplete(stripToolCalls(raw));
-  return (body ? body + '\n\n' : '') + '> 🛠 工具调用：' + names.join('、');
+  return (body ? body + '\n\n' : '') + '🛠 工具调用：' + names.join('、');
 }
 
 /** 当前会话 ID（取自地址栏 /chat/s/<id>；新会话页等无法识别的场景为空串） */
@@ -642,7 +644,9 @@ function extractRenderedReplyHTML(replyEl: HTMLElement): string {
   clone
     .querySelectorAll('[style*="display: none"], [style*="display:none"]')
     .forEach((el) => el.remove());
-  clone.querySelectorAll('a').forEach((el) => {
+  // 兜底：官方以 class 而非 inline style 隐藏的残留空元素（textContent 为空），
+  // 同样会经 inlineToMarkdown 产生乱码；空元素无可见内容，删除无副作用
+  clone.querySelectorAll('span, strong, b, em, i, code, a').forEach((el) => {
     if (!(el.textContent || '').trim()) el.remove();
   });
 

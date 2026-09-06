@@ -221,6 +221,19 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     expect(lastPrompt(req)).toBe('第二条');
   });
 
+  it('注入记录上限 200：超出时淘汰最旧会话键，不无限累积', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    for (let i = 0; i < 205; i++) {
+      app.post(COMPLETION_URL, { chat_session_id: 's' + i, prompt: '第' + i + '条' });
+    }
+    const recorded = JSON.parse(app.store['ds_mini_injected_sessions'] || '{}');
+    expect(Object.keys(recorded).length).toBeLessThanOrEqual(200);
+    // 最新键仍在，最旧键被淘汰
+    expect(recorded['s204']).toBe(true);
+    expect(recorded['s0']).toBeUndefined();
+  });
+
   it('并发交错流按 XHR 实例隔离阶段：A 流思考与 B 流正文互不污染', () => {
     const app = loadInject();
     app.setAgentMode(true);

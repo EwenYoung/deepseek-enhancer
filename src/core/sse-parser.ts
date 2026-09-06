@@ -72,10 +72,16 @@ function extractContent(parsed: unknown): ParsedMessage {
   // DeepSeek 新流式格式的主体就是这种行（4521/4533 行）。
   // 排除 o === 'SET' 的状态行（如 {"p":"response/status","o":"SET","v":"FINISHED"}），
   // 否则 FINISHED 等状态值会被当作文本追加进 buffer，污染导出数据。
+  // 思考过程增量同样以 string v 到达（p 含 thinking/reasoning），不排除会混进正文。
   // ponytail: 与 main-xhr-inject.ts extractTextFromData 的 string v 分支保持一致。
   // ============================================================
   if (typeof obj.v === 'string' && obj.o !== 'SET') {
-    result.text += obj.v;
+    const p = typeof obj.p === 'string' ? obj.p : '';
+    if (p.includes('thinking') || p.includes('reasoning')) {
+      // 思考增量不算正文
+    } else {
+      result.text += obj.v;
+    }
   }
 
   // ============================================================
@@ -170,6 +176,8 @@ function extractPatchText(response: Record<string, unknown>, result: ParsedMessa
 
 function isTextPath(path: unknown): boolean {
   if (typeof path !== 'string') return false;
+  // thinking_content 这类思考路径也含 "content" 子串，必须先排除
+  if (path.includes('thinking') || path.includes('reasoning')) return false;
   return path.includes('content') || path.includes('text') || path.includes('delta');
 }
 

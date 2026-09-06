@@ -63,9 +63,9 @@
   // 注意：注释中不得出现占位符字面量，否则 replace 只替换第一处会放走真正的注入点
   // ==========================================================
   const TOOL_DEFS = JSON.parse('__DS_TOOL_DEFS__');
-  const disabledTools = {}; // 用户禁用的工具列表
 
   function buildToolDefs(mode) {
+    const disabledTools = {}; // 每次构建重算：工具在面板重新启用后无需刷新页面即生效
     try {
       const ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
       for (const k in ls) {
@@ -146,6 +146,7 @@
   let agentModeEnabled = false;
   let stopRequested = false; // 用户点击 Stop 后置位，吞掉后续工具事件
   let lastIsNewUserFlow = true; // 最近一次请求是否新用户消息（非工具结果回注）
+  const injectedSessions = {}; // 已注入工具定义的会话 ID：会话中途才打开 Agent 开关时补注入一次
   const lastCtx = {
     chat_session_id: '',
     model_type: '',
@@ -167,6 +168,7 @@
       // 保存会话上下文
       try {
         const parsedCtx = JSON.parse(body);
+        this.__ds_session = parsedCtx.chat_session_id || '';
         if (parsedCtx.chat_session_id) {
           lastCtx.chat_session_id = parsedCtx.chat_session_id;
           lastCtx.model_type = parsedCtx.model_type || 'default';
@@ -202,7 +204,9 @@
       } catch (e) {}
 
       body = augmentPrompt(body);
-      this.addEventListener('progress', createProgressHandler());
+      const progressHandler = createProgressHandler();
+      this.addEventListener('progress', progressHandler);
+      this.addEventListener('load', createLoadHandler(progressHandler));
     }
 
     return origSend.call(this, body);
@@ -228,10 +232,17 @@
       return JSON.stringify(parsed);
     }
 
-    // Agent 模式开启时，即使是工具结果回注也注入工具定义（支持多轮循环）
-    // ponytail: 静默 XHR 因 PoW 防重放不可用，改用 DOM 纯循环，需每轮注入工具定义
+    // 工具定义注入门槛：会话首条消息（parent_message_id 为空）注入；会话中途才打开
+    // Agent 开关时首条已过而历史里没有定义，此时补注入一次（injectedSessions 记录；
+    // 页面刷新后集合清空会再补一次，重复定义无害）。工具结果回注（循环续接）一律
+    // 不注入，定义留在会话历史里，续接轮次依赖它继续调用工具。
+    // 不编入模式指纹：页面切换时模式检测会误读。
+    const isToolResultEcho = userContent.indexOf('以下是工具执行结果') === 0;
+    const sid = parsed.chat_session_id || '';
+    const needToolDefs =
+      !isToolResultEcho && (!parsed.parent_message_id || (sid !== '' && !injectedSessions[sid]));
 
-    const toolDefs = getToolDefs(currentMode);
+    const toolDefs = needToolDefs ? getToolDefs(currentMode) : '';
     let prefix = '';
 
     // 检测 /skill 命令
@@ -247,6 +258,8 @@
       prefix = toolDefs + '\n---\n';
       parsed.prompt = prefix + userContent;
     }
+
+    if (toolDefs && sid) injectedSessions[sid] = true;
 
     if (parsed.prompt !== userContent) {
       console.log(
@@ -273,8 +286,9 @@
     el.textContent = (el.textContent || '') + record;
   }
 
-  // 保存助手原始响应文本（带 Markdown），供导出使用
-  function saveAssistantResponse(text) {
+  // 保存助手原始响应文本（带 Markdown），供导出使用；每条记录按会话 ID 归档
+  // （「会话 ID||ASST_SID||文本」，解析侧 chat-exporter.ts，分隔符须同步）
+  function saveAssistantResponse(text, xhr) {
     if (!text || !text.trim()) return;
     let el = document.getElementById('ds-mini-asst-raw');
     if (!el) {
@@ -283,8 +297,9 @@
       el.style.display = 'none';
       document.body.appendChild(el);
     }
+    const record = (xhr && xhr.__ds_session ? xhr.__ds_session : '') + '||ASST_SID||' + text;
     const existing = el.textContent || '';
-    el.textContent = existing ? existing + '||ASST_SEP||' + text : text;
+    el.textContent = existing ? existing + '||ASST_SEP||' + record : record;
   }
 
   function parseSkillCommand(text) {
@@ -308,10 +323,21 @@
     xhr.__ds_buf[name] = val;
   }
 
+  // 每条完成请求恰落一条助手响应记录（progress 命中 FINISHED 或 load 兜底时调用）。
+  // 纯工具调用/纯 task_complete 轮的正文剥空但确有响应，落占位记录保持
+  // 请求↔记录一一对应：缺失会让缓存条数与页面气泡数出现差口，导出配对整体错位
+  function saveAssistantFinal(xhr) {
+    if (xhr.__ds_saved) return;
+    var fullText = getBuf(xhr, 'text');
+    if (!fullText && getBuf(xhr, 'raw')) fullText = '（工具调用）';
+    if (fullText) saveAssistantResponse(fullText, xhr);
+    xhr.__ds_saved = true;
+  }
+
   function createProgressHandler() {
     return function (event) {
       const xhr = event.target;
-      if (!xhr || !xhr.responseText) return;
+      if (!xhr || !xhr.responseText || xhr.__ds_done) return;
 
       var fullText = xhr.responseText;
       const pos = getBuf(xhr, 'pos');
@@ -340,8 +366,11 @@
         const text = extractTextFromData(data);
         if (text) setBuf(xhr, 'text', getBuf(xhr, 'text') + text);
 
-        // 方法2: 直接扫描原始 data 行
-        setBuf(xhr, 'raw', getBuf(xhr, 'raw') + dataStr);
+        // 思考过程增量不进 raw 兜底缓冲，防止思考里提及的工具标签被误检出
+        const p = typeof data.p === 'string' ? data.p : '';
+        if (p.indexOf('thinking') === -1 && p.indexOf('reasoning') === -1) {
+          setBuf(xhr, 'raw', getBuf(xhr, 'raw') + dataStr);
+        }
 
         if (isStreamFinished(data)) finished = true;
       }
@@ -350,8 +379,24 @@
       checkToolCallsBoth(xhr);
 
       if (finished) {
-        var fullText = getBuf(xhr, 'text');
-        if (fullText) saveAssistantResponse(fullText);
+        // 流已完成：置完成标记，后续 progress/load 一律忽略。
+        // 否则位置清零后的整段重扫会把同一条回复存两次、工具调用检出两遍
+        saveAssistantFinal(xhr);
+        xhr.__ds_done = true;
+        flushBuffers(xhr);
+      }
+    };
+  }
+
+  // FINISHED 行可能落在只触发 load 的尾块里：不兜底的话这条回复就存不上
+  function createLoadHandler(progressHandler) {
+    return function (event) {
+      const xhr = event.target;
+      if (!xhr || xhr.__ds_done) return;
+      progressHandler(event);
+      if (!xhr.__ds_done) {
+        saveAssistantFinal(xhr);
+        xhr.__ds_done = true;
         flushBuffers(xhr);
       }
     };
@@ -382,9 +427,14 @@
     }
 
     // 裸 string v 行（新格式主体）：排除 o === 'SET' 状态行（FINISHED 等），
-    // 否则状态值会被当作文本追加进 buffer，污染 saveAssistantResponse 落盘数据
-    // ponytail: 与 sse-parser.ts extractContent 方式0a 保持一致
-    if (typeof data.v === 'string' && data.o !== 'SET') return data.v;
+    // 否则状态值会被当作文本追加进 buffer，污染 saveAssistantResponse 落盘数据。
+    // 思考过程增量同样以 string v 到达（p 含 thinking/reasoning），不排除就会混进
+    // 正文缓存与续接上下文；ponytail: 与 sse-parser.ts extractContent 方式0a 保持一致
+    if (typeof data.v === 'string' && data.o !== 'SET') {
+      const p = typeof data.p === 'string' ? data.p : '';
+      if (p.indexOf('thinking') !== -1 || p.indexOf('reasoning') !== -1) return '';
+      return data.v;
+    }
 
     if (Array.isArray(data.choices)) {
       var text = '';
@@ -417,6 +467,8 @@
 
   function _isTextPath(path) {
     if (typeof path !== 'string') return false;
+    // thinking_content 这类思考路径也含 "content" 子串，必须先排除
+    if (path.indexOf('thinking') !== -1 || path.indexOf('reasoning') !== -1) return false;
     return (
       path.indexOf('content') !== -1 || path.indexOf('text') !== -1 || path.indexOf('delta') !== -1
     );

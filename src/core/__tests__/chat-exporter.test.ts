@@ -52,6 +52,25 @@ describe('wrapToolResultMD', () => {
   it('handles empty string', () => {
     expect(wrapToolResultMD('')).toBe('');
   });
+
+  it('wraps <tool_results> JSON block in code fence', () => {
+    const input =
+      '<tool_results>\n[\n  {\n    "tool": "GitHub热门"\n  }\n]\n</tool_results>\n以上是工具执行结果。';
+    const result = wrapToolResultMD(input);
+    expect(result).toContain('```\n<tool_results>');
+    expect(result).toContain('以上是工具执行结果。');
+    expect(result).toContain('\n```');
+  });
+
+  it('detail 内含 --- 行时 <tool_results> 不按 \n--- 提前截断', () => {
+    const input =
+      '<tool_results>\n[\n  {\n    "tool": "新闻聚合",\n    "detail": "第一节\\n\\n---\\n\\n第二节"}\n  }\n]\n</tool_results>\n以上是工具执行结果。';
+    const result = wrapToolResultMD(input);
+    expect(result).toContain('第二节');
+    expect(result).toContain('</tool_results>');
+    // 正确整体收尾（截断会在 detail 的 --- 处提前闭合，丢掉第二节）
+    expect(result.trimEnd()).toMatch(/\n```\n---$/);
+  });
 });
 
 describe('renderHTML（微信对话风格）', () => {
@@ -118,6 +137,16 @@ describe('renderHTML（微信对话风格）', () => {
       '测试会话',
     );
     expect(html).toContain('<pre>');
+    expect(html).not.toContain('<strong>');
+  });
+
+  it('现行 XML 工具结果（字典列表）以 pre 原样呈现，JSON 不被 markdown 解析', () => {
+    const content =
+      '<tool_results>\n[\n  {\n    "tool": "GitHub热门",\n    "detail": "- affaan-m/ECC\\n- mattpocock/skills",\n    "output": ["affaan-m/ECC"]\n  }\n]\n</tool_results>\n以上是工具执行结果。';
+    const html = renderHTML(makeMessages({ content }), '测试会话');
+    expect(html).toContain('<pre>&lt;tool_results&gt;');
+    expect(html).toContain('&quot;tool&quot;');
+    expect(html).not.toContain('<ul>');
     expect(html).not.toContain('<strong>');
   });
 
@@ -226,6 +255,20 @@ describe('renderMarkdown（Markdown 导出）', () => {
     );
     expect(md).toContain('> 第一行\n>\n> 第二行');
     expect(md).not.toMatch(/^第一行/m);
+  });
+
+  it('工具结果字典列表以代码块原样保留（JSON 不被解析为列表/标题）', () => {
+    const md = renderMarkdown(
+      makeMessages({
+        content:
+          '<tool_results>\n[\n  {\n    "tool": "GitHub热门",\n    "detail": "- affaan-m/ECC\\n- mattpocock/skills"\n  }\n]\n</tool_results>\n以上是工具执行结果。',
+      }),
+      '测试会话',
+    );
+    expect(md).toContain('> ```\n> <tool_results>');
+    expect(md).toContain('"GitHub热门"');
+    expect(md).toContain('- affaan-m/ECC');
+    expect(md).not.toMatch(/^- affaan-m\/ECC$/m); // 不许被解析成无序列表
   });
 
   it('助手思考过程渲染为无空行折叠块（Typora 兼容），内容转义承载', () => {

@@ -13,7 +13,7 @@ interface SentRequest {
   body: string;
 }
 
-function loadInject() {
+function loadInject(seedStore: Record<string, string> = {}) {
   const sent: SentRequest[] = [];
   const xhrs: unknown[] = [];
   const messageHandlers: Array<
@@ -45,11 +45,15 @@ function loadInject() {
       (this.listeners[type] ||= []).push(handler);
     }
   }
-  const store: Record<string, string> = {};
+  const store: Record<string, string> = { ...seedStore };
   const storage = {
     getItem: (k: string) => store[k] ?? null,
-    setItem: () => {},
-    removeItem: () => {},
+    setItem: (k: string, v: string) => {
+      store[k] = String(v);
+    },
+    removeItem: (k: string) => {
+      delete store[k];
+    },
   };
   const fakeWindow = {
     postMessage: () => {},
@@ -199,6 +203,65 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     expect(lastPrompt(req2)).toBe('第三条');
   });
 
+  it('页面刷新后基于 localStorage 的注入记录不再重复补注入（第二轮消息保持原文）', () => {
+    // 会话首条注入后，注入记录持久化到 localStorage
+    const app1 = loadInject();
+    app1.setAgentMode(true);
+    app1.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '第一条' });
+    expect((app1.store['ds_mini_injected_sessions'] || '').includes('s1')).toBe(true);
+
+    // 模拟页面刷新：新页面实例 localStorage 内容保留
+    const app2 = loadInject({ ...app1.store });
+    app2.setAgentMode(true);
+    const req = app2.post(COMPLETION_URL, {
+      chat_session_id: 's1',
+      parent_message_id: 'm2',
+      prompt: '第二条',
+    });
+    expect(lastPrompt(req)).toBe('第二条');
+  });
+
+  it('并发交错流按 XHR 实例隔离阶段：A 流思考与 B 流正文互不污染', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: 'A问题' });
+    app.post(COMPLETION_URL, { chat_session_id: 's2', prompt: 'B问题' });
+    const xhrA = app.xhrs[app.xhrs.length - 2] as unknown as {
+      responseText: string;
+      listeners: Record<string, Array<(e: unknown) => void>>;
+    };
+    const xhrB = app.xhrs[app.xhrs.length - 1] as unknown as {
+      responseText: string;
+      listeners: Record<string, Array<(e: unknown) => void>>;
+    };
+
+    // A 流：快照声明思考模式 + 首段思考
+    const a1 =
+      'data: {"v":{"response":{"message_id":1,"thinking_enabled":true,"fragments":[{"id":2,"type":"THINK","content":"用户"}]}}}\n\n' +
+      'data: {"v":"思考A1"}\n\n';
+    app.fireProgress(xhrA, a1);
+    // B 流：快照声明无思考 + 正文（此时若阶段为共享状态会被 B 改为 RESPONSE）
+    const b1 =
+      'data: {"v":{"response":{"message_id":1,"thinking_enabled":false,"fragments":[]}}}\n\n' +
+      'data: {"v":"正文B1"}\n\n';
+    app.fireProgress(xhrB, b1);
+    // A 流继续思考：若阶段共享，此刻已是 RESPONSE → 思考A2 会混入；实例隔离则仍 THINK → 丢弃
+    const a2 = a1 + 'data: {"v":"思考A2"}\n\n';
+    app.fireProgress(xhrA, a2);
+    // A 流正文 + 完成（fireProgress 传累计文本，progress 侧按 pos 增量处理后续行）
+    const a3 =
+      a2 +
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"正文A"}]}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(xhrA, a3);
+    // B 流完成
+    const b2 = b1 + 'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(xhrB, b2);
+
+    expect(cacheRecords(app)).toContain('s1||ASST_SID||正文A'); // 思考A1/A2 均未混入
+    expect(cacheRecords(app)).toContain('s2||ASST_SID||正文B1');
+  });
+
   it('工具结果回注消息不注入（旧中文前缀仍识别，双保险）', () => {
     const app = loadInject();
     app.setAgentMode(true);
@@ -325,6 +388,76 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
       'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
     app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
     expect(cacheRecords(app)).toEqual(['s1||ASST_SID||正文内容']);
+  });
+
+  it('THINK 阶段后的 fragments/-1/content 行按思考处理，不进正文缓存', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const sse =
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":2,"type":"THINK","content":"用户"}]}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"想要热门新闻，我先想想。"}\n\n' +
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"<web_search>"}]}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"{\\"query\\":\\"a\\"}</web_search>"}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
+    // 思考文本不落地；正文只有工具调用（被检出删除）→ 落占位记录
+    expect(cacheRecords(app)).toEqual(['s1||ASST_SID||（工具调用）']);
+  });
+
+  it('RESPONSE 阶段后的 fragments/-1/content 行正常进正文缓存', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const sse =
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"你好"}]}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"世界"}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
+    expect(cacheRecords(app)).toEqual(['s1||ASST_SID||你好世界']);
+  });
+
+  it('思考段全为 -1/content 裸行（快照行声明思考模式）时按思考丢弃，正文以 RESPONSE 行开头', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const sse =
+      'data: {"v":{"response":{"message_id":2,"thinking_enabled":true,"fragments":[]}}}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"让我想想。"}\n\n' +
+      'data: {"p":"response/fragments/-1/elapsed_secs","o":"SET","v":1.2}\n\n' +
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"答案"}]}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"在这里"}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
+    expect(cacheRecords(app)).toEqual(['s1||ASST_SID||答案在这里']);
+  });
+
+  it('思考段的裸行（无 p 字段）不进缓存，正文裸行正常保留', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const sse =
+      'data: {"v":{"response":{"message_id":2,"thinking_enabled":true,"fragments":[{"id":2,"type":"THINK","content":"用户"}]}}}\n\n' +
+      'data: {"v":"让我"}\n\n' +
+      'data: {"v":"想想。"}\n\n' +
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"我是"}]}\n\n' +
+      'data: {"v":"答案"}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
+    expect(cacheRecords(app)).toEqual(['s1||ASST_SID||我是答案']);
+  });
+
+  it('thinking_enabled=false 的无思考流，正文裸行不被丢弃', () => {
+    const app = loadInject();
+    app.setAgentMode(true);
+    app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
+    const sse =
+      'data: {"v":{"response":{"message_id":2,"thinking_enabled":false,"fragments":[]}}}\n\n' +
+      'data: {"v":"直接"}\n\n' +
+      'data: {"v":"回答。"}\n\n' +
+      'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
+    app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
+    expect(cacheRecords(app)).toEqual(['s1||ASST_SID||直接回答。']);
   });
 
   it('流结束后再来的尾块不会把同一条回复存两次', () => {

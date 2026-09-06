@@ -234,7 +234,20 @@ interface ToolResultExport {
 }
 
 function extractToolResultsFromContinuation(text: string): string {
-  // 提取 <tool_results> JSON
+  // 现行 XML 格式：页面原样展示 <tool_results> 字典列表（JSON 原样渲染），
+  // 导出保持同样形态，与页面展示一致（不再压成摘要文本）
+  const head = text.trimStart();
+  if (head.startsWith('<tool_results>')) return head;
+  if (head.startsWith('&lt;tool_results&gt;')) {
+    // HTML 转义形态（理论上 textContent 已解码，此处兜底）
+    return head
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  }
+  // 旧版中文前缀（历史会话，仅匹配含 original_task 的旧格式）
   const re = /<tool_results>\s*([\s\S]*?)\s*<\/tool_results>/;
   const match = re.exec(text);
   if (!match) return '[Agent 工具执行]';
@@ -298,13 +311,20 @@ function mergeInjectedPrefixes(messages: ChatMessage[]) {
     if (messages[i].role !== 'user') continue;
 
     const rec = records[rIdx];
-    // 如果这个消息是工具结果回注，跳过（不对应任何 injection）
-    if (messages[i].content.indexOf('[工具执行结果]') === 0) continue;
+    // 工具结果回注消息不对应任何注入（现行 XML 格式 + 旧翻译格式都要跳过）
+    if (
+      messages[i].content.indexOf('[工具执行结果]') === 0 ||
+      messages[i].content.indexOf('<tool_results>') === 0
+    ) {
+      continue;
+    }
 
-    // 如果 user 消息看起来和记录的原始文本匹配或包含它
-    // 或者还没有被注入过 prefix
+    // 会话中页面本地渲染用户输入（无注入痕迹），刷新后页面展示的是服务器存的
+    // 完整注入形态（tool_defs + <user_message> 包裹，见 main-xhr-inject augmentPrompt）。
+    // 导出统一按该形态补全，保证会话中导出与刷新后页面展示一致
     if (messages[i].content.indexOf(rec.prefix) === -1) {
-      messages[i].content = rec.prefix + '\n' + messages[i].content;
+      messages[i].content =
+        rec.prefix + '\n\n<user_message>\n' + messages[i].content + '\n</user_message>';
     }
     rIdx++;
   }
@@ -522,6 +542,9 @@ const WECHAT_STYLE = `  *{margin:0;padding:0;box-sizing:border-box}
 // ============================================================
 // 工具结果内容处理 — 防止 Markdown 渲染
 // ============================================================
+// 工具结果有两种形态：旧翻译格式（[工具执行结果] 开头）与现行原样格式
+// （<tool_results> JSON 字典列表，与页面展示一致）。两者都以原样文本呈现，
+// 不能被 markdown 渲染器解析（JSON 里的 "- item"、"### 标题" 会变形）
 // 逐行加引用前缀（空行保留 >），使整段成为 markdown 块引用
 function prefixQuoteLines(text: string): string {
   return text
@@ -531,34 +554,64 @@ function prefixQuoteLines(text: string): string {
 }
 
 export function wrapToolResultMD(content: string): string {
-  // 将匹配到的 [工具执行结果] 区域包裹在 ``` 代码块中
-  return content.replace(/(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g, function (match) {
-    // 去掉末尾可能匹配到的 ---
+  // 现行 <tool_results> 字典列表：内容可能含 "---" 行（detail 里的分隔线），
+  // 不能按 \n--- 提前收尾——先匹配首个 </tool_results> 闭合（其后补说明到 \
+  // n---/文末），整体包进代码块
+  let out = content.replace(
+    /(<tool_results>[\s\S]*?<\/tool_results>[\s\S]*?)(?=\n---|$)/g,
+    function (match) {
+      const clean = match.replace(/\n---$/, '');
+      return '```\n' + clean + '\n```\n---';
+    },
+  );
+  // 旧翻译格式 [工具执行结果]：段落以消息分隔符 --- 或文末收尾
+  out = out.replace(/(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g, function (match) {
     const clean = match.replace(/\n---$/, '');
     return '```\n' + clean + '\n```\n---';
   });
+  return out;
 }
 
 function renderUserContentHTML(content: string): string {
-  const re = /(\[工具执行结果\][\s\S]*?)(?:\n---|$)/g;
   const parts: string[] = [];
   let lastIdx = 0;
-  let match: RegExpExecArray | null;
+  let pos = 0;
+  const len = content.length;
 
-  while ((match = re.exec(content)) !== null) {
-    // 普通内容部分
-    if (match.index > lastIdx) {
-      parts.push(renderMarkdownToHTML(content.slice(lastIdx, match.index)));
+  while (pos < len) {
+    // 找最近一个工具结果标记头
+    const iTool = content.indexOf('<tool_results>', pos);
+    const iLegacy = content.indexOf('[工具执行结果]', pos);
+    let start = -1;
+    let kind: 'tool_results' | 'legacy' = 'tool_results';
+    if (iTool === -1 && iLegacy === -1) break;
+    if (iTool === -1) {
+      start = iLegacy;
+      kind = 'legacy';
+    } else if (iLegacy === -1) {
+      start = iTool;
+    } else {
+      start = Math.min(iTool, iLegacy);
+      kind = iTool < iLegacy ? 'tool_results' : 'legacy';
+    }
+
+    if (start > lastIdx) parts.push(renderMarkdownToHTML(content.slice(lastIdx, start)));
+
+    // <tool_results> 以首个闭合标签定界（内容含 --- 不截断），旧格式以 \n--- 收尾
+    let end: number;
+    if (kind === 'tool_results') {
+      const close = content.indexOf('</tool_results>', start + '<tool_results>'.length);
+      end = close !== -1 ? close + '</tool_results>'.length : len;
+    } else {
+      const sep = content.indexOf('\n---', start);
+      end = sep !== -1 ? sep : len;
     }
     // 工具结果部分 → <pre> 包裹，不渲染 markdown
-    const raw = match[1].replace(/\n---$/, '');
-    parts.push(`<pre>${escapeHTML(raw)}</pre>`);
-    lastIdx = match.index + match[0].length;
+    parts.push(`<pre>${escapeHTML(content.slice(start, end))}</pre>`);
+    lastIdx = end;
+    pos = end;
   }
-  // 剩余部分
-  if (lastIdx < content.length) {
-    parts.push(renderMarkdownToHTML(content.slice(lastIdx)));
-  }
+  if (lastIdx < len) parts.push(renderMarkdownToHTML(content.slice(lastIdx)));
   return parts.join('\n');
 }
 
@@ -571,7 +624,28 @@ const RENDERED_DOM_CHROME_SELECTOR =
 
 function extractRenderedReplyHTML(replyEl: HTMLElement): string {
   const clone = replyEl.cloneNode(true) as HTMLElement;
+
+  // 折叠条（ui-collapse 对原始工具调用 XML 的处理产物）：隐藏的 <pre> 原文会被
+  // htmlToMarkdown 导出成完整 XML，页面实际显示的是折叠条按钮文本——这里将整个
+  // 折叠条替换为单行工具调用标记（与缓存路径 assistantRawToExport 的形态一致）
+  for (const el of clone.querySelectorAll('[data-ds-collapse]')) {
+    const btnText = el.querySelector('button')?.textContent || '';
+    const nameMatch = /工具调用\s*([A-Za-z0-9_]+)/.exec(btnText);
+    const label = nameMatch ? `🛠 工具调用：${nameMatch[1]}` : '🛠 工具调用';
+    el.replaceWith(Object.assign(document.createElement('span'), { textContent: label }));
+  }
+
   clone.querySelectorAll(RENDERED_DOM_CHROME_SELECTOR).forEach((el) => el.remove());
+
+  // 折叠/隐藏处理留下的 display:none 残留（空 span/strong/em/code 等）会被
+  // inlineToMarkdown 转成 "**"、"""" 这类乱码；空链接产生 "[](url)"——一并剔除
+  clone
+    .querySelectorAll('[style*="display: none"], [style*="display:none"]')
+    .forEach((el) => el.remove());
+  clone.querySelectorAll('a').forEach((el) => {
+    if (!(el.textContent || '').trim()) el.remove();
+  });
+
   return sanitizeRenderedHTML(clone.innerHTML);
 }
 

@@ -138,7 +138,26 @@
   let agentModeEnabled = false;
   let stopRequested = false; // 用户点击 Stop 后置位，吞掉后续工具事件
   let lastIsNewUserFlow = true; // 最近一次请求是否新用户消息（非工具结果回注）
-  const injectedSessions = {}; // 已注入工具定义的会话 ID：会话中途才打开 Agent 开关时补注入一次
+  // 已注入工具定义的会话 ID。localStorage 持久化：会话从头注入过之后，
+  // 页面刷新也不再重复补注入（刷新后 server 历史里首条已带定义，模型仍可调用；
+  // 历史里从未注入过的会话中途打开 Agent 开关时才补注入一次）
+  let injectedSessions = {};
+  const INJECTED_KEY = 'ds_mini_injected_sessions';
+  try {
+    const stored = localStorage.getItem(INJECTED_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) injectedSessions = parsed;
+    }
+  } catch (e) {
+    /* localStorage 不可用时退化为仅内存记录（刷新后可能重复，但功能不中断） */
+  }
+  function rememberInjected(sid) {
+    injectedSessions[sid] = true;
+    try {
+      localStorage.setItem(INJECTED_KEY, JSON.stringify(injectedSessions));
+    } catch (e) {}
+  }
   const lastCtx = {
     chat_session_id: '',
     model_type: '',
@@ -229,10 +248,11 @@
       return JSON.stringify(parsed);
     }
 
-    // 工具定义注入门槛：会话首条消息（parent_message_id 为空）注入；会话中途才打开
-    // Agent 开关时首条已过而历史里没有定义，此时补注入一次（injectedSessions 记录；
-    // 页面刷新后集合清空会再补一次，重复定义无害）。工具结果回注（循环续接）一律
-    // 不注入，定义留在会话历史里，续接轮次依赖它继续调用工具。
+    // 工具定义注入门槛：会话首条消息（parent_message_id 为空）注入；历史里从未
+    // 注入过定义的会话中途才打开 Agent 开关时补注入一次（injectedSessions 持久化在
+    // localStorage：页面刷新后靠它避免对已注入过的会话重复补注入，否则第二轮以后的
+    // 用户消息会被反复包上工具定义）。工具结果回注（循环续接）一律不注入，定义留在
+    // 会话历史里，续接轮次依赖它继续调用工具。
     // 不编入模式指纹：页面切换时模式检测会误读。
     const isToolResultEcho =
       userContent.indexOf('<tool_results>') === 0 ||
@@ -261,7 +281,7 @@
       parsed.prompt = prefix + '\n\n<user_message>\n' + userContent + '\n</user_message>';
     }
 
-    if (toolDefs && sid) injectedSessions[sid] = true;
+    if (toolDefs && sid) rememberInjected(sid);
 
     if (parsed.prompt !== userContent) {
       console.log(
@@ -365,12 +385,18 @@
           continue;
         }
 
-        const text = extractTextFromData(data);
+        const text = extractTextFromData(xhr, data);
         if (text) setBuf(xhr, 'text', getBuf(xhr, 'text') + text);
 
-        // 思考过程增量不进 raw 兜底缓冲，防止思考里提及的工具标签被误检出
+        // 思考过程增量不进 raw 兜底缓冲，防止思考里提及的工具标签被误检出。
+        // 思考段增量同样可能是无 p 字段裸行（{"v":"字"}）或 fragments/-1/content 行，
+        // 按当前流的阶段（getFragPhase）一并过滤
         const p = typeof data.p === 'string' ? data.p : '';
-        if (p.indexOf('thinking') === -1 && p.indexOf('reasoning') === -1) {
+        const inThinking =
+          p.indexOf('thinking') !== -1 ||
+          p.indexOf('reasoning') !== -1 ||
+          getFragPhase(xhr) === 'THINK';
+        if (!inThinking) {
           setBuf(xhr, 'raw', getBuf(xhr, 'raw') + dataStr);
         }
 
@@ -407,9 +433,49 @@
   // ==========================================================
   // 文本提取（支持 DeepSeek SSE 格式）
   // ==========================================================
+  // fragment 阶段跟踪：思考增量与正文增量共用 "response/fragments/-1/content"
+  // 路径（-1 是当前活跃 fragment 占位，路径不含 thinking/reasoning 字样，凭行
+  // 内容无法区分），后续增量多为无 p 字段的裸行（{"v":"字"}）。DeepSeek 流
+  // 顺序固定：快照行（携带 thinking_enabled / fragments 类型）→ 思考段 →
+  // 携带 type=RESPONSE 的 fragments 数组行（正文开始标记）→ 正文段。判定规则：
+  //   1. 初始视为正文（RESPONSE），兼容无快照行的简单流；
+  //   2. 快照行按 thinking_enabled 与 fragments 类型校正当前阶段；
+  //   3. 思考阶段的 -1/content 与裸行一律不进正文缓存（修复：思考文本曾混入
+  //      缓存并随导出重复出现在正文位置）。
+  // 阶段状态挂在 XHR 实例（__ds_frag_phase），与 text/raw/pos buffer 一致按流隔离，
+  // 避免并发流（用户连发多条）互相污染导致正文丢失或思考混入。
+  function getFragPhase(xhr) {
+    return xhr && xhr.__ds_frag_phase ? xhr.__ds_frag_phase : 'RESPONSE';
+  }
+  function setFragPhase(xhr, v) {
+    if (xhr) xhr.__ds_frag_phase = v;
+  }
+
+  function trackFragPhase(xhr, data) {
+    if (!data || typeof data !== 'object') return;
+    if (data.o === 'APPEND' && Array.isArray(data.v)) {
+      for (var i = 0; i < data.v.length; i++) {
+        var fr = data.v[i];
+        if (fr && (fr.type === 'THINK' || fr.type === 'RESPONSE')) setFragPhase(xhr, fr.type);
+      }
+    }
+    // message 快照行（v.response.fragments 携带类型），取最后一个作为当前阶段；
+    // 快照行无有效 fragments 类型时以 thinking_enabled 判定（无思考流程直接进入正文）
+    var resp =
+      data.v && typeof data.v === 'object' && !Array.isArray(data.v) ? data.v.response : null;
+    if (resp && Array.isArray(resp.fragments) && resp.fragments.length > 0) {
+      var last = resp.fragments[resp.fragments.length - 1];
+      if (last && (last.type === 'THINK' || last.type === 'RESPONSE')) setFragPhase(xhr, last.type);
+    } else if (resp && typeof resp.thinking_enabled === 'boolean') {
+      setFragPhase(xhr, resp.thinking_enabled ? 'THINK' : 'RESPONSE');
+    }
+  }
+
   // ponytail: duplicates sse-parser.ts extractContent(). Keep in sync.
-  function extractTextFromData(data) {
+  function extractTextFromData(xhr, data) {
     if (!data || typeof data !== 'object') return '';
+
+    trackFragPhase(xhr, data);
 
     // 新格式：fragments 数组行（{"p":"response/fragments","o":"APPEND","v":[{type,content,...}]}）
     // 开标签 `<` 等字符可能以数组形式到达，旧实现只处理 string v 会漏掉
@@ -431,10 +497,13 @@
     // 裸 string v 行（新格式主体）：排除 o === 'SET' 状态行（FINISHED 等），
     // 否则状态值会被当作文本追加进 buffer，污染 saveAssistantResponse 落盘数据。
     // 思考过程增量同样以 string v 到达（p 含 thinking/reasoning），不排除就会混进
-    // 正文缓存与续接上下文；ponytail: 与 sse-parser.ts extractContent 方式0a 保持一致
+    // 正文缓存与续接上下文；思考段增量还可能是无 p 字段的裸行（{"v":"字"}），
+    // 一律按当前阶段判定：THINK 阶段的增量不进正文缓存；
+    // ponytail: 与 sse-parser.ts extractContent 方式0a 保持一致
     if (typeof data.v === 'string' && data.o !== 'SET') {
       const p = typeof data.p === 'string' ? data.p : '';
       if (p.indexOf('thinking') !== -1 || p.indexOf('reasoning') !== -1) return '';
+      if (getFragPhase(xhr) === 'THINK') return '';
       return data.v;
     }
 

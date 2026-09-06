@@ -6,6 +6,7 @@ import { initAutocomplete } from '../core/ui-autocomplete';
 import { initPanel } from '../core/ui-panel';
 import { initToolBlocks, handleMainWorldToolCalls } from '../core/ui-tool-blocks';
 import { initArtifacts } from '../core/artifact';
+import { initCollapse } from '../core/ui-collapse';
 import {
   loadEnhancerFeatures,
   initThemeAutoSwitch,
@@ -59,6 +60,7 @@ export default defineContentScript({
     initPanel(state);
     initToolBlocks(state);
     initArtifacts();
+    initCollapse();
     initCategories();
 
     // 增强器功能
@@ -112,8 +114,11 @@ export default defineContentScript({
         if (node.nodeType === 1) {
           const cls = String(node.className || '');
           if (cls.indexOf('virtual-list') !== -1) break;
+          // 只允许隐藏气泡内组件：domSubmitText 填入续接文本时输入框容器/镜像
+          // 节点也会命中前缀特征，误隐藏会把输入框压扁
           if (
             isMsgComponent(node) &&
+            node.closest('.ds-message') &&
             node.textContent &&
             node.textContent.indexOf('以下是工具执行结果') === 0
           ) {

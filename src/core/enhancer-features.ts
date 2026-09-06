@@ -812,6 +812,14 @@ let inputHideEl: HTMLElement | null = null; // 要平移的元素（_77cefa5）
 let inputClipEl: HTMLElement | null = null; // 裁剪溢出的元素（aaff8b8f）
 let inputFocused = false; // textarea 是否有焦点
 let inputCurrentlyHidden = true;
+// 锚点校验失败的告警只发一次：重试循环挂在高频 MutationObserver 上，逐次告警会刷屏
+let inputAnchorWarned = false;
+
+function warnInputAnchorMissed() {
+  if (inputAnchorWarned) return;
+  inputAnchorWarned = true;
+  console.warn('[DS-Mini] 输入框自动隐藏未生效：锚点类名校验未命中（官方改版后类名可能已漂移）');
+}
 
 function onMouseMove(e: MouseEvent) {
   if (!inputHideActive || !inputHideEl) return;
@@ -860,6 +868,33 @@ function onTextareaBlur() {
 
 let textareaObserver: MutationObserver | null = null;
 
+// 锚点类名是官方构建产物（滑层 _77cefa5、裁剪层 aaff8b8f），会随部署漂移。
+// 必须校验命中才套样式：从 textarea 上爬三层没有结构保证，错套内联
+// transform/overflow 会把输入区压扁（截断滚动容器裁错层），宁可本次不生效。
+function locateInputAnchors(ta: HTMLTextAreaElement): boolean {
+  inputHideEl = ta.parentElement?.parentElement?.parentElement as HTMLElement | null;
+  inputClipEl = inputHideEl?.parentElement as HTMLElement | null;
+  if (!inputHideEl || !inputClipEl) return false;
+  const anchored =
+    inputHideEl.classList.contains('_77cefa5') && inputClipEl.classList.contains('aaff8b8f');
+  if (!anchored) {
+    inputHideEl = null;
+    inputClipEl = null;
+  }
+  return anchored;
+}
+
+function applyInputHideState(ta: HTMLTextAreaElement) {
+  inputClipEl!.style.overflow = 'hidden';
+  inputHideEl!.style.transition = 'transform 0.35s ease';
+  inputFocused = document.activeElement === ta;
+  const hasMessages = !!document.querySelector('[class*="ds-message"]');
+  inputCurrentlyHidden = !inputFocused && hasMessages && ta.value.trim().length === 0;
+  inputHideEl!.style.transform = inputCurrentlyHidden ? 'translateY(120px)' : 'translateY(0)';
+  ta.addEventListener('focus', onTextareaFocus);
+  ta.addEventListener('blur', onTextareaBlur);
+}
+
 function setupTextareaObserver() {
   textareaObserver?.disconnect();
   textareaObserver = new MutationObserver(() => {
@@ -867,23 +902,18 @@ function setupTextareaObserver() {
     if (ta && (!inputHideEl || !document.body.contains(inputHideEl))) {
       // textarea 被 React 重建了，重新初始化
       const tryInit = () => {
-        inputHideEl = ta.parentElement?.parentElement?.parentElement as HTMLElement | null;
-        inputClipEl = inputHideEl?.parentElement as HTMLElement | null;
-        if (!inputHideEl || !inputClipEl || !document.body.contains(inputHideEl)) return false;
-        inputClipEl.style.overflow = 'hidden';
-        inputHideEl.style.transition = 'transform 0.35s ease';
-        inputFocused = document.activeElement === ta;
-        const hasMessages = !!document.querySelector('[class*="ds-message"]');
-        inputCurrentlyHidden = !inputFocused && hasMessages && ta.value.trim().length === 0;
-        inputHideEl.style.transform = inputCurrentlyHidden ? 'translateY(120px)' : 'translateY(0)';
-        ta.addEventListener('focus', onTextareaFocus);
-        ta.addEventListener('blur', onTextareaBlur);
+        if (!document.body.contains(ta)) return false;
+        if (!locateInputAnchors(ta)) return false;
+        applyInputHideState(ta);
         return true;
       };
       if (!tryInit()) {
         let retries = 4;
         const iv = setInterval(() => {
-          if (tryInit() || --retries <= 0) clearInterval(iv);
+          if (tryInit() || --retries <= 0) {
+            clearInterval(iv);
+            warnInputAnchorMissed();
+          }
         }, 500);
       }
     }
@@ -902,24 +932,18 @@ export async function toggleAutoHideInput(enabled: boolean) {
     const tryInit = () => {
       const ta = document.querySelector('textarea');
       if (!ta) return false;
-      inputHideEl = ta.parentElement?.parentElement?.parentElement as HTMLElement | null;
-      inputClipEl = inputHideEl?.parentElement as HTMLElement | null;
-      if (!inputHideEl || !inputClipEl) return false;
-      inputClipEl.style.overflow = 'hidden';
-      inputHideEl.style.transition = 'transform 0.35s ease';
-      inputFocused = document.activeElement === ta;
-      const hasMessages = !!document.querySelector('[class*="ds-message"]');
-      inputCurrentlyHidden = !inputFocused && hasMessages && ta.value.trim().length === 0;
-      inputHideEl.style.transform = inputCurrentlyHidden ? 'translateY(120px)' : 'translateY(0)';
-      ta.addEventListener('focus', onTextareaFocus);
-      ta.addEventListener('blur', onTextareaBlur);
+      if (!locateInputAnchors(ta)) return false;
+      applyInputHideState(ta);
       return true;
     };
     // 尝试重试（页面加载时 textarea 可能还没渲染）
     if (!tryInit()) {
       let retries = 6;
       const iv = setInterval(() => {
-        if (tryInit() || --retries <= 0) clearInterval(iv);
+        if (tryInit() || --retries <= 0) {
+          clearInterval(iv);
+          warnInputAnchorMissed();
+        }
       }, 500);
     }
     // 监听 textarea 替换（SPA 切换会话时 React 重建）

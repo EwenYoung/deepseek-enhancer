@@ -910,7 +910,9 @@ function setupTextareaObserver() {
       if (!tryInit()) {
         let retries = 4;
         const iv = setInterval(() => {
-          if (tryInit() || --retries <= 0) {
+          if (tryInit()) {
+            clearInterval(iv);
+          } else if (--retries <= 0) {
             clearInterval(iv);
             warnInputAnchorMissed();
           }
@@ -940,7 +942,9 @@ export async function toggleAutoHideInput(enabled: boolean) {
     if (!tryInit()) {
       let retries = 6;
       const iv = setInterval(() => {
-        if (tryInit() || --retries <= 0) {
+        if (tryInit()) {
+          clearInterval(iv);
+        } else if (--retries <= 0) {
           clearInterval(iv);
           warnInputAnchorMissed();
         }

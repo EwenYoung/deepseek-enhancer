@@ -77,8 +77,8 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 ## 经验教训
 
 <!-- retro-managed-start -->
+
 <!-- retro:escalated 完整版见 .retro/INDEX.md，满 12 条时用 retro.py escalate --demote 降级最旧条目 -->
-- 元素级 CSS 变量声明永远赢过继承，html 内联覆盖无效；合成值拆成独立低层变量（如 --panel-alpha）下发 [20260824-001]
 - ink 深色下 --accent/--danger 是浅色，按钮文字一律 var(--accent-text,#fff)，写死 #fff 不可读 [20260824-002]
 - 导出助手回复是双数据源：原始 markdown 缓存只覆盖本页会话，历史会话走已渲染 DOM 提取+白名单净化 [20260824-009]
 - 视觉/布局结论以计算样式+几何测量为准，DOM 顺序不代表视觉方位 [20260824-011]
@@ -90,6 +90,11 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 - 哈希类名由官方构建生成，随部署无通知变化 [20260824-016]
 
 - 改主题色优先覆盖 --dsw-alias-* 变量链，派生态写死的品牌色一并覆盖 [20260824-017]
+- ZCode 拒收 aoci_update_entry 的 entries[]，须走 JSON-RPC 桥接（ZCode 宿主内提交 AOCI 受管批次时） [20260906-001]
+
+- 提交前独立 subagent review：抓实现者和主 agent 共享盲区（涉及 seam/注入/转义/双份逻辑的批次提交前） [20260904-012]
+
+- 流式中同一工具调用会以不同 raw 多次触发，去重键须由解析结果决定（MAIN postMessage 与 DOM 兜底双路径的工具执行去重） [20260906-010]
 <!-- retro-managed-end -->
 
 完整经验库在 **[.retro/](.retro/INDEX.md)**（脚本生成索引，条目在 `.retro/entries/`、原始摘录在 `.retro/log/`）：排查卡壳先查其 INDEX；会话收尾沉淀用 /retro 技能，跑 `retro.py check` 校验一致性。

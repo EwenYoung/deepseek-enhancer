@@ -624,18 +624,80 @@ function renderUserContentHTML(content: string): string {
 const RENDERED_DOM_CHROME_SELECTOR =
   '.md-code-block-banner-wrap, .ds-markdown-cite, svg, button, [role="button"]';
 
+export interface FoldBlockExportInput {
+  /** 折叠类型：新形态取 data-ds-fold（'tool' | 'code'）；旧形态折叠条无此属性 */
+  foldKind?: string | null;
+  /** 新形态标签行文案，取 data-ds-fold-label */
+  label?: string | null;
+  /** 块内完整文本：新形态原文常驻 DOM（CSS 裁剪不改文本节点） */
+  text: string;
+  /** 旧形态折叠条的按钮文案（过渡兼容用） */
+  legacyButtonText?: string | null;
+}
+
+/**
+ * 纯函数（测试覆盖）：折叠块 → 导出文本，空串表示整块丢弃。
+ * 新形态折叠块原文完整留在 DOM 里，不显式替换就会把整段 XML 导出，这里压成
+ * 与缓存路径 assistantRawToExport 一致的单行标记；代码块折叠保留全文（代码
+ * 本就该完整导出）。旧形态 [data-ds-collapse]（自建折叠条 + 隐藏 pre）保留
+ * 兼容分支，待历史会话全部重渲染后再删。
+ */
+export function foldBlockToExportText(input: FoldBlockExportInput): string {
+  if (input.foldKind === 'code') return input.text;
+  if (input.foldKind === 'tool') {
+    const fromLabel = toolNamesFromLabel(input.label || '');
+    return toolMarker(fromLabel.length > 0 ? fromLabel : uniqueToolNames(input.text));
+  }
+  // 旧形态折叠条自身的文本只有按钮文案：工具调用原文在条内 <pre>（随条一起替换），
+  // 代码块原文在条外的兄弟 <pre>（条本身直接丢弃，代码仍由 pre 导出）
+  const buttonText = input.legacyButtonText || '';
+  if (/代码块/.test(buttonText)) return '';
+  const fromButton = legacyFoldToolNames(buttonText);
+  return toolMarker(fromButton.length > 0 ? fromButton : uniqueToolNames(input.text));
+}
+
+function toolMarker(names: string[]): string {
+  return names.length > 0 ? `🛠 工具调用：${names.join('、')}` : '🛠 工具调用';
+}
+
+/** 从标签文案 '▸ 工具调用 doc_generate、web_search' 取工具名 */
+function toolNamesFromLabel(label: string): string[] {
+  const match = /工具调用\s*(.*)$/.exec(label);
+  if (!match) return [];
+  return match[1]
+    .split('、')
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+/** 旧形态折叠条只能从按钮文案反解工具名 */
+function legacyFoldToolNames(buttonText: string): string[] {
+  const match = /工具调用\s*([A-Za-z0-9_]+)/.exec(buttonText);
+  return match ? [match[1]] : [];
+}
+
+function uniqueToolNames(text: string): string[] {
+  return Array.from(new Set(extractToolCalls(text).map((call) => call.name)));
+}
+
 function extractRenderedReplyHTML(replyEl: HTMLElement): string {
   const clone = replyEl.cloneNode(true) as HTMLElement;
 
-  // 折叠条（ui-collapse 对原始工具调用 XML 的处理产物）：隐藏的 <pre> 原文会被
-  // htmlToMarkdown 导出成完整 XML，页面实际显示的是折叠条按钮文本——这里将整个
-  // 折叠条替换为单行工具调用标记（与缓存路径 assistantRawToExport 的形态一致）
-  for (const el of clone.querySelectorAll('[data-ds-collapse]')) {
-    const btnText = el.querySelector('button')?.textContent || '';
-    const nameMatch = /工具调用\s*([A-Za-z0-9_]+)/.exec(btnText);
-    const label = nameMatch ? `🛠 工具调用：${nameMatch[1]}` : '🛠 工具调用';
-    el.replaceWith(Object.assign(document.createElement('span'), { textContent: label }));
-  }
+  // 折叠块（ui-collapse）：工具调用块替换为单行标记；代码块保留原文不动。
+  // 旧形态 [data-ds-collapse] 与新形态并存，见 foldBlockToExportText
+  clone.querySelectorAll<HTMLElement>('[data-ds-fold], [data-ds-collapse]').forEach((el) => {
+    const rawText = el.textContent || '';
+    const exported = foldBlockToExportText({
+      foldKind: el.getAttribute('data-ds-fold'),
+      label: el.getAttribute('data-ds-fold-label'),
+      text: rawText,
+      legacyButtonText: el.querySelector('button')?.textContent,
+    });
+    if (exported === rawText) return;
+    if (exported)
+      el.replaceWith(Object.assign(document.createElement('span'), { textContent: exported }));
+    else el.remove();
+  });
 
   clone.querySelectorAll(RENDERED_DOM_CHROME_SELECTOR).forEach((el) => el.remove());
 

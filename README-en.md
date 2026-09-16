@@ -31,7 +31,7 @@
 - 🔧 **Tool Calling** — Auto-injects `web_search`, `web_fetch`, `news_hub`, `github_trending`, `doc_generate` into model context
 - 🧩 **Skill System** — 8 built-in skills (deep thinking, code review, writing, translation, etc.) with custom creation and GitHub import
 - 🔄 **Agent Loop** — SSE stream parsing → tool call detection → background execution → DOM submit, driving multi-step reasoning
-- 🎨 **UI Enhancements** — Widescreen mode, multi-theme switching, font customization, scrollbar hiding, auto-hide input
+- 🎨 **UI Enhancements** — Widescreen mode, multi-theme switching, font customization, scrollbar hiding, auto-hide input, tool calls and long code blocks auto-collapsed into a one-line label
 - 🗂️ **Chat Categories** — Sidebar conversation categorization with bulk organizing
 - 📤 **Chat Export** — One-click Markdown / HTML export, tool results wrapped as code blocks
 - 💾 **Data Backup** — One-click config export / import (skills, categories, themes, API keys)
@@ -95,6 +95,8 @@ Supports import from GitHub URL or local Markdown files.
 ### Export Chat
 
 Panel bottom button → choose Markdown or HTML format. Auto-scrolls to top before export to ensure all virtual-scrolled messages are loaded.
+
+Markdown export: the current session uses its original Markdown; historical sessions are rebuilt from rendered page content, keeping headings, lists, and code blocks. User messages appear as blockquotes, thinking as a collapsible block, and tool calls as a single-line marker (without the raw XML).
 
 ## Architecture
 
@@ -165,10 +167,10 @@ deepseek-enhancer/
 │   │   ├── ui-panel.ts             # Floating management panel
 │   │   ├── ui-autocomplete.ts      # / triggered skill dropdown
 │   │   ├── ui-tool-blocks.ts       # Tool call result UI + DOM submit
+│   │   ├── ui-collapse.ts          # Tool call / long code block folding (attribute tagging + CSS clipping)
 │   │   ├── ui-categories.ts        # Chat category management
 │   │   ├── chat-exporter.ts        # Markdown/HTML export
 │   │   ├── enhancer-features.ts    # Widescreen/theme/font/scrollbar
-│   │   ├── fetch-hook.ts           # Fetch interception (backup path)
 │   │   ├── conversation-store.ts   # Conversation state management
 │   │   ├── artifact.ts             # Artifact downloads
 │   │   ├── data-backup.ts          # Config backup & restore

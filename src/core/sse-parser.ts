@@ -199,8 +199,9 @@ function getToolCallRegex(): RegExp {
 
 /**
  * 从 startIndex 起扫描平衡 JSON 对象（跳过字符串与转义），返回完整 JSON 文本
+ * @internal 供折叠模块定位工具调用区间复用，避免第二份平衡扫描
  */
-function extractBalancedJson(text: string, startIndex: number): string | null {
+export function extractBalancedJson(text: string, startIndex: number): string | null {
   if (text[startIndex] !== '{') return null;
   let depth = 0;
   let inString = false;

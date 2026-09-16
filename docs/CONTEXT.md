@@ -101,8 +101,8 @@ _Avoid_: 分组、标签
 _Avoid_: 附件、产物
 
 **折叠条** (Collapse Bar)：
-把助手消息里的大段内容（原始工具调用文本、超长代码块）默认收起为一条可点击展开的横条，由 ui-collapse 模块在官方气泡上做非破坏性 DOM 折叠。
-_Avoid_: 折叠面板、收起块
+把助手消息里的大段内容（原始工具调用文本、超长代码块）默认收成一条可点击展开的横条：ui-collapse 只给块级元素加属性（`data-ds-fold` 存在即已折叠、`data-ds-fold-open` 存在即展开、`data-ds-fold-label` 存标签行文案），标签行由 CSS `::before` 用 `attr()` 渲染，不插入自建节点、不改写文本节点，原文完整留在 DOM 中；折叠靠 `max-height` + `overflow: hidden` + `visibility: hidden` 裁剪，扫描用 `MutationObserver` 加 250ms 节流。
+_Avoid_: 折叠面板、收起块、折叠 DOM 节点
 
 **主题** (Theme)：
 扩展的深色/浅色主题系统，支持跟随系统和自定义主题。

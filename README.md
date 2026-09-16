@@ -31,7 +31,7 @@
 - 🔧 **工具调用** — 自动注入 `web_search`、`web_fetch`、`news_hub`、`github_trending`、`doc_generate` 到模型上下文
 - 🧩 **技能系统** — 内置 8 个技能（深度思考、代码审查、写作、翻译等），支持自定义创建和 GitHub 导入
 - 🔄 **Agent 循环** — SSE 流解析 → 工具调用检测 → 后台执行 → DOM 提交，驱动模型多步推理
-- 🎨 **UI 增强** — 宽屏模式、多主题切换、字体自定义、滚动条隐藏、自动隐藏输入框
+- 🎨 **UI 增强** — 宽屏模式、多主题切换、字体自定义、滚动条隐藏、自动隐藏输入框、工具调用与超长代码块自动折叠成一行标签
 - 🗂️ **会话分类** — 侧边栏会话分类管理，批量归类整理
 - 📤 **会话导出** — 一键导出 Markdown / HTML，历史会话同样保留 Markdown 格式，工具结果自动包装为代码块
 - 💾 **数据备份** — 配置一键导出 / 导入（技能、分类、主题、API Key）
@@ -96,7 +96,7 @@ pnpm build
 
 面板底部按钮 → 选择 Markdown 或 HTML 格式。导出前会自动滚动到顶部确保虚拟滚动中的消息全部加载。
 
-Markdown 导出：本页会话直接使用原始 Markdown；历史会话从页面渲染结果逆向重建，标题、列表、代码块等格式同样保留。用户消息显示为引用块，思考过程为可折叠块。
+Markdown 导出：本页会话直接使用原始 Markdown；历史会话从页面渲染结果逆向重建，标题、列表、代码块等格式同样保留。用户消息显示为引用块，思考过程为可折叠块，工具调用显示为单行标记（不含完整 XML）。
 
 ## 架构
 
@@ -167,10 +167,10 @@ deepseek-enhancer/
 │   │   ├── ui-panel.ts             # 浮层管理面板
 │   │   ├── ui-autocomplete.ts      # / 触发技能下拉
 │   │   ├── ui-tool-blocks.ts       # 工具调用结果 UI + DOM 提交
+│   │   ├── ui-collapse.ts          # 工具调用/长代码块折叠（属性打标 + CSS 裁剪）
 │   │   ├── ui-categories.ts        # 会话分类管理
 │   │   ├── chat-exporter.ts        # Markdown/HTML 导出
 │   │   ├── enhancer-features.ts    # 宽屏/主题/字体/滚动条
-│   │   ├── fetch-hook.ts           # fetch 拦截（备用路径）
 │   │   ├── conversation-store.ts   # 会话状态管理
 │   │   ├── artifact.ts             # 产出物下载
 │   │   ├── data-backup.ts          # 配置备份与恢复

@@ -227,9 +227,16 @@ export async function handleMainWorldToolCalls(toolCalls: ToolCall[], isNewUserF
     handleDocGenerate(call);
   }
 
-  if (otherCalls.length === 0) return;
-
   const container = findChatContainer();
+
+  if (otherCalls.length === 0) {
+    // 纯 local 调用（doc_generate）没有续接消息，拿不到下面那条 markLastAssistantProcessed；
+    // 原文现在常驻 DOM（折叠只做 CSS 裁剪），DOM 兜底路径会反复扫到同一调用，而
+    // processedDocKeys 的键含 content.length，流式过程中长度每次不同 → 挡不住重复下载
+    markLastAssistantProcessed(container);
+    return;
+  }
+
   if (!container) return;
 
   if (!loopState.onToolCallsDetected(1)) {
@@ -413,8 +420,8 @@ function processNewContent(node: HTMLElement) {
   // 跳过续接消息（已被隐藏）
   if (node.hasAttribute && node.hasAttribute('data-ds-continuation')) return;
   if (node.closest && node.closest('[data-ds-tool-processed]')) return;
-  // 扩展自渲染的 UI（工具块、折叠条）里含原始调用文本，扫到会把已执行的调用再执行一遍
-  if (node.closest && (node.closest('.ds-mini-tool-block') || node.closest('[data-ds-collapse]')))
+  // 扩展自渲染的 UI（工具块、折叠块）里含原始调用文本，扫到会把已执行的调用再执行一遍
+  if (node.closest && (node.closest('.ds-mini-tool-block') || node.closest('[data-ds-fold]')))
     return;
   if (!node.closest || !node.closest('.ds-message')) return;
 
@@ -429,37 +436,16 @@ function processNewContent(node: HTMLElement) {
   const calls = extractToolCalls(text);
   if (!calls.length) return;
 
-  hideRawToolCalls(node, calls);
-
   // 直接执行工具调用
   // DOM 兜底一律视为工具回注（isNewUserFlow=false），不复位 loop 状态
   handleMainWorldToolCalls(calls, false);
 }
 
 // ============================================================
-// 隐藏原始 XML — 只在最新消息上操作，不碰历史
-// ============================================================
-function hideRawToolCalls(container: HTMLElement, toolCalls: ToolCall[]) {
-  // 只操作最后一条助理消息
-  const asstMsgs = container.querySelectorAll('.ds-message:not(.d29f3d7d)');
-  if (!asstMsgs.length) return;
-  const target = asstMsgs[asstMsgs.length - 1];
-
-  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
-  let n: Text | null;
-  while ((n = walker.nextNode() as Text | null)) {
-    for (const call of toolCalls) {
-      if (n.textContent?.includes(call.raw)) {
-        n.textContent = n.textContent.replace(call.raw, '');
-      }
-    }
-  }
-}
-
-// ============================================================
 // 辅助
 // ============================================================
-function markLastAssistantProcessed(container: HTMLElement) {
+function markLastAssistantProcessed(container: HTMLElement | null) {
+  if (!container) return;
   const msgs = container.querySelectorAll('.ds-message:not(.d29f3d7d)');
   const last = msgs[msgs.length - 1] as HTMLElement | undefined;
   if (last) last.setAttribute('data-ds-tool-processed', 'true');

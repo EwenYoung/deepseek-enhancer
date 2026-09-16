@@ -1,47 +1,157 @@
-// ui-collapse 的 DOM 部分依赖真实页面结构（.ds-message / 流式渲染），只测纯函数：
-// findToolCallRegion 的区间定位是折叠功能正确性的核心。
+// ui-collapse 的 DOM 部分（观察器、打标、点击委托）不做单测：依赖真实页面结构
+// （.ds-message / 虚拟列表 / 流式渲染 / ::before 伪元素点击目标），当前 vitest
+// 环境是 node，无 jsdom。这里只覆盖纯逻辑。
 import { describe, it, expect } from 'vitest';
-import { findToolCallRegion } from '../ui-collapse';
+import {
+  findToolCallSpans,
+  classifyFoldableBlock,
+  buildFoldLabel,
+  buildCodeFoldLabel,
+  hasTextOutsideSpans,
+} from '../ui-collapse';
 import { toolNames } from '../tool-descriptors';
 
-describe('findToolCallRegion', () => {
-  it('定位单个完整工具调用区间（含关闭标签）', () => {
+describe('findToolCallSpans', () => {
+  it('定位完整工具调用区间（含闭合标签）', () => {
     const text = '前言\n<doc_generate>{"title":"a","content":"x"}</doc_generate>';
-    const region = findToolCallRegion(text);
-    expect(region).toEqual({ name: 'doc_generate', start: 3, end: text.length });
-    expect(text.slice(region!.start, region!.end)).toBe(
-      '<doc_generate>{"title":"a","content":"x"}</doc_generate>',
-    );
+    expect(findToolCallSpans(text)).toEqual([{ name: 'doc_generate', start: 3, end: text.length }]);
   });
 
-  it('多个标签时取起点最靠前的完整区间', () => {
-    const text = '<web_search>{"query":"q"}</web_search> 中间 <doc_generate>{}</doc_generate>';
-    const region = findToolCallRegion(text);
-    expect(region?.name).toBe('web_search');
-    expect(region?.start).toBe(0);
+  it('闭合标签缺失时仍能定位区间（JSON 之后即为区间末尾）', () => {
+    const text = '<doc_generate>{"title":"a","format":"html","content":"<h1>x</h1>"}';
+    expect(findToolCallSpans(text)).toEqual([{ name: 'doc_generate', start: 0, end: text.length }]);
   });
 
-  it('只有开标签（流式未完成）时返回 null', () => {
-    expect(findToolCallRegion('正文 <doc_generate>{"title":"a"')).toBeNull();
+  it('闭合标签前的空白计入区间', () => {
+    const text = '<web_search>{"query":"q"}  \n</web_search>';
+    expect(findToolCallSpans(text)).toEqual([{ name: 'web_search', start: 0, end: text.length }]);
   });
 
-  it('只有闭标签时返回 null', () => {
-    expect(findToolCallRegion('正文 </doc_generate> 结束')).toBeNull();
+  it('找出多个工具调用并保持出现顺序', () => {
+    const text =
+      '<web_search>{"query":"q"}</web_search> <doc_generate>{"title":"t"}</doc_generate>';
+    const spans = findToolCallSpans(text);
+    expect(spans.map((span) => span.name)).toEqual(['web_search', 'doc_generate']);
+    expect(spans[1].end).toBe(text.length);
   });
 
-  it('闭标签在开标签之前时返回 null', () => {
-    expect(findToolCallRegion('</doc_generate> 前缀 <doc_generate>')).toBeNull();
+  it('JSON 含嵌套花括号、字符串内花括号与转义引号时仍完整切出', () => {
+    const text =
+      '<doc_generate>{"content":"say \\"hi\\" and \\\\ path","code":"if (a) { b }","nested":{"a":{"b":1}}}</doc_generate>';
+    expect(findToolCallSpans(text)).toEqual([{ name: 'doc_generate', start: 0, end: text.length }]);
   });
 
-  it('无任何标签时返回 null', () => {
-    expect(findToolCallRegion('普通回复文本')).toBeNull();
+  it('JSON 未闭合（流式输出中段）时区间延到文本末尾，保证立即折叠', () => {
+    const text = '<doc_generate>{"title":"a"';
+    expect(findToolCallSpans(text)).toEqual([{ name: 'doc_generate', start: 0, end: text.length }]);
+  });
+
+  it('流式未闭合的区间外无正文时判定可折叠（边输出边折）', () => {
+    const text = '<doc_generate>{"title":"a","content":"<h1>x';
+    expect(classifyFoldableBlock(text, findToolCallSpans(text))).toEqual({
+      foldable: true,
+      toolNames: ['doc_generate'],
+    });
+  });
+
+  it('JSON 闭合后区间终点回到实际调用末尾', () => {
+    const text = '<doc_generate>{"title":"a"} 后续正文';
+    const spans = findToolCallSpans(text);
+    expect(spans).toEqual([
+      { name: 'doc_generate', start: 0, end: '<doc_generate>{"title":"a"}'.length },
+    ]);
+  });
+
+  it('标签后没有 JSON 时跳过该标签', () => {
+    expect(findToolCallSpans('<web_search> 没有 JSON')).toEqual([]);
+  });
+
+  it('无标签时返回空', () => {
+    expect(findToolCallSpans('普通回复文本')).toEqual([]);
   });
 
   it('默认标签表覆盖全部工具', () => {
-    // 通过行为验证：每个工具名都能被检出
     for (const name of toolNames) {
       const text = 'x <' + name + '>{}</' + name + '> y';
-      expect(findToolCallRegion(text)?.name).toBe(name);
+      expect(findToolCallSpans(text).map((span) => span.name)).toEqual([name]);
     }
+  });
+});
+
+describe('classifyFoldableBlock', () => {
+  const call = '<doc_generate>{"title":"t"}</doc_generate>';
+
+  it('区间外只有空白时可折叠', () => {
+    expect(
+      classifyFoldableBlock('  \n' + call + '\n  ', findToolCallSpans('  \n' + call + '\n  ')),
+    ).toEqual({ foldable: true, toolNames: ['doc_generate'] });
+  });
+
+  it('区间外有正文时不折叠', () => {
+    const text = '下面是文档：' + call;
+    expect(classifyFoldableBlock(text, findToolCallSpans(text))).toEqual({
+      foldable: false,
+      toolNames: ['doc_generate'],
+    });
+  });
+
+  it('无工具区间时不折叠', () => {
+    expect(classifyFoldableBlock('纯正文', [])).toEqual({ foldable: false, toolNames: [] });
+  });
+
+  it('工具名去重且保持出现顺序', () => {
+    const text =
+      '<web_search>{"query":"a"}</web_search> <doc_generate>{"title":"t"}</doc_generate> <web_search>{"query":"b"}</web_search>';
+    expect(classifyFoldableBlock(text, findToolCallSpans(text)).toolNames).toEqual([
+      'web_search',
+      'doc_generate',
+    ]);
+  });
+});
+
+describe('buildFoldLabel', () => {
+  it('折叠态用 ▸ 并列出全部工具名', () => {
+    expect(buildFoldLabel(['doc_generate', 'web_search'], false)).toBe(
+      '▸ 工具调用 doc_generate、web_search',
+    );
+  });
+
+  it('展开态用 ▾', () => {
+    expect(buildFoldLabel(['doc_generate'], true)).toBe('▾ 工具调用 doc_generate');
+  });
+
+  it('无工具名时只留前缀', () => {
+    expect(buildFoldLabel([], false)).toBe('▸ 工具调用');
+  });
+});
+
+describe('buildCodeFoldLabel', () => {
+  it('带行数与展开箭头', () => {
+    expect(buildCodeFoldLabel(20, false)).toBe('▸ 代码块（20 行）');
+    expect(buildCodeFoldLabel(20, true)).toBe('▾ 代码块（20 行）');
+  });
+});
+
+describe('hasTextOutsideSpans', () => {
+  it('空串视为无区间外文本', () => {
+    expect(hasTextOutsideSpans('', [])).toBe(false);
+  });
+
+  it('全空白视为无区间外文本', () => {
+    expect(hasTextOutsideSpans('  \n\t ', [])).toBe(false);
+  });
+
+  it('无区间但含文本时判定为有文本', () => {
+    expect(hasTextOutsideSpans('正文', [])).toBe(true);
+  });
+
+  it('区间外的正文不算忽略', () => {
+    const text = '前 <web_search>{"query":"q"}</web_search> 后';
+    expect(hasTextOutsideSpans(text, findToolCallSpans(text))).toBe(true);
+  });
+
+  it('区间紧贴文本两端时判定为无区间外文本', () => {
+    const text = '<web_search>{"query":"q"}</web_search>';
+    expect(hasTextOutsideSpans(text, findToolCallSpans(text))).toBe(false);
   });
 });

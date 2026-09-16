@@ -1,243 +1,343 @@
 // ============================================================
 // deepseek-enhancer — 内容折叠（Collapse）
 // ============================================================
-// 助手消息里的大段内容默认收起为可展开横条：
-//   1. 原始工具调用文本（<doc_generate>{...}</doc_generate> 等）——
-//      SSE 主路径检出并执行调用后，官方气泡仍会渲染原始 XML，长文档（HTML/Markdown
-//      文件内容）会铺满正文；
-//   2. 超过行数阈值的代码块（pre>code）。
-// 折叠只做非破坏性操作（截断/清空文本节点、display:none、插入横条），不移动 React
-// 管理的节点；官方重渲染（虚拟列表滚动、会话切换）会还原原文，轮询扫描到后重新折叠。
-// DOM 重依赖，单元测试只覆盖纯函数 findToolCallRegion。
+// 助手消息里的大段内容（原始工具调用 XML、超长代码块）默认收成一行标签：
+// 只给块级元素加 data-ds-fold 系列属性，标签行由 CSS ::before 渲染；不插入自建
+// 节点、不改写文本节点，原文始终留在 DOM 里（复制、搜索、导出都能读到）。
+// 官方重渲染会抹掉属性，MutationObserver 重扫后幂等补打。
+// 这里刻意不打任何控制台日志：观察器跟着 #root 的每个文本变化跑，流式输出期间
+// 每秒触发上百次，日志会刷爆控制台（该路径无排查需求）。
+// DOM 部分依赖真实页面结构（虚拟列表、流式渲染、伪元素点击目标），不做单测；
+// 当前 vitest 环境是 node，无 jsdom。纯逻辑部分见 __tests__/ui-collapse.test.ts。
 
+import { applyGuardedCSS } from './enhancer-features';
+import { extractBalancedJson } from './sse-parser';
 import { toolNames } from './tool-descriptors';
 
-// 需要从正文收起的 XML 标签：五个工具
-const COLLAPSE_TAGS = toolNames;
+// 折叠契约：属性存在即已折叠（幂等标记），data-ds-fold-open 存在即展开
+const FOLD_ATTR = 'data-ds-fold';
+const FOLD_LABEL_ATTR = 'data-ds-fold-label';
+const FOLD_OPEN_ATTR = 'data-ds-fold-open';
+
+type FoldKind = 'tool' | 'code';
+
 // 代码块达到该行数才折叠
 const CODE_COLLAPSE_MIN_LINES = 15;
-// 折叠态代码块保留的可见高度（px）
-const CODE_COLLAPSED_HEIGHT = 240;
-// 展开后原文预览的最大高度（px）
-const RAW_VIEW_MAX_HEIGHT = 320;
-// 扫描轮询间隔（ms）；配合文本稳定门避开流式输出中段
-const RESCAN_INTERVAL_MS = 1200;
-// 折叠扫描跳过的子树：思考过程、扩展自渲染的工具结果块、已有折叠条
-const SKIP_SUBTREE_SELECTOR = '.ds-think-content, .ds-mini-tool-block, [data-ds-collapse]';
+// 标签行高度（px），与官方「已思考」折叠块一致
+const FOLD_LABEL_HEIGHT_PX = 34;
+// 变化入队后的合并处理间隔（ms）
+const SCAN_THROTTLE_MS = 250;
+// 折叠扫描跳过的子树：思考过程、扩展自渲染的工具结果块、已折叠块
+const SKIP_SUBTREE_SELECTOR = '.ds-think-content, .ds-mini-tool-block, [data-ds-fold]';
+// 折叠候选：助手正文的直接子块，或代码块容器（折容器才能连顶栏一起藏）
+const FOLD_CANDIDATE_SELECTOR =
+  '.ds-assistant-message-main-content > *, .ds-assistant-message-main-content .md-code-block';
 
-const BTN_STYLE =
-  'cursor:pointer;font-size:12px;color:var(--ds-text-secondary,#86909c);' +
-  'background:var(--ds-bg-subtle, rgba(0,0,0,0.03));' +
-  'border:1px solid var(--ds-border, rgba(0,0,0,0.08));border-radius:6px;padding:3px 10px;';
+// ============================================================
+// 纯逻辑（测试覆盖）
+// ============================================================
+export interface ToolCallSpan {
+  name: string;
+  /** 含 `<tag>` */
+  start: number;
+  /** 闭合标签之后；模型省略闭合标签时为 JSON 之后 */
+  end: number;
+}
 
-export interface ToolCallRegion {
+interface OpenTag {
   name: string;
   start: number;
-  /** 关闭标签之后的排他下标 */
   end: number;
 }
 
-/** 纯函数（测试覆盖）：找出文本中第一段完整的 <tag>...</tag> 区间，多个标签取起点最靠前的 */
-export function findToolCallRegion(
-  text: string,
-  tags: string[] = COLLAPSE_TAGS,
-): ToolCallRegion | null {
-  let best: ToolCallRegion | null = null;
-  for (const name of tags) {
-    const open = '<' + name + '>';
-    const start = text.indexOf(open);
-    if (start === -1) continue;
-    const close = '</' + name + '>';
-    const closeIdx = text.indexOf(close, start + open.length);
-    if (closeIdx === -1) continue;
-    const end = closeIdx + close.length;
-    if (!best || start < best.start) best = { name, start, end };
-  }
-  return best;
-}
-
-// ============================================================
-// 初始化：固定间隔轮询扫描气泡
-// ============================================================
-export function initCollapse() {
-  // 实测 DeepSeek 页面持续存在 mutation（虚拟列表回收、动画、埋点 SDK），
-  // “等安静再扫”的防抖可能永远等不到安静期，因此用固定间隔轮询全量扫描。
-  // 文本稳定门：同一气泡文本连续两轮一致才折叠，避开流式输出中途折叠生长中的内容。
-  const lastSeenText = new WeakMap<HTMLElement, string>();
-
-  const scan = () => {
-    document.querySelectorAll('.ds-message').forEach((el) => {
-      const bubble = el as HTMLElement;
-      if (bubble.closest('[data-ds-hidden]')) return;
-      // 只折叠助手消息：用户气泡里的注入说明带工具示例标签，折叠会毁掉原文并污染导出
-      if (!bubble.querySelector('.ds-assistant-message-main-content')) return;
-      const text = bubble.textContent || '';
-      if (lastSeenText.get(bubble) !== text) {
-        lastSeenText.set(bubble, text);
-        return;
-      }
-      collapseRawToolCall(bubble);
-      collapseLongCodeBlocks(bubble);
-    });
-  };
-
-  setTimeout(scan, RESCAN_INTERVAL_MS);
-  setInterval(scan, RESCAN_INTERVAL_MS);
-}
-
-// ============================================================
-// 原始工具调用文本 → 折叠条
-// ============================================================
-interface TextSeg {
-  node: Node;
-  start: number;
-  end: number;
-  value: string;
-}
-
-function collapseRawToolCall(bubble: HTMLElement) {
-  // 先收集跳过子树之外的文本段，再在拼接文本上找调用区间
-  const walker = document.createTreeWalker(bubble, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
-      const el = n.parentElement;
-      return el && el.closest(SKIP_SUBTREE_SELECTOR)
-        ? NodeFilter.FILTER_REJECT
-        : NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  const segs: TextSeg[] = [];
+/** 找出文本中所有工具调用区间；闭合标签可选（模型有时省略） */
+export function findToolCallSpans(text: string, tags: string[] = toolNames): ToolCallSpan[] {
+  const spans: ToolCallSpan[] = [];
   let cursor = 0;
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const value = node.nodeValue || '';
-    if (!value) continue;
-    segs.push({ node, start: cursor, end: cursor + value.length, value });
-    cursor += value.length;
+  while (cursor < text.length) {
+    const open = findEarliestOpenTag(text, cursor, tags);
+    if (!open) break;
+    const jsonStart = skipWhitespace(text, open.end);
+    if (text[jsonStart] !== '{') {
+      // 标签后压根没有 JSON 起点（模型误写或正文引用标签词）：不是调用，跳过
+      cursor = open.end;
+      continue;
+    }
+    const body = extractBalancedJson(text, jsonStart);
+    if (!body) {
+      // JSON 已开始但未闭合＝流式输出进行中。必须在标签出现的这一刻就折叠，否则长
+      // 文档会在输出全程铺满正文（折叠的意义就是挡住这段）。区间先延到文本末尾，
+      // 下一轮扫描拿到完整 JSON 后再重算终点
+      spans.push({ name: open.name, start: open.start, end: text.length });
+      break;
+    }
+    let end = jsonStart + body.length;
+    const close = matchClosingTag(text, end, open.name);
+    if (close) end += close.length;
+    spans.push({ name: open.name, start: open.start, end });
+    cursor = end;
   }
-  if (!segs.length) return;
+  return spans;
+}
 
-  const text = segs.map((s) => s.value).join('');
-  const region = findToolCallRegion(text);
-  if (!region) return;
-  const raw = text.slice(region.start, region.end);
+export interface FoldDecision {
+  foldable: boolean;
+  /** 去重，保持出现顺序 */
+  toolNames: string[];
+}
 
-  // 区间起点所在段：截掉区间部分保留原文前后缀；完全落在区间内的段：清空并隐藏空壳祖先。
-  // 锚点取第一个与区间相交的段——调用文本常自成段落（起点恰为段首），此时也必须折叠。
-  let anchorNode: Node | null = null;
-  let anchorAfter = false;
-  const emptied: Node[] = [];
-  for (const seg of segs) {
-    if (seg.end <= region.start || seg.start >= region.end) continue;
-    if (seg.start < region.start && seg.end > region.start) {
-      const head = seg.value.slice(0, region.start - seg.start);
-      const tail = seg.value.slice(Math.max(region.end - seg.start, 0));
-      seg.node.nodeValue = head + tail;
-      anchorNode = seg.node;
-      anchorAfter = true;
-    } else if (seg.start >= region.start && seg.end <= region.end) {
-      seg.node.nodeValue = '';
-      emptied.push(seg.node);
-      if (!anchorNode) {
-        anchorNode = seg.node;
-        anchorAfter = false;
-      }
-    } else if (seg.start < region.end) {
-      seg.node.nodeValue = seg.value.slice(region.end - seg.start);
-      if (!anchorNode) {
-        anchorNode = seg.node;
-        anchorAfter = false;
-      }
+/** 折叠判定：块内除工具调用外还有正文时不折叠 */
+export function classifyFoldableBlock(text: string, spans: ToolCallSpan[]): FoldDecision {
+  const names = [...new Set(spans.map((span) => span.name))];
+  return { foldable: spans.length > 0 && !hasTextOutsideSpans(text, spans), toolNames: names };
+}
+
+/** 标签行文案：'▸ 工具调用 doc_generate、web_search' */
+export function buildFoldLabel(toolNames: string[], expanded: boolean): string {
+  const names = toolNames.join('、');
+  return names ? `${foldMarker(expanded)} 工具调用 ${names}` : `${foldMarker(expanded)} 工具调用`;
+}
+
+/** 代码块标签行文案：'▸ 代码块（20 行）' */
+export function buildCodeFoldLabel(lines: number, expanded: boolean): string {
+  return `${foldMarker(expanded)} 代码块（${lines} 行）`;
+}
+
+/** 区间外文本（去空白后）是否为空 */
+export function hasTextOutsideSpans(text: string, spans: ToolCallSpan[]): boolean {
+  let outside = '';
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start > cursor) outside += text.slice(cursor, span.start);
+    cursor = Math.max(cursor, span.end);
+  }
+  if (cursor < text.length) outside += text.slice(cursor);
+  return outside.trim().length > 0;
+}
+
+function foldMarker(expanded: boolean): string {
+  return expanded ? '▾' : '▸';
+}
+
+function findEarliestOpenTag(text: string, from: number, tags: string[]): OpenTag | null {
+  let earliest: OpenTag | null = null;
+  for (const name of tags) {
+    const token = '<' + name + '>';
+    const start = text.indexOf(token, from);
+    if (start === -1) continue;
+    if (!earliest || start < earliest.start) {
+      earliest = { name, start, end: start + token.length };
     }
   }
-  if (!anchorNode) return;
-
-  const bar = buildToolCallBar(region.name, raw);
-  const parent = anchorNode.parentElement;
-  if (!parent) return;
-  parent.insertBefore(bar, anchorAfter ? anchorNode.nextSibling : anchorNode);
-  for (const n of emptied) hideEmptyAncestors(n, bubble);
+  return earliest;
 }
 
-function hideEmptyAncestors(node: Node, root: HTMLElement) {
-  let el = node.parentElement;
-  while (el && el !== root && root.contains(el)) {
-    // 折叠条使容器非空时自然停下，不会隐藏承载横条的块
-    if ((el.textContent || '').trim() !== '') break;
-    const parent = el.parentElement;
-    (el as HTMLElement).style.display = 'none';
-    el = parent;
-  }
+function skipWhitespace(text: string, from: number): number {
+  let i = from;
+  while (i < text.length && /\s/.test(text[i])) i++;
+  return i;
 }
 
-function toolCallLabel(name: string): string {
-  return '🛠 工具调用 ' + name;
+/** 闭合标签允许前置空白；命中时连同空白一起返回，区间覆盖整段调用 */
+function matchClosingTag(text: string, from: number, name: string): string | null {
+  const token = '</' + name + '>';
+  const closeStart = skipWhitespace(text, from);
+  return text.startsWith(token, closeStart) ? text.slice(from, closeStart + token.length) : null;
 }
 
-function buildToolCallBar(name: string, raw: string): HTMLElement {
-  const bar = document.createElement('div');
-  bar.setAttribute('data-ds-collapse', 'tool');
-  bar.style.cssText = 'margin:4px 0;';
+// ============================================================
+// DOM 层：观察器 → 入队 → 节流批量打标
+// ============================================================
+interface FoldPlan {
+  kind: FoldKind;
+  label: string;
+}
 
-  const btn = document.createElement('button');
-  const label = (expanded: boolean) =>
-    expanded
-      ? '▾ 收起' + toolCallLabel(name) + '原文'
-      : '▸ ' + toolCallLabel(name) + '（点击展开原文）';
-  btn.textContent = label(false);
-  btn.style.cssText = BTN_STYLE;
+export function initCollapse() {
+  applyGuardedCSS(
+    'collapse',
+    `
+    [${FOLD_ATTR}] {
+      position: relative;
+      transition: max-height 0.25s ease;
+    }
+    [${FOLD_ATTR}]::before {
+      content: attr(${FOLD_LABEL_ATTR});
+      display: flex;
+      align-items: center;
+      height: ${FOLD_LABEL_HEIGHT_PX}px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+      color: var(--dsw-alias-label-secondary, #61666b);
+    }
+    [${FOLD_ATTR}]:not([${FOLD_OPEN_ATTR}]) {
+      max-height: ${FOLD_LABEL_HEIGHT_PX}px;
+      overflow: hidden;
+      visibility: hidden;
+      box-sizing: border-box;
+    }
+    [${FOLD_ATTR}]:not([${FOLD_OPEN_ATTR}])::before {
+      visibility: visible;
+    }
+    `,
+  );
 
-  const pre = document.createElement('pre');
-  pre.style.cssText =
-    'display:none;max-height:' +
-    RAW_VIEW_MAX_HEIGHT +
-    'px;overflow:auto;' +
-    'white-space:pre-wrap;word-break:break-all;font-size:12px;line-height:1.6;' +
-    'background:var(--ds-bg-subtle, rgba(0,0,0,0.03));color:var(--ds-text,#1d2129);' +
-    'border-radius:8px;padding:10px;margin:6px 0 0;';
-  pre.textContent = raw;
-
-  btn.addEventListener('click', () => {
-    const show = pre.style.display === 'none';
-    pre.style.display = show ? 'block' : 'none';
-    btn.textContent = label(show);
+  // 用捕获阶段委托：官方在 #root 内部对气泡点击调用 stopPropagation，冒泡阶段的
+  // 监听器（含绑在 document 上的）收不到事件，只有捕获阶段能先于它命中
+  document.addEventListener('click', onFoldClick, true);
+  scheduleScanAll();
+  // #root 是 DeepSeek 的 React 挂载点；缺失时退回 body，保证仍能观察
+  const observedRoot = document.querySelector('#root') ?? document.body;
+  new MutationObserver(onMutations).observe(observedRoot, {
+    childList: true,
+    subtree: true,
+    characterData: true,
   });
-
-  bar.appendChild(btn);
-  bar.appendChild(pre);
-  return bar;
 }
 
-// ============================================================
-// 超长代码块 → 折叠条
-// ============================================================
-function collapseLongCodeBlocks(bubble: HTMLElement) {
-  const pres = bubble.querySelectorAll('pre');
-  for (const pre of pres) {
-    if (pre.hasAttribute('data-ds-collapse-code')) continue;
-    if (pre.closest(SKIP_SUBTREE_SELECTOR)) continue;
-    const lines = (pre.textContent || '').split('\n').length;
-    if (lines < CODE_COLLAPSE_MIN_LINES) continue;
+const pendingBlocks = new Set<HTMLElement>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-    pre.setAttribute('data-ds-collapse-code', 'collapsed');
-    pre.style.maxHeight = CODE_COLLAPSED_HEIGHT + 'px';
-    pre.style.overflow = 'hidden';
+function scheduleScanAll() {
+  document.querySelectorAll<HTMLElement>(FOLD_CANDIDATE_SELECTOR).forEach(scheduleScan);
+}
 
-    const bar = document.createElement('div');
-    bar.setAttribute('data-ds-collapse', 'code');
-    bar.style.cssText = 'margin:4px 0;';
-    const btn = document.createElement('button');
-    const label = (expanded: boolean) =>
-      expanded ? '▾ 收起代码块（' + lines + ' 行）' : '▸ 展开代码块（' + lines + ' 行）';
-    btn.textContent = label(false);
-    btn.style.cssText = BTN_STYLE;
-    btn.addEventListener('click', () => {
-      const expanded = pre.style.maxHeight === '';
-      pre.style.maxHeight = expanded ? CODE_COLLAPSED_HEIGHT + 'px' : '';
-      pre.style.overflow = expanded ? 'hidden' : '';
-      btn.textContent = label(!expanded);
-    });
-    bar.appendChild(btn);
+function scheduleScan(block: HTMLElement) {
+  pendingBlocks.add(block);
+  if (flushTimer !== null) return;
+  flushTimer = setTimeout(flushPending, SCAN_THROTTLE_MS);
+}
 
-    pre.parentNode?.insertBefore(bar, pre);
+function flushPending() {
+  flushTimer = null;
+  const blocks = [...pendingBlocks];
+  pendingBlocks.clear();
+  for (const block of blocks) foldBlockIfEligible(block);
+}
+
+function onMutations(records: MutationRecord[]) {
+  for (const record of records) {
+    scheduleCandidate(record.target);
+    record.addedNodes.forEach(scheduleCandidate);
   }
+}
+
+function scheduleCandidate(node: Node) {
+  const element = node instanceof Element ? node : node.parentElement;
+  if (!element) return;
+
+  const candidate = findFoldCandidate(element);
+  if (candidate) {
+    scheduleScan(candidate);
+    return;
+  }
+  // 新增的是整个正文容器（React 重建消息）时向上找不到候选，其子块全部重扫
+  element.querySelectorAll<HTMLElement>(FOLD_CANDIDATE_SELECTOR).forEach(scheduleScan);
+}
+
+/** 从变化节点向上找最近的折叠候选 */
+function findFoldCandidate(element: Element): HTMLElement | null {
+  const codeBlock = element.closest<HTMLElement>('.md-code-block');
+  if (codeBlock) return codeBlock;
+
+  const content = element.closest('.ds-assistant-message-main-content');
+  if (!content || element === content) return null;
+  let candidate: Element = element;
+  while (candidate.parentElement && candidate.parentElement !== content) {
+    candidate = candidate.parentElement;
+  }
+  return candidate.parentElement === content ? (candidate as HTMLElement) : null;
+}
+
+function foldBlockIfEligible(block: HTMLElement) {
+  if (!isFoldCandidate(block)) return;
+  const plan = planFold(block, block.hasAttribute(FOLD_OPEN_ATTR));
+  if (plan) applyFold(block, plan);
+  else undoFold(block);
+}
+
+/** 只处理助手正文里的可见块：用户气泡的注入说明带工具示例，折叠会污染导出 */
+function isFoldCandidate(block: HTMLElement): boolean {
+  if (!block.isConnected) return false;
+  if (block.closest('[data-ds-hidden]')) return false;
+  if (block.parentElement?.closest(SKIP_SUBTREE_SELECTOR)) return false;
+  return block.closest('.ds-assistant-message-main-content') !== null;
+}
+
+function planFold(block: HTMLElement, expanded: boolean): FoldPlan | null {
+  if (block.classList.contains('md-code-block')) {
+    const lines = countCodeLines(block);
+    return lines >= CODE_COLLAPSE_MIN_LINES
+      ? { kind: 'code', label: buildCodeFoldLabel(lines, expanded) }
+      : null;
+  }
+  const text = collectVisibleText(block);
+  const decision = classifyFoldableBlock(text, findToolCallSpans(text));
+  return decision.foldable
+    ? { kind: 'tool', label: buildFoldLabel(decision.toolNames, expanded) }
+    : null;
+}
+
+function applyFold(block: HTMLElement, plan: FoldPlan) {
+  // 幂等：已折叠且文案一致就不重复写属性，避免无谓的 DOM 变更
+  if (
+    block.getAttribute(FOLD_ATTR) === plan.kind &&
+    block.getAttribute(FOLD_LABEL_ATTR) === plan.label
+  ) {
+    return;
+  }
+  block.setAttribute(FOLD_ATTR, plan.kind);
+  block.setAttribute(FOLD_LABEL_ATTR, plan.label);
+}
+
+/** 撤销保险：内容变化后不再符合折叠条件时移除全部折叠属性 */
+function undoFold(block: HTMLElement) {
+  if (!block.hasAttribute(FOLD_ATTR)) return;
+  block.removeAttribute(FOLD_ATTR);
+  block.removeAttribute(FOLD_LABEL_ATTR);
+  block.removeAttribute(FOLD_OPEN_ATTR);
+}
+
+function onFoldClick(event: MouseEvent) {
+  const target = event.target;
+  const block = target instanceof Element ? target.closest<HTMLElement>(`[${FOLD_ATTR}]`) : null;
+  // 标签行是块自身的 ::before 伪元素，点击时 target 就是块；展开态点正文
+  // （target 为子元素）不应收起
+  if (!block || target !== block) return;
+  toggleFold(block);
+}
+
+function toggleFold(block: HTMLElement) {
+  const expanded = !block.hasAttribute(FOLD_OPEN_ATTR);
+  if (expanded) block.setAttribute(FOLD_OPEN_ATTR, '');
+  else block.removeAttribute(FOLD_OPEN_ATTR);
+
+  const plan = planFold(block, expanded);
+  if (plan) applyFold(block, plan);
+  else undoFold(block);
+}
+
+function countCodeLines(block: HTMLElement): number {
+  const pre = block.querySelector('pre');
+  return pre ? (pre.textContent || '').split('\n').length : 0;
+}
+
+function collectVisibleText(block: HTMLElement): string {
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      isSkippedTextNode(node as Text, block) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
+  const parts: string[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (node.nodeValue) parts.push(node.nodeValue);
+  }
+  return parts.join('');
+}
+
+/** 块内嵌套的思考区/工具块/已折叠块不参与文本收集；块自身不算跳过 */
+function isSkippedTextNode(node: Text, block: HTMLElement): boolean {
+  const skipped = node.parentElement?.closest(SKIP_SUBTREE_SELECTOR);
+  return skipped != null && skipped !== block;
 }

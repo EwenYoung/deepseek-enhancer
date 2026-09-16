@@ -8,6 +8,7 @@ import {
   htmlToMarkdown,
   filterAsstCache,
   assistantRawToExport,
+  foldBlockToExportText,
 } from '../chat-exporter';
 
 type ExportMessage = Parameters<typeof renderHTML>[0][number];
@@ -434,5 +435,58 @@ describe('assistantRawToExport（缓存原文 → 导出文本）', () => {
     const raw =
       '<web_search>{"query": "a"}</web_search>中间文本<web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
     expect(assistantRawToExport(raw)).toBe('中间文本\n\n🛠 工具调用：web_search、github_trending');
+  });
+});
+
+describe('foldBlockToExportText（折叠块 → 导出文本）', () => {
+  it('新形态工具折叠块压成单行标记，不带完整 XML', () => {
+    const text = '<doc_generate>{"title": "示例文档", "content": "# 正文"}</doc_generate>';
+    expect(
+      foldBlockToExportText({ foldKind: 'tool', label: '▸ 工具调用 doc_generate', text }),
+    ).toBe('🛠 工具调用：doc_generate');
+  });
+
+  it('标签含多个工具名时保持去重顺序', () => {
+    const text =
+      '<web_search>{"query": "a"}</web_search><web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
+    expect(
+      foldBlockToExportText({
+        foldKind: 'tool',
+        label: '▸ 工具调用 web_search、github_trending',
+        text,
+      }),
+    ).toBe('🛠 工具调用：web_search、github_trending');
+  });
+
+  it('标签缺失时从块内原文提取工具名并去重', () => {
+    const text =
+      '<web_fetch>{"url": "https://x.com"}</web_fetch><web_fetch>{"url": "https://y.com"}</web_fetch>';
+    expect(foldBlockToExportText({ foldKind: 'tool', text })).toBe('🛠 工具调用：web_fetch');
+  });
+
+  it('代码块折叠保留原文', () => {
+    const code = Array.from({ length: 20 }, (_, i) => `const a${i} = ${i};`).join('\n');
+    expect(
+      foldBlockToExportText({ foldKind: 'code', label: '▸ 代码块（20 行）', text: code }),
+    ).toBe(code);
+  });
+
+  it('旧形态折叠条从按钮文案反解工具名', () => {
+    expect(
+      foldBlockToExportText({
+        label: null,
+        text: '<web_search>{"query": "a"}</web_search>',
+        legacyButtonText: '▸ 🛠 工具调用 web_search（点击展开原文）',
+      }),
+    ).toBe('🛠 工具调用：web_search');
+  });
+
+  it('旧形态代码折叠条自身丢弃，代码原文由兄弟 pre 导出', () => {
+    expect(
+      foldBlockToExportText({
+        text: '▸ 展开代码块（20 行）',
+        legacyButtonText: '▸ 展开代码块（20 行）',
+      }),
+    ).toBe('');
   });
 });

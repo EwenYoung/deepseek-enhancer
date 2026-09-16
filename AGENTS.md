@@ -17,7 +17,19 @@ Chrome MV3 扩展（WXT + TypeScript），增强 chat.deepseek.com：拦截 XHR 
 </important>
 
 <important if="你正在用 chrome-devtools-mcp 调试">
-**用完即断**：任务结束前执行 `chrome-devtools stop`，并确认无残留进程（`Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome-devtools' }` 为空，含 telemetry watchdog 孤儿进程）；残留会干扰其他调试任务。
+**用完即断**：本机没有 `chrome-devtools stop` 这个子命令（MCP 由 `npx chrome-devtools-mcp` 启动），收尾要自己终止进程链、叶子优先——残留会占住连接，让后续新实例的调用全部挂起。链结构：npx 启动器(cmd) → npx-cli(node) → cmd → chrome-devtools-mcp(node) → telemetry watchdog(node)。
+
+```powershell
+# 1) 列链
+$p = Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome[-]devtools-mcp' }
+$p | Select-Object ProcessId,ParentProcessId,Name
+# 2) 先杀叶子（telemetry watchdog），再重跑第 1 步，反复到为空
+$p | ? { $p.ParentProcessId -notcontains $_.ProcessId } | % { Stop-Process -Id $_.ProcessId -Force }
+# 3) 复核为空（chrome[-]devtools 写法避免匹配到查询命令自身）
+Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome[-]devtools' }
+```
+
+杀链会断开当前会话的 chrome-devtools 工具能力，只在调试任务确实结束后做；`DimAgent.exe` 是父进程但不在链上，勿杀。
 </important>
 
 ## 参考文档

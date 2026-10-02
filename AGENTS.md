@@ -74,7 +74,7 @@ Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome[-]devtools' }
 
 **Agent 循环**（每轮走完 1-6 后页面发起新 XHR 重入，直至模型自然回复）：
 1. 拦截 `XMLHttpRequest.send`，向请求体注入工具定义；
-2. 解析 SSE 流，检出 `<web_search>{…}</web_search>` 等工具标记；
+2. 解析 SSE 流，检出 `<news_hub>{…}</news_hub>` 等工具标记；
 3. `postMessage` 通知 Isolated 层；
 4. Background 调 Tavily API 取结果；
 5. `domSubmitText()`（填 textarea + 点发送按钮）提交结果；
@@ -83,7 +83,6 @@ Get-CimInstance Win32_Process | ? { $_.CommandLine -match 'chrome[-]devtools' }
 **关键模式**（改动这几块前先对号入座）：
 - SSE 流缓冲挂 `xhr.__ds_buf`，按 XHR 实例隔离，避免并发污染；
 - `/` 自动补全用 `ignoreNextInput` 标记，应对 React 18 重渲染；
-- 从 DOM 活跃类 `_31a22b0` 读取当前模式，决定注入的工具范围；
 - 主题与品牌色逻辑集中在 `enhancer-features.ts`。
 
 ## 经验教训

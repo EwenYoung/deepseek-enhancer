@@ -23,15 +23,14 @@ describe('findToolCallSpans', () => {
   });
 
   it('闭合标签前的空白计入区间', () => {
-    const text = '<web_search>{"query":"q"}  \n</web_search>';
-    expect(findToolCallSpans(text)).toEqual([{ name: 'web_search', start: 0, end: text.length }]);
+    const text = '<news_hub>{"query":"q"}  \n</news_hub>';
+    expect(findToolCallSpans(text)).toEqual([{ name: 'news_hub', start: 0, end: text.length }]);
   });
 
   it('找出多个工具调用并保持出现顺序', () => {
-    const text =
-      '<web_search>{"query":"q"}</web_search> <doc_generate>{"title":"t"}</doc_generate>';
+    const text = '<news_hub>{"query":"q"}</news_hub> <doc_generate>{"title":"t"}</doc_generate>';
     const spans = findToolCallSpans(text);
-    expect(spans.map((span) => span.name)).toEqual(['web_search', 'doc_generate']);
+    expect(spans.map((span) => span.name)).toEqual(['news_hub', 'doc_generate']);
     expect(spans[1].end).toBe(text.length);
   });
 
@@ -63,7 +62,7 @@ describe('findToolCallSpans', () => {
   });
 
   it('标签后没有 JSON 时跳过该标签', () => {
-    expect(findToolCallSpans('<web_search> 没有 JSON')).toEqual([]);
+    expect(findToolCallSpans('<news_hub> 没有 JSON')).toEqual([]);
   });
 
   it('无标签时返回空', () => {
@@ -101,9 +100,9 @@ describe('classifyFoldableBlock', () => {
 
   it('工具名去重且保持出现顺序', () => {
     const text =
-      '<web_search>{"query":"a"}</web_search> <doc_generate>{"title":"t"}</doc_generate> <web_search>{"query":"b"}</web_search>';
+      '<news_hub>{"query":"a"}</news_hub> <doc_generate>{"title":"t"}</doc_generate> <news_hub>{"query":"b"}</news_hub>';
     expect(classifyFoldableBlock(text, findToolCallSpans(text)).toolNames).toEqual([
-      'web_search',
+      'news_hub',
       'doc_generate',
     ]);
   });
@@ -111,8 +110,8 @@ describe('classifyFoldableBlock', () => {
 
 describe('buildFoldLabel', () => {
   it('折叠态用 ▸ 并列出全部工具名', () => {
-    expect(buildFoldLabel(['doc_generate', 'web_search'], false)).toBe(
-      '▸ 工具调用 doc_generate、web_search',
+    expect(buildFoldLabel(['doc_generate', 'news_hub'], false)).toBe(
+      '▸ 工具调用 doc_generate、news_hub',
     );
   });
 
@@ -146,12 +145,12 @@ describe('hasTextOutsideSpans', () => {
   });
 
   it('区间外的正文不算忽略', () => {
-    const text = '前 <web_search>{"query":"q"}</web_search> 后';
+    const text = '前 <news_hub>{"query":"q"}</news_hub> 后';
     expect(hasTextOutsideSpans(text, findToolCallSpans(text))).toBe(true);
   });
 
   it('区间紧贴文本两端时判定为无区间外文本', () => {
-    const text = '<web_search>{"query":"q"}</web_search>';
+    const text = '<news_hub>{"query":"q"}</news_hub>';
     expect(hasTextOutsideSpans(text, findToolCallSpans(text))).toBe(false);
   });
 });

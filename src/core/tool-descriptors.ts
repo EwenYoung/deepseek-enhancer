@@ -2,20 +2,6 @@ import type { ToolDescriptor } from './types';
 
 export const TOOL_DESCRIPTORS: ToolDescriptor[] = [
   {
-    name: 'web_search',
-    label: '联网搜索',
-    description: '使用 Tavily 搜索引擎搜索互联网获取实时信息',
-    parameters: { query: { type: 'string', description: '搜索关键词或问题', required: true } },
-    execution: 'background',
-  },
-  {
-    name: 'web_fetch',
-    label: '抓取网页',
-    description: '抓取指定 URL 的网页全文内容',
-    parameters: { url: { type: 'string', description: '要抓取的网页完整 URL', required: true } },
-    execution: 'background',
-  },
-  {
     name: 'news_hub',
     label: '新闻聚合',
     description:

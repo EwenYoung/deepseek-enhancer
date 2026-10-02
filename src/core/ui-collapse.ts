@@ -92,7 +92,7 @@ export function classifyFoldableBlock(text: string, spans: ToolCallSpan[]): Fold
   return { foldable: spans.length > 0 && !hasTextOutsideSpans(text, spans), toolNames: names };
 }
 
-/** 标签行文案：'▸ 工具调用 doc_generate、web_search' */
+/** 标签行文案：'▸ 工具调用 doc_generate、news_hub' */
 export function buildFoldLabel(toolNames: string[], expanded: boolean): string {
   const names = toolNames.join('、');
   return names ? `${foldMarker(expanded)} 工具调用 ${names}` : `${foldMarker(expanded)} 工具调用`;

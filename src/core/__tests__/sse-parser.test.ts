@@ -137,37 +137,37 @@ describe('parseSSEChunk', () => {
 });
 
 describe('extractToolCalls', () => {
-  it('extracts web_search with JSON payload', () => {
-    const text = 'Let me search for this <web_search>{"query":"latest AI news"}</web_search>';
+  it('extracts news_hub with JSON payload', () => {
+    const text = 'Let me search for this <news_hub>{"query":"latest AI news"}</news_hub>';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(1);
-    expect(calls[0].name).toBe('web_search');
+    expect(calls[0].name).toBe('news_hub');
     expect(calls[0].payload).toEqual({ query: 'latest AI news' });
   });
 
-  it('extracts web_fetch with URL payload', () => {
-    const text = '<web_fetch>{"url":"https://example.com"}</web_fetch>';
+  it('extracts github_trending with URL payload', () => {
+    const text = '<github_trending>{"url":"https://example.com"}</github_trending>';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(1);
-    expect(calls[0].name).toBe('web_fetch');
+    expect(calls[0].name).toBe('github_trending');
     expect(calls[0].payload).toEqual({ url: 'https://example.com' });
   });
 
   it('handles missing closing tag (DeepSeek quirk)', () => {
-    const text = '<web_search>{"query":"test"}';
+    const text = '<news_hub>{"query":"test"}';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(1);
-    expect(calls[0].name).toBe('web_search');
+    expect(calls[0].name).toBe('news_hub');
     expect(calls[0].payload).toEqual({ query: 'test' });
   });
 
   it('extracts multiple tool calls', () => {
     const text =
-      '<web_search>{"query":"A"}</web_search> some text <web_fetch>{"url":"B"}</web_fetch>';
+      '<news_hub>{"query":"A"}</news_hub> some text <github_trending>{"url":"B"}</github_trending>';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(2);
-    expect(calls[0].name).toBe('web_search');
-    expect(calls[1].name).toBe('web_fetch');
+    expect(calls[0].name).toBe('news_hub');
+    expect(calls[1].name).toBe('github_trending');
   });
 
   it('returns empty array for text with no tool calls', () => {
@@ -176,20 +176,20 @@ describe('extractToolCalls', () => {
   });
 
   it('handles malformed JSON payload gracefully', () => {
-    const text = '<web_search>{not valid json}</web_search>';
+    const text = '<news_hub>{not valid json}</news_hub>';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(1);
     expect(calls[0].payload).toEqual({});
   });
 
   it('ignores array JSON payload (regex only matches {})', () => {
-    const text = '<web_search>[1,2,3]</web_search>';
+    const text = '<news_hub>[1,2,3]</news_hub>';
     const calls = extractToolCalls(text);
     expect(calls).toEqual([]);
   });
 
   it('generates unique IDs for each call', () => {
-    const text = '<web_search>{"q":"a"}</web_search><web_search>{"q":"b"}</web_search>';
+    const text = '<news_hub>{"q":"a"}</news_hub><news_hub>{"q":"b"}</news_hub>';
     const calls = extractToolCalls(text);
     expect(calls[0].id).not.toBe(calls[1].id);
   });
@@ -216,10 +216,11 @@ describe('extractToolCalls', () => {
   });
 
   it('handles braces in both title and content', () => {
-    const text = '<web_fetch>{"url":"https://example.com/a{b}c","headers":{"x":"}"}}</web_fetch>';
+    const text =
+      '<github_trending>{"url":"https://example.com/a{b}c","headers":{"x":"}"}}</github_trending>';
     const calls = extractToolCalls(text);
     expect(calls).toHaveLength(1);
-    expect(calls[0].name).toBe('web_fetch');
+    expect(calls[0].name).toBe('github_trending');
     expect(calls[0].payload).toEqual({
       url: 'https://example.com/a{b}c',
       headers: { x: '}' },
@@ -304,13 +305,13 @@ describe('stripTaskComplete（旧数据兜底）', () => {
 describe('stripToolCalls', () => {
   it('removes all tool call XML tags', () => {
     const text =
-      'Before <web_search>{"q":"x"}</web_search> middle <web_fetch>{"url":"y"}</web_fetch> after';
+      'Before <news_hub>{"q":"x"}</news_hub> middle <github_trending>{"url":"y"}</github_trending> after';
     const result = stripToolCalls(text);
     expect(result).toBe('Before  middle  after');
   });
 
   it('removes tool calls without closing tags', () => {
-    const text = 'text <web_search>{"q":"x"}';
+    const text = 'text <news_hub>{"q":"x"}';
     const result = stripToolCalls(text);
     expect(result).toBe('text');
   });
@@ -321,7 +322,7 @@ describe('stripToolCalls', () => {
   });
 
   it('trims whitespace from result', () => {
-    const text = '  <web_search>{"q":"x"}</web_search>  ';
+    const text = '  <news_hub>{"q":"x"}</news_hub>  ';
     expect(stripToolCalls(text)).toBe('');
   });
 });
@@ -343,18 +344,18 @@ describe('accumulateText', () => {
   });
 
   it('detects tool calls in accumulated text', () => {
-    const r1 = accumulateText('Before <web_se', state);
+    const r1 = accumulateText('Before <news_', state);
     expect(r1.toolCalls).toEqual([]);
 
-    const r2 = accumulateText('arch>{"q":"test"}</web_search>', state);
+    const r2 = accumulateText('hub>{"q":"test"}</news_hub>', state);
     expect(r2.toolCalls).toHaveLength(1);
-    expect(r2.toolCalls[0].name).toBe('web_search');
+    expect(r2.toolCalls[0].name).toBe('news_hub');
   });
 
   it('strips tool calls from accumulated text', () => {
-    accumulateText('text <web_search>{"q":"x"}</web_search>', state);
+    accumulateText('text <news_hub>{"q":"x"}</news_hub>', state);
     const result = accumulateText(' more', state);
-    expect(result.text).not.toContain('<web_search>');
+    expect(result.text).not.toContain('<news_hub>');
     expect(result.text).toContain('text');
     expect(result.text).toContain('more');
   });

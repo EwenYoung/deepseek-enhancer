@@ -2,11 +2,11 @@
 // 替换构建期占位符后传入最小 DOM/window 桩求值，直接验证生产行为：
 // 工具定义只在会话首条消息（parent_message_id 为空）注入、工具结果回注不注入、
 // /skill 指令不受影响。实测依据：chat/completion 请求体首条消息 pid=null、
-// 第二条起 pid 有值，且页面切换时模式检测会误读（不可作为判定依据）。
+// 第二条起 pid 有值（不可作为判定依据）。
 import { describe, it, expect } from 'vitest';
 import injectSource from '../main-xhr-inject.ts?raw';
 
-const TOOL_DEFS_STUB = JSON.stringify([{ name: 'web_search' }, { name: 'doc_generate' }]);
+const TOOL_DEFS_STUB = JSON.stringify([{ name: 'news_hub' }, { name: 'doc_generate' }]);
 
 interface SentRequest {
   url: string;
@@ -22,7 +22,6 @@ function loadInject(seedStore: Record<string, string> = {}) {
   const elements: Record<string, { id: string; textContent: string }> = {};
 
   const doc = {
-    querySelectorAll: () => [],
     createElement: () => ({ id: '', textContent: '', style: {} as Record<string, string> }),
     getElementById: (id: string) => elements[id] ?? null,
     body: {
@@ -68,7 +67,7 @@ function loadInject(seedStore: Record<string, string> = {}) {
     .replaceAll("'__DS_TOOL_DEFS__'", JSON.stringify(TOOL_DEFS_STUB))
     // 与 main-world.content.ts buildToolRegex 同形：只匹配标签本身（含尖括号），
     // JSON 主体由 extractFromText 的平衡扫描提取
-    .replaceAll('__DS_TOOL_NAMES_REGEX__', '/<(web_search|doc_generate)>/g');
+    .replaceAll('__DS_TOOL_NAMES_REGEX__', '/<(news_hub|doc_generate)>/g');
   new Function(
     'window',
     'document',
@@ -156,7 +155,7 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '你好' });
     const prompt = lastPrompt(req);
     expect(prompt.indexOf('<tool_defs>\n【工具调用说明】')).toBe(0);
-    expect(prompt).toContain('web_search');
+    expect(prompt).toContain('news_hub');
     expect(prompt).toContain('</tool_defs>');
     expect(prompt.endsWith('<user_message>\n你好\n</user_message>')).toBe(true);
   });
@@ -352,7 +351,7 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     const app = loadInject();
     app.setAgentMode(true);
     app.setSkill('技能指令文本');
-    app.store['ds_mini_tools_state'] = JSON.stringify({ web_search: false, doc_generate: false });
+    app.store['ds_mini_tools_state'] = JSON.stringify({ news_hub: false, doc_generate: false });
     const req = app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '/mycat 处理参数' });
     expect(lastPrompt(req)).toBe(
       '<skill_instructions>\n技能指令文本\n</skill_instructions>\n\n<user_message>\n处理参数\n</user_message>',
@@ -410,8 +409,8 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     const sse =
       'data: {"p":"response/fragments","o":"APPEND","v":[{"id":2,"type":"THINK","content":"用户"}]}\n\n' +
       'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"想要热门新闻，我先想想。"}\n\n' +
-      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"<web_search>"}]}\n\n' +
-      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"{\\"query\\":\\"a\\"}</web_search>"}\n\n' +
+      'data: {"p":"response/fragments","o":"APPEND","v":[{"id":3,"type":"RESPONSE","content":"<news_hub>"}]}\n\n' +
+      'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"{\\"query\\":\\"a\\"}</news_hub>"}\n\n' +
       'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
     app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
     // 思考文本不落地；正文只有工具调用（被检出删除）→ 落占位记录
@@ -513,7 +512,7 @@ describe('main-xhr-inject 工具定义注入门槛', () => {
     app.setAgentMode(true);
     app.post(COMPLETION_URL, { chat_session_id: 's1', prompt: '搜一下' });
     const sse =
-      'data: {"v":"<web_search>{\\"query\\": \\"x\\"}</web_search>"}\n\n' +
+      'data: {"v":"<news_hub>{\\"query\\": \\"x\\"}</news_hub>"}\n\n' +
       'data: {"o":"SET","p":"response/status","v":"FINISHED"}\n\n';
     app.fireProgress(app.xhrs[app.xhrs.length - 1], sse);
     expect(cacheRecords(app)).toEqual(['s1||ASST_SID||（工具调用）']);

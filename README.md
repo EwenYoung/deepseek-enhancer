@@ -28,7 +28,7 @@
 
 ## 功能特性
 
-- 🔧 **工具调用** — 自动注入 `web_search`、`web_fetch`、`news_hub`、`github_trending`、`doc_generate` 到模型上下文
+- 🔧 **工具调用** — 自动注入 `news_hub`、`github_trending`、`doc_generate` 到模型上下文
 - 🧩 **技能系统** — 内置 8 个技能（深度思考、代码审查、写作、翻译等），支持自定义创建和 GitHub 导入
 - 🔄 **Agent 循环** — SSE 流解析 → 工具调用检测 → 后台执行 → DOM 提交，驱动模型多步推理
 - 🎨 **UI 增强** — 宽屏模式、多主题切换、字体自定义、滚动条隐藏、自动隐藏输入框、工具调用与超长代码块自动折叠成一行标签
@@ -63,7 +63,7 @@ pnpm build
 
 ### 配置 Tavily API Key
 
-> `web_search` 和 `web_fetch` 需要 Tavily API Key。`news_hub` 和 `github_trending` 无需 Key。
+> `news_hub` 的中文源（百度/微博/知乎/36氪）需要 Tavily API Key；其余工具无需 Key。
 
 1. 点击扩展图标打开管理面板
 2. 在 API Key 输入框填入你的 Tavily Key
@@ -110,7 +110,7 @@ flowchart LR
     DeepSeek --> |SSE 响应| Parser[SSE Parser<br/>工具调用检测]
     Parser --> |检测到工具调用| Exec[tool-executor.ts]
     Exec --> |chrome.runtime| Background[Background<br/>Service Worker]
-    Background --> |Tavily API| Tavily[Tavily Search<br/> Tavily Extract]
+    Background --> |Tavily API| Tavily[Tavily Search]
     Background --> |news/github| Scrape[网页抓取<br/>无需 API Key]
     Tavily --> |结果| DOM[domSubmitText<br/>填充+提交]
     Scrape --> |结果| DOM
@@ -140,7 +140,7 @@ MAIN ↔ Isolated 通过 `window.postMessage` 通信，消息标记 `source: 'DS
 ### Agent 工具调用循环
 
 1. MAIN 层拦截 `XMLHttpRequest.prototype.send` → 将工具定义注入 prompt
-2. SSE progress 事件 → 解析文本 → 正则检出 `<web_search>{...}</web_search>`
+2. SSE progress 事件 → 解析文本 → 正则检出 `<news_hub>{...}</news_hub>`
 3. → postMessage → Isolated → `chrome.runtime.sendMessage` → Background → Tavily API
 4. → 结果通过 `domSubmitText()` 提交（填充 textarea + 点击发送按钮）
 5. → 页面发起新 XHR → 循环继续或模型自然回复
@@ -160,7 +160,7 @@ deepseek-enhancer/
 │   │   ├── context-builder.ts      # 工具定义 XML 构建 + skill 注入
 │   │   ├── sse-parser.ts           # SSE 流解析 + 工具调用提取
 │   │   ├── tool-executor.ts        # 工具调用分发
-│   │   ├── tool-descriptors.ts     # 5 个工具定义
+│   │   ├── tool-descriptors.ts     # 工具定义唯一事实源
 │   │   ├── skill-registry.ts       # Skill CRUD（chrome.storage.local）
 │   │   ├── skill-builtin.ts        # 8 个内置技能
 │   │   ├── skill-importer.ts       # GitHub / 本地导入
@@ -191,9 +191,7 @@ deepseek-enhancer/
 
 | 工具 | 说明 | 需要 API Key |
 |------|------|:---:|
-| `web_search` | Tavily 搜索引擎，获取实时信息 | ✅ |
-| `web_fetch` | Tavily 抓取网页全文 | ✅ |
-| `news_hub` | 聚合 8 个平台热点（百度/微博/GitHub/知乎/36氪/arXiv/HN/Reddit） | ❌ |
+| `news_hub` | 聚合 8 个平台热点（百度/微博/GitHub/知乎/36氪/arXiv/HN/Reddit） | 中文源需要 |
 | `github_trending` | GitHub Trending 热门项目列表 | ❌ |
 | `doc_generate` | 将模型输出 Markdown 触发浏览器下载 | ❌ |
 

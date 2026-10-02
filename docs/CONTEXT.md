@@ -55,7 +55,7 @@ _Avoid_: 样式监控、标签守卫
 ### 核心概念
 
 **工具** (Tool)：
-模型可调用的外部能力，由 `TOOL_DESCRIPTORS`（唯一事实源）定义名称、描述、参数 schema 和执行位置。按 `execution` 字段分派：`background` 工具经 Background 代理（Tavily 搜索/网页抓取等），`local` 工具在 Isolated 本地执行（doc_generate）。
+模型可调用的外部能力，由 `TOOL_DESCRIPTORS`（唯一事实源）定义名称、描述、参数 schema 和执行位置。按 `execution` 字段分派：`background` 工具经 Background 代理（多源新闻聚合等），`local` 工具在 Isolated 本地执行（doc_generate）。
 _Avoid_: 插件、函数
 
 **工具执行器** (Tool Executor)：

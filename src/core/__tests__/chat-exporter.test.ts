@@ -134,7 +134,7 @@ describe('renderHTML（微信对话风格）', () => {
 
   it('工具结果以 pre 呈现且不做 markdown 渲染', () => {
     const html = renderHTML(
-      makeMessages({ content: '[工具执行结果]\nOK web_search: **关键词**' }),
+      makeMessages({ content: '[工具执行结果]\nOK news_hub: **关键词**' }),
       '测试会话',
     );
     expect(html).toContain('<pre>');
@@ -433,8 +433,8 @@ describe('assistantRawToExport（缓存原文 → 导出文本）', () => {
 
   it('多次调用合并为去重后的工具名单', () => {
     const raw =
-      '<web_search>{"query": "a"}</web_search>中间文本<web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
-    expect(assistantRawToExport(raw)).toBe('中间文本\n\n🛠 工具调用：web_search、github_trending');
+      '<news_hub>{"query": "a"}</news_hub>中间文本<news_hub>{"query": "b"}</news_hub><github_trending>{}</github_trending>';
+    expect(assistantRawToExport(raw)).toBe('中间文本\n\n🛠 工具调用：news_hub、github_trending');
   });
 });
 
@@ -448,20 +448,20 @@ describe('foldBlockToExportText（折叠块 → 导出文本）', () => {
 
   it('标签含多个工具名时保持去重顺序', () => {
     const text =
-      '<web_search>{"query": "a"}</web_search><web_search>{"query": "b"}</web_search><github_trending>{}</github_trending>';
+      '<news_hub>{"query": "a"}</news_hub><news_hub>{"query": "b"}</news_hub><github_trending>{}</github_trending>';
     expect(
       foldBlockToExportText({
         foldKind: 'tool',
-        label: '▸ 工具调用 web_search、github_trending',
+        label: '▸ 工具调用 news_hub、github_trending',
         text,
       }),
-    ).toBe('🛠 工具调用：web_search、github_trending');
+    ).toBe('🛠 工具调用：news_hub、github_trending');
   });
 
   it('标签缺失时从块内原文提取工具名并去重', () => {
     const text =
-      '<web_fetch>{"url": "https://x.com"}</web_fetch><web_fetch>{"url": "https://y.com"}</web_fetch>';
-    expect(foldBlockToExportText({ foldKind: 'tool', text })).toBe('🛠 工具调用：web_fetch');
+      '<github_trending>{"url": "https://x.com"}</github_trending><github_trending>{"url": "https://y.com"}</github_trending>';
+    expect(foldBlockToExportText({ foldKind: 'tool', text })).toBe('🛠 工具调用：github_trending');
   });
 
   it('代码块折叠保留原文', () => {
@@ -475,10 +475,10 @@ describe('foldBlockToExportText（折叠块 → 导出文本）', () => {
     expect(
       foldBlockToExportText({
         label: null,
-        text: '<web_search>{"query": "a"}</web_search>',
-        legacyButtonText: '▸ 🛠 工具调用 web_search（点击展开原文）',
+        text: '<news_hub>{"query": "a"}</news_hub>',
+        legacyButtonText: '▸ 🛠 工具调用 news_hub（点击展开原文）',
       }),
-    ).toBe('🛠 工具调用：web_search');
+    ).toBe('🛠 工具调用：news_hub');
   });
 
   it('旧形态代码折叠条自身丢弃，代码原文由兄弟 pre 导出', () => {

@@ -660,7 +660,7 @@ function toolMarker(names: string[]): string {
   return names.length > 0 ? `🛠 工具调用：${names.join('、')}` : '🛠 工具调用';
 }
 
-/** 从标签文案 '▸ 工具调用 doc_generate、web_search' 取工具名 */
+/** 从标签文案 '▸ 工具调用 doc_generate、news_hub' 取工具名 */
 function toolNamesFromLabel(label: string): string[] {
   const match = /工具调用\s*(.*)$/.exec(label);
   if (!match) return [];

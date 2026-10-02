@@ -15,48 +15,8 @@
 
   console.log('[DS-Mini:MAIN] XHR hook installed');
 
-  // ==========================================================
-  // 模式检测 — 使用 _31a22b0 定位实际激活的模式
-  // ==========================================================
-  let currentMode = 'expert'; // 默认专家
-
-  function detectMode() {
-    // 查找所有模式 span: 快速/专家/识图
-    const spans = document.querySelectorAll('span._321831d');
-    for (let i = 0; i < spans.length; i++) {
-      const s = spans[i];
-      // 激活的模式条目: 它所在的 .aa40b5de 的祖父级有 _31a22b0 类
-      const p = s.parentElement;
-      if (!p || !p.classList.contains('aa40b5de')) continue;
-      const gp = p.parentElement;
-      if (!gp || !gp.classList.contains('_31a22b0')) continue;
-
-      const t = s.textContent || '';
-      if (t.indexOf('快速') !== -1) return 'fast';
-      if (t.indexOf('专家') !== -1) return 'expert';
-      if (t.indexOf('识图') !== -1) return 'image';
-    }
-    return 'expert';
-  }
-
-  // 初始化检测
-  currentMode = detectMode();
-
-  // 监听模式切换（带去重保护，防止 SPA 反复触发）
-  let modeObserverTimer = null;
-  const modeObserver = new MutationObserver(function () {
-    if (modeObserverTimer) return;
-    modeObserverTimer = setTimeout(function () {
-      modeObserverTimer = null;
-      const prev = currentMode;
-      const next = detectMode();
-      if (prev !== next) {
-        currentMode = next;
-        console.log('[DS-Mini:MAIN] Mode:', prev, '→', next);
-      }
-    }, 200);
-  });
-  if (document.body) modeObserver.observe(document.body, { childList: true, subtree: true });
+  // 官方页面已下线快速/专家/识图三种模式，只剩单一入口，无需再做模式检测；
+  // 工具定义按工具面板开关全量注入。
 
   // ==========================================================
   // 工具定义 — 由构建期 seam 生成（main-world.content.ts 注入时替换占位符）
@@ -64,7 +24,7 @@
   // ==========================================================
   const TOOL_DEFS = JSON.parse('__DS_TOOL_DEFS__');
 
-  function buildToolDefs(mode) {
+  function buildToolDefs() {
     const disabledTools = {}; // 每次构建重算：工具在面板重新启用后无需刷新页面即生效
     try {
       const ls = JSON.parse(localStorage.getItem('ds_mini_tools_state') || '{}');
@@ -72,14 +32,9 @@
         if (!ls[k]) disabledTools[k] = true;
       }
     } catch (e) {}
-    let avail = [];
-    for (var i = 0; i < TOOL_DEFS.length; i++) {
-      if (!disabledTools[TOOL_DEFS[i].name]) avail.push(TOOL_DEFS[i]);
-    }
-    if (mode === 'fast')
-      avail = avail.filter(function (t) {
-        return t.name === 'web_fetch' || t.name === 'doc_generate';
-      });
+    const avail = TOOL_DEFS.filter(function (t) {
+      return !disabledTools[t.name];
+    });
     if (avail.length === 0) return '';
 
     const lines = [];
@@ -90,15 +45,7 @@
 
     for (var i = 0; i < avail.length; i++) {
       const t = avail[i];
-      if (t.name === 'web_search') {
-        lines.push('搜索网络：<web_search>{"query": "你的搜索关键词"}</web_search>');
-        lines.push('例如：<web_search>{"query": "2026年6月24日热点新闻"}</web_search>');
-      } else if (t.name === 'web_fetch') {
-        lines.push('抓取网页：<web_fetch>{"url": "目标页面完整URL"}</web_fetch>');
-        lines.push(
-          '例如：<web_fetch>{"url": "https://github.com/bytedance/deer-flow"}</web_fetch>',
-        );
-      } else if (t.name === 'news_hub') {
+      if (t.name === 'news_hub') {
         lines.push('聚合新闻：<news_hub>{"sources": "baidu,weibo,zhihu,36kr"}</news_hub>');
         lines.push('8大实时源：百度热搜|微博热搜|GitHub|知乎|36氪|arXiv|HN|Reddit');
         lines.push('例如：<news_hub>{}</news_hub>（全部源）或指定部分源');
@@ -120,12 +67,6 @@
     lines.push('- 一次只输出一个 XML 标签，放到回复末尾');
     lines.push('- 收到工具结果后，如有需要可以再次调用工具，直到完成全部需求后再回复用户');
     return '<tool_defs>\n' + lines.join('\n') + '\n</tool_defs>';
-  }
-
-  var TOOL_DEFS_CACHE = {};
-
-  function getToolDefs(mode) {
-    return buildToolDefs(mode); // 实时构建，不缓存（Tools 开关动态变化）
   }
 
   // ==========================================================
@@ -259,7 +200,6 @@
     // localStorage：页面刷新后靠它避免对已注入过的会话重复补注入，否则第二轮以后的
     // 用户消息会被反复包上工具定义）。工具结果回注（循环续接）一律不注入，定义留在
     // 会话历史里，续接轮次依赖它继续调用工具。
-    // 不编入模式指纹：页面切换时模式检测会误读。
     const isToolResultEcho =
       userContent.indexOf('<tool_results>') === 0 ||
       userContent.indexOf('以下是工具执行结果') === 0;
@@ -267,7 +207,7 @@
     const needToolDefs =
       !isToolResultEcho && (!parsed.parent_message_id || (sid !== '' && !injectedSessions[sid]));
 
-    const toolDefs = needToolDefs ? getToolDefs(currentMode) : '';
+    const toolDefs = needToolDefs ? buildToolDefs() : '';
     let prefix = '';
 
     // 注入块与用户原文各包一层 XML，模型据此区分消息类型；无注入块时不包装，
@@ -290,12 +230,7 @@
     if (toolDefs && sid) rememberInjected(sid);
 
     if (parsed.prompt !== userContent) {
-      console.log(
-        '[DS-Mini:MAIN] Mode:',
-        currentMode,
-        '| Injected context, prompt length:',
-        parsed.prompt.length,
-      );
+      console.log('[DS-Mini:MAIN] Injected context, prompt length:', parsed.prompt.length);
       storeInjectionRecord(prefix, userContent);
     }
     return JSON.stringify(parsed);
@@ -772,5 +707,5 @@
     }
   });
 
-  console.log('[DS-Mini:MAIN] Ready, mode:', currentMode);
+  console.log('[DS-Mini:MAIN] Ready');
 })();

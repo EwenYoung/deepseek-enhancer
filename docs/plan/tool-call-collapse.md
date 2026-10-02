@@ -1,6 +1,6 @@
 # 实现计划：工具调用原始输出折叠（CSS 裁剪方案）
 
-> 依据：[tool-call-collapse-research.md](../notes/tool-call-collapse-research.md) ｜ 状态：待实施
+> 依据：[tool-call-collapse-research.md](../notes/tool-call-collapse-research.md) ｜ 状态：已实施并提交（fb2f6df），待人工验证
 > 规范：[CLEAN-CODE.md](../CLEAN-CODE.md) ｜ 术语：[CONTEXT.md](../CONTEXT.md)
 
 ## 一、目标与范围

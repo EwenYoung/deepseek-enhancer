@@ -37,9 +37,9 @@ describe('tool-descriptors 唯一事实源', () => {
   });
 
   it('getToolByName 命中返回描述符，未命中返回 undefined', () => {
-    const web = getToolByName('web_search');
-    expect(web).toBeDefined();
-    expect(web?.label).toBe('联网搜索');
+    const trendTool = getToolByName('github_trending');
+    expect(trendTool).toBeDefined();
+    expect(trendTool?.label).toBe('GitHub热门');
     expect(getToolByName('not_a_tool')).toBeUndefined();
   });
 
@@ -95,7 +95,7 @@ describe('buildToolDefsJson（IIFE 注入用精简定义）', () => {
     // 真实 TOOL_DESCRIPTORS 全是中文，不会触发 `'`/`<`/`\` 转义——用构造输入打穿这层偶然性
     const fixture = [
       {
-        name: 'web_fetch',
+        name: 'github_trending',
         label: "抓'取\\页</script><script>alert(1)</script>",
         params: { u: { desc: 'a\\b' + "'c'" } },
       },

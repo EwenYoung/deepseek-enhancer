@@ -24,9 +24,9 @@ const skill: Skill = {
 };
 
 const toolCall: ToolCall = {
-  name: 'web_search',
+  name: 'news_hub',
   payload: { query: 'x' },
-  raw: '<web_search>{"query":"x"}</web_search>',
+  raw: '<news_hub>{"query":"x"}</news_hub>',
   id: 't1',
 };
 
@@ -88,7 +88,7 @@ describe('isIsolatedToBackground', () => {
     expect(
       isIsolatedToBackground({
         type: 'EXECUTE_TOOL',
-        payload: { name: 'web_search', payload: {} },
+        payload: { name: 'news_hub', payload: {} },
       }),
     ).toBe(true);
     expect(isIsolatedToBackground({ type: 'SET_API_KEY', key: 'k' })).toBe(true);
@@ -137,11 +137,11 @@ describe('sendToBackground', () => {
     });
     const toolResp = await sendToBackground({
       type: 'EXECUTE_TOOL',
-      payload: { name: 'web_search', payload: { query: 'q' } },
+      payload: { name: 'news_hub', payload: { query: 'q' } },
     });
     expect(sendMessage).toHaveBeenLastCalledWith({
       type: 'EXECUTE_TOOL',
-      payload: { name: 'web_search', payload: { query: 'q' } },
+      payload: { name: 'news_hub', payload: { query: 'q' } },
     });
     expect(toolResp.success).toBe(true);
   });

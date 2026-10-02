@@ -67,22 +67,22 @@ describe('parseSkillCommand', () => {
 describe('buildContextPrefix', () => {
   it('joins tool definitions and skill instructions with separator', () => {
     const ctx: InjectionContext = {
-      toolDefinitions: '<web_search>\n  params:\n    query: search query</web_search>',
+      toolDefinitions: '<news_hub>\n  params:\n    query: search query</news_hub>',
       skillInstructions: 'You are a helpful assistant.',
     };
     const result = buildContextPrefix(ctx);
-    expect(result).toContain('<web_search>');
+    expect(result).toContain('<news_hub>');
     expect(result).toContain('You are a helpful assistant.');
     expect(result).toContain('---');
   });
 
   it('returns only tool definitions when no skill instructions', () => {
     const ctx: InjectionContext = {
-      toolDefinitions: '<web_search>...</web_search>',
+      toolDefinitions: '<news_hub>...</news_hub>',
       skillInstructions: '',
     };
     const result = buildContextPrefix(ctx);
-    expect(result).toContain('<web_search>');
+    expect(result).toContain('<news_hub>');
     expect(result).toContain('---');
     expect(result).not.toContain('You are');
   });

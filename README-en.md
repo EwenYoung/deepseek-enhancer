@@ -28,7 +28,7 @@
 
 ## Features
 
-- 🔧 **Tool Calling** — Auto-injects `web_search`, `web_fetch`, `news_hub`, `github_trending`, `doc_generate` into model context
+- 🔧 **Tool Calling** — Auto-injects `news_hub`, `github_trending`, `doc_generate` into model context
 - 🧩 **Skill System** — 8 built-in skills (deep thinking, code review, writing, translation, etc.) with custom creation and GitHub import
 - 🔄 **Agent Loop** — SSE stream parsing → tool call detection → background execution → DOM submit, driving multi-step reasoning
 - 🎨 **UI Enhancements** — Widescreen mode, multi-theme switching, font customization, scrollbar hiding, auto-hide input, tool calls and long code blocks auto-collapsed into a one-line label
@@ -63,7 +63,7 @@ Output in `dist/chrome-mv3/`.
 
 ### Configure Tavily API Key
 
-> `web_search` and `web_fetch` require a Tavily API Key. `news_hub` and `github_trending` work without one.
+> `news_hub`'s Chinese sources (Baidu/Weibo/Zhihu/36kr) require a Tavily API Key; other tools work without one.
 
 1. Click the extension icon to open the management panel
 2. Enter your Tavily Key in the API Key field
@@ -110,7 +110,7 @@ flowchart LR
     DeepSeek --> |SSE response| Parser[SSE Parser<br/>tool call detection]
     Parser --> |tool call found| Exec[tool-executor.ts]
     Exec --> |chrome.runtime| Background[Background<br/>Service Worker]
-    Background --> |Tavily API| Tavily[Tavily Search<br/> Tavily Extract]
+    Background --> |Tavily API| Tavily[Tavily Search]
     Background --> |news/github| Scrape[Web Scraping<br/>no API Key]
     Tavily --> |results| DOM[domSubmitText<br/>fill + submit]
     Scrape --> |results| DOM
@@ -140,7 +140,7 @@ MAIN ↔ Isolated communicate via `window.postMessage`, messages tagged with `so
 ### Agent Tool Calling Loop
 
 1. MAIN layer intercepts `XMLHttpRequest.prototype.send` → injects tool definitions into prompt
-2. SSE progress events → parse text → regex detects `<web_search>{...}</web_search>`
+2. SSE progress events → parse text → regex detects `<news_hub>{...}</news_hub>`
 3. → postMessage → Isolated → `chrome.runtime.sendMessage` → Background → Tavily API
 4. → results submitted via `domSubmitText()` (fill textarea + click send button)
 5. → page initiates new XHR → loop continues or model replies naturally
@@ -160,7 +160,7 @@ deepseek-enhancer/
 │   │   ├── context-builder.ts      # Tool definition XML builder + skill injection
 │   │   ├── sse-parser.ts           # SSE stream parsing + tool call extraction
 │   │   ├── tool-executor.ts        # Tool call dispatch
-│   │   ├── tool-descriptors.ts     # 5 tool definitions
+│   │   ├── tool-descriptors.ts     # Single source of truth for tool definitions
 │   │   ├── skill-registry.ts       # Skill CRUD (chrome.storage.local)
 │   │   ├── skill-builtin.ts        # 8 built-in skills
 │   │   ├── skill-importer.ts       # GitHub / local import
@@ -191,9 +191,7 @@ deepseek-enhancer/
 
 | Tool | Description | API Key Required |
 |------|-------------|:---:|
-| `web_search` | Tavily search engine for real-time info | ✅ |
-| `web_fetch` | Tavily webpage full-text extraction | ✅ |
-| `news_hub` | Aggregate 8 platforms (Baidu/Weibo/GitHub/Zhihu/36kr/arXiv/HN/Reddit) | ❌ |
+| `news_hub` | Aggregate 8 platforms (Baidu/Weibo/GitHub/Zhihu/36kr/arXiv/HN/Reddit) | Chinese sources |
 | `github_trending` | GitHub Trending project list | ❌ |
 | `doc_generate` | Trigger browser download of model Markdown output | ❌ |
 

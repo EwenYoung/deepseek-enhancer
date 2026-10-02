@@ -401,17 +401,14 @@ export async function applyTheme(idx: number) {
       fill: ${textColorOnBrand(theme.brandColor)} !important;
     }
     /* 精确着色：仅对标记了蓝色的原生图标位置 */
-    /* 1. Header 模式指示图标（快速模式/专家模式/识图模式）*/
+    /* 1. Header 图标 */
     #root .the-header .ds-icon,
     /* 2. 已思考 brain icon */
     #root [style*="collapsible-area"] .ds-icon,
     /* 3. Toggle 按钮图标（仅开启状态） */
     #root .ds-toggle-button--selected .ds-toggle-button__icon,
     /* 4. 新对话页 whale icon */
-    #root .cddfb2ed,
-    /* 5. 活跃 mode tab（_31a22b0 是 DeepSeek 活跃模式标识类）*/
-    #root ._31a22b0,
-    #root ._31a22b0 svg {
+    #root .cddfb2ed {
       color: ${theme.brandColor} !important;
     }
     /* toggle 按钮：选中=品牌色，未选中=灰色 */
@@ -427,10 +424,6 @@ export async function applyTheme(idx: number) {
     #root ._9996a53, #root ._3d616d3 {
       border-color: ${theme.brandColor}26 !important;
       box-shadow: none !important;
-    }
-    /* mode tab 选中态 oval box-shadow */
-    #root .c15ec89f {
-      box-shadow: inset 0 0 0 2px ${theme.brandColor}66 !important;
     }
     /* 用户消息气泡着色：d29f3d7d = 用户消息标识类（哈希，随官方构建变化），
        气泡容器 = 消息容器第一个子元素；只叠加品牌色透明底色，不改布局。

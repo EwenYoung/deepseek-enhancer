@@ -67,14 +67,6 @@ async function handleToolExecution(req: ToolExecRequest) {
     let toolOutput: ToolOutput;
 
     switch (req.name) {
-      case 'web_search':
-        if (!apiKey) return { success: false, error: '未设置 Tavily API Key', duration: 0 };
-        toolOutput = await tavilySearch(apiKey, req.payload);
-        break;
-      case 'web_fetch':
-        if (!apiKey) return { success: false, error: '未设置 Tavily API Key', duration: 0 };
-        toolOutput = await tavilyExtract(apiKey, req.payload);
-        break;
       case 'news_hub':
         toolOutput = await newsHubSearch(req.payload, apiKey);
         break;
@@ -143,168 +135,13 @@ async function testTavily(): Promise<{ ok: boolean; message: string }> {
 }
 
 // ============================================================
-// Tavily Search
-// ============================================================
-// API: POST https://api.tavily.com/search
-// Docs: https://docs.tavily.com/api-reference/endpoint/search
-
-async function tavilySearch(apiKey: string, payload: Record<string, unknown>): Promise<ToolOutput> {
-  const query = String(payload.query || payload.q || '');
-  if (!query) throw new Error('web_search 缺少 query 参数');
-
-  const body = JSON.stringify({
-    api_key: apiKey,
-    query,
-    search_depth: 'advanced', // advanced 返回质量更高的结果
-    include_answer: true, // AI 生成的摘要
-    include_raw_content: false,
-    max_results: 5,
-    exclude_domains: [
-      // 排除低质量/成人内容站
-      'famosas.vip',
-      'pornhub.com',
-      'xvideos.com',
-      'xhamster.com',
-    ],
-  });
-
-  const res = await fetch(`${TAVILY_BASE}/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Tavily 搜索失败: HTTP ${res.status} — ${errText.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as Record<string, unknown>;
-  const lines: string[] = [`🔍 搜索: "${query}"`, ''];
-
-  // AI 生成的答案
-  const answer = data.answer as string | undefined;
-  if (answer) {
-    lines.push(`**答案**: ${answer}`, '');
-  }
-
-  // 搜索结果
-  const results = data.results as Array<Record<string, unknown>> | undefined;
-  const resultCount = results ? results.length : 0;
-  if (results && results.length > 0) {
-    lines.push('**来源**:');
-    for (const r of results) {
-      const title = (r.title as string) || '(无标题)';
-      const url = (r.url as string) || '';
-      const content = (r.content as string) || '';
-      const snippet = content.length > 300 ? content.slice(0, 300) + '...' : content;
-      lines.push(`- **[${title}](${url})**`);
-      if (snippet) lines.push(`  ${snippet}`);
-    }
-  }
-
-  if (lines.length <= 2) lines.push('未找到相关结果。');
-
-  const result = lines.join('\n');
-  return {
-    result,
-    summary: `找到 ${resultCount} 条结果`,
-    detail: result.length > 4000 ? result.slice(0, 4000) : result,
-    output: data,
-    truncated: result.length > 4000,
-  };
-}
-
-// ============================================================
-// Tavily Extract
-// ============================================================
-// API: POST https://api.tavily.com/extract
-// Docs: https://docs.tavily.com/api-reference/endpoint/extract
-
-async function tavilyExtract(
-  apiKey: string,
-  payload: Record<string, unknown>,
-): Promise<ToolOutput> {
-  const url = String(payload.url || '');
-  if (!url) throw new Error('web_fetch 缺少 url 参数');
-
-  const urls = url
-    .split(',')
-    .map((u) => u.trim())
-    .filter(Boolean);
-  if (urls.length === 0) throw new Error('web_fetch 缺少有效的 url');
-
-  const body = JSON.stringify({
-    api_key: apiKey,
-    urls,
-    include_images: false,
-    extract_depth: 'basic',
-  });
-
-  const res = await fetch(`${TAVILY_BASE}/extract`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Tavily 抓取失败: HTTP ${res.status} — ${errText.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as Record<string, unknown>;
-  const lines: string[] = [];
-
-  const results = data.results as Array<Record<string, unknown>> | undefined;
-  const failed = data.failed_results as Array<Record<string, unknown>> | undefined;
-
-  let totalLen = 0;
-  if (results) {
-    for (const r of results) {
-      const rawContent = (r.raw_content as string) || '';
-      const u = (r.url as string) || '';
-      totalLen += rawContent.length;
-      lines.push(`📄 抓取: ${u}`, '');
-
-      if (rawContent) {
-        const maxLen = 8000;
-        lines.push(
-          rawContent.length > maxLen
-            ? rawContent.slice(0, maxLen) + '\n\n...（已截断）'
-            : rawContent,
-        );
-      } else {
-        lines.push('(无内容)');
-      }
-      lines.push('');
-    }
-  }
-
-  if (failed && failed.length > 0) {
-    lines.push('**抓取失败**:');
-    for (const f of failed) {
-      lines.push(`- ${f.url}: ${f.error || '未知错误'}`);
-    }
-  }
-
-  const result = lines.join('\n') || '(无结果)';
-  return {
-    result,
-    summary: `抓取成功，内容长度 ${totalLen}`,
-    detail: result.length > 4000 ? result.slice(0, 4000) : result,
-    output: data,
-    truncated: result.length > 4000,
-  };
-}
-
-// ============================================================
 // 多源新闻聚合（百度热搜 + 微博热搜 + Tavily）
 // ============================================================
 async function newsHubSearch(
   payload: Record<string, unknown>,
   apiKey: string,
 ): Promise<ToolOutput> {
-  const defaultSources = 'baidu,weibo,github,zhihu,36kr,hackernews,reddit';
+  const defaultSources = 'baidu,weibo,github,zhihu,36kr,arxiv,hackernews,reddit';
   const sources: string[] = String(payload.sources || defaultSources)
     .split(',')
     .map((s) => s.trim());
